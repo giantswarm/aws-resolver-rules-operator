@@ -1,4 +1,4 @@
-name: {APP-NAME}
+name: aws-resolver-rules-operator
 serviceType: managed
 
 project:
@@ -7,6 +7,6 @@ project:
 
 image:
   registry: quay.io
-  name: giantswarm/{APP-NAME}
+  name: giantswarm/aws-resolver-rules-operator
   tag: v0.0.1
   pullPolicy: IfNotPresent
