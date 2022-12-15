@@ -8,18 +8,16 @@ project:
   commit: "[[ .SHA ]]"
 
 image:
+  registry: quay.io
   name: giantswarm/aws-resolver-rules-operator
   tag: "[[ .Version ]]"
   pullPolicy: IfNotPresent
-
-registry:
-  domain: docker.io
 
 managementClusterName: ""
 managementClusterNamespace: ""
 
 pod:
   user:
-    id: 1000
+    id: "1000"
   group:
-    id: 1000
+    id: "1000"
