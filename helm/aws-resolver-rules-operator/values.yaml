@@ -1,12 +1,25 @@
-name: aws-resolver-rules-operator
-serviceType: managed
+aws:
+  accessKeyID: accesskey
+  secretAccessKey: secretkey
+  region: region
 
 project:
   branch: "[[ .Branch ]]"
   commit: "[[ .SHA ]]"
 
 image:
-  registry: quay.io
   name: giantswarm/aws-resolver-rules-operator
-  tag: v0.0.1
+  tag: "[[ .Version ]]"
   pullPolicy: IfNotPresent
+
+registry:
+  domain: docker.io
+
+managementClusterName: ""
+managementClusterNamespace: ""
+
+pod:
+  user:
+    id: 1000
+  group:
+    id: 1000
