@@ -13,9 +13,6 @@ image:
   tag: "[[ .Version ]]"
   pullPolicy: IfNotPresent
 
-managementClusterName: ""
-managementClusterNamespace: ""
-
 pod:
   user:
     id: "1000"

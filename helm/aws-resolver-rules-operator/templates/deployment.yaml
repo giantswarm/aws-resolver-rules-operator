@@ -35,12 +35,7 @@ spec:
           command:
             - /manager
           args:
-            - --enable-leader-election
-            - --management-cluster-basedomain={{ .Values.managementClusterBaseDomain }}
-            - --management-cluster-arn={{ .Values.managementClusterRole }}
-            - --management-cluster-namespace={{ .Values.managementClusterNamespace }}
-            - --management-cluster-name={{ .Values.managementClusterName  }}
-            - --workload-cluster-basedomain={{ .Values.workloadClusterBaseDomain }}
+            - --leader-elect
           resources:
             requests:
               cpu: 100m
