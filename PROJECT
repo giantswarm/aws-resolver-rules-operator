@@ -1,0 +1,12 @@
+domain: cluster.x-k8s.io
+layout:
+- go.kubebuilder.io/v3
+projectName: aws-resolver-rules-operator
+repo: github.com/aws-resolver-rules-operator
+resources:
+- controller: true
+  domain: cluster.x-k8s.io
+  group: infrastructure
+  kind: AwsCluster
+  version: v1alpha1
+version: "3"
