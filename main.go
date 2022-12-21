@@ -34,7 +34,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/aws-resolver-rules-operator/controllers"
-	//+kubebuilder:scaffold:imports
+	"github.com/aws-resolver-rules-operator/pkg/awsclient"
+	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
+	// +kubebuilder:scaffold:imports
 )
 
 var (
@@ -46,7 +48,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(capi.AddToScheme(scheme))
 	utilruntime.Must(capa.AddToScheme(scheme))
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 }
 
 func main() {
@@ -90,14 +92,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	awsClient := k8sclient.NewAWSCluster(mgr.GetClient())
+
 	if err = (&controllers.AwsClusterReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		AWSClusterClient: awsClient,
+		AWSClients:       &awsclient.ClientsFactory{},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AwsCluster")
 		os.Exit(1)
 	}
-	//+kubebuilder:scaffold:builder
+	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
