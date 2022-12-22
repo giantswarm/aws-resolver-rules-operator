@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type Resolver struct {
@@ -75,6 +76,8 @@ func (r *Resolver) CreateRule(ctx context.Context, clusterName, clusterRegion, c
 }
 
 func (r *Resolver) createRule(ctx context.Context, clusterName, clusterRegion, clusterArn, clusterVPCId string, clusterSubnetIds []string) (string, string, error) {
+	logger := log.FromContext(ctx)
+
 	ec2Client, err := r.awsClients.NewEC2Client(clusterRegion, clusterArn)
 	if err != nil {
 		return "", "", errors.WithStack(err)
@@ -84,11 +87,15 @@ func (r *Resolver) createRule(ctx context.Context, clusterName, clusterRegion, c
 		return "", "", errors.WithStack(err)
 	}
 
+	logger.Info("Creating security group for the Resolver endpoints")
 	securityGroupId, err := ec2Client.CreateSecurityGroupWithContext(ctx, clusterVPCId, SecurityGroupDescription, getSecurityGroupName(clusterName))
 	if err != nil {
 		return "", "", errors.WithStack(err)
 	}
 
+	logger.WithValues("securityGroupId", securityGroupId)
+
+	logger.Info("Creating ingress rules in the security group")
 	err = ec2Client.AuthorizeSecurityGroupIngressWithContext(ctx, securityGroupId, "udp", DNSPort)
 	if err != nil {
 		return "", "", errors.WithStack(err)
@@ -99,39 +106,54 @@ func (r *Resolver) createRule(ctx context.Context, clusterName, clusterRegion, c
 		return "", "", errors.WithStack(err)
 	}
 
-	_, err = resolverClient.CreateResolverEndpointWithContext(ctx, "INBOUND", getInboundEndpointName(clusterName), []string{securityGroupId}, clusterSubnetIds)
+	logger.Info("Creating inbound resolver endpoint")
+	inboundEndpointId, err := resolverClient.CreateResolverEndpointWithContext(ctx, "INBOUND", getInboundEndpointName(clusterName), []string{securityGroupId}, clusterSubnetIds)
 	if err != nil {
 		return "", "", errors.WithStack(err)
 	}
 
+	logger.WithValues("inboundEndpointId", inboundEndpointId)
+
+	logger.Info("Creating outbound resolver endpoint")
 	outboundEndpointId, err := resolverClient.CreateResolverEndpointWithContext(ctx, "OUTBOUND", getOutboundEndpointName(clusterName), []string{securityGroupId}, clusterSubnetIds)
 	if err != nil {
 		return "", "", errors.WithStack(err)
 	}
 
-	resolverRuleARN, resolverRuleId, err := resolverClient.CreateResolverRuleWithContext(ctx, getResolverRuleDomainName(clusterName, r.workloadClusterBaseDomain), getResolverRuleName(clusterName), outboundEndpointId, "FORWARD", clusterSubnetIds)
+	logger.WithValues("outboundEndpointId", outboundEndpointId)
+
+	logger.Info("Creating resolver rule", "type", "FORWARD", "domainName", getResolverRuleDomainName(clusterName, r.workloadClusterBaseDomain))
+	resolverRuleArn, resolverRuleId, err := resolverClient.CreateResolverRuleWithContext(ctx, getResolverRuleDomainName(clusterName, r.workloadClusterBaseDomain), getResolverRuleName(clusterName), outboundEndpointId, "FORWARD", clusterSubnetIds)
 	if err != nil {
 		return "", "", errors.WithStack(err)
 	}
 
-	return resolverRuleARN, resolverRuleId, nil
+	logger.WithValues("resolverRuleId", resolverRuleId, "resolverRuleArn", resolverRuleArn, "inboundEndpointId", inboundEndpointId, "outboundEndpointId", outboundEndpointId, "securityGroupId", securityGroupId)
+
+	return resolverRuleArn, resolverRuleId, nil
 }
 
 func (r *Resolver) associateRule(ctx context.Context, clusterName, clusterRegion, clusterArn, resolverRuleARN, resolverRuleId string) (string, error) {
+	logger := log.FromContext(ctx)
+
 	ramClient, err := r.awsClients.NewRAMClient(clusterRegion, clusterArn)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
+	logger.Info("Creating resource share item so we can share resolver rule with a different aws account", "awsAccount", r.dnsServerAWSAccountId)
 	_, err = ramClient.CreateResourceShareWithContext(ctx, getResourceShareName(clusterName), true, []string{resolverRuleARN}, []string{r.dnsServerAWSAccountId})
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
+	logger.Info("Associating resolver rule with VPC", "vpcId", r.dnsServerVPCId)
 	associationId, err := r.dnsServerResolverClient.AssociateResolverRuleWithContext(ctx, getAssociationName(clusterName), r.dnsServerVPCId, resolverRuleId)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
+
+	logger.WithValues("associationId", associationId)
 
 	return associationId, nil
 }

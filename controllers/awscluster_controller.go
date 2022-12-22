@@ -109,10 +109,12 @@ func (r *AwsClusterReconciler) reconcileNormal(ctx context.Context, awsCluster *
 		return ctrl.Result{}, nil
 	}
 
-	_, err = r.resolver.CreateRule(ctx, awsCluster.Name, awsCluster.Spec.Region, identity.Spec.RoleArn, awsCluster.Spec.NetworkSpec.VPC.ID, getSubnetIds(awsCluster))
+	associatedResolverRule, err := r.resolver.CreateRule(ctx, awsCluster.Name, awsCluster.Spec.Region, identity.Spec.RoleArn, awsCluster.Spec.NetworkSpec.VPC.ID, getSubnetIds(awsCluster))
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
+
+	logger.Info("Created resolver rule", "ruleName", associatedResolverRule.RuleName, "associationId", associatedResolverRule.AssociationId)
 
 	return reconcile.Result{}, nil
 }
