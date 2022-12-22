@@ -39,6 +39,20 @@ type FakeAWSClusterClient struct {
 		result1 *v1beta1.AWSCluster
 		result2 error
 	}
+	GetIdentityStub        func(context.Context, *v1beta1.AWSCluster) (*v1beta1.AWSClusterRoleIdentity, error)
+	getIdentityMutex       sync.RWMutex
+	getIdentityArgsForCall []struct {
+		arg1 context.Context
+		arg2 *v1beta1.AWSCluster
+	}
+	getIdentityReturns struct {
+		result1 *v1beta1.AWSClusterRoleIdentity
+		result2 error
+	}
+	getIdentityReturnsOnCall map[int]struct {
+		result1 *v1beta1.AWSClusterRoleIdentity
+		result2 error
+	}
 	GetOwnerStub        func(context.Context, *v1beta1.AWSCluster) (*v1beta1a.Cluster, error)
 	getOwnerMutex       sync.RWMutex
 	getOwnerArgsForCall []struct {
@@ -198,6 +212,71 @@ func (fake *FakeAWSClusterClient) GetReturnsOnCall(i int, result1 *v1beta1.AWSCl
 	}{result1, result2}
 }
 
+func (fake *FakeAWSClusterClient) GetIdentity(arg1 context.Context, arg2 *v1beta1.AWSCluster) (*v1beta1.AWSClusterRoleIdentity, error) {
+	fake.getIdentityMutex.Lock()
+	ret, specificReturn := fake.getIdentityReturnsOnCall[len(fake.getIdentityArgsForCall)]
+	fake.getIdentityArgsForCall = append(fake.getIdentityArgsForCall, struct {
+		arg1 context.Context
+		arg2 *v1beta1.AWSCluster
+	}{arg1, arg2})
+	stub := fake.GetIdentityStub
+	fakeReturns := fake.getIdentityReturns
+	fake.recordInvocation("GetIdentity", []interface{}{arg1, arg2})
+	fake.getIdentityMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeAWSClusterClient) GetIdentityCallCount() int {
+	fake.getIdentityMutex.RLock()
+	defer fake.getIdentityMutex.RUnlock()
+	return len(fake.getIdentityArgsForCall)
+}
+
+func (fake *FakeAWSClusterClient) GetIdentityCalls(stub func(context.Context, *v1beta1.AWSCluster) (*v1beta1.AWSClusterRoleIdentity, error)) {
+	fake.getIdentityMutex.Lock()
+	defer fake.getIdentityMutex.Unlock()
+	fake.GetIdentityStub = stub
+}
+
+func (fake *FakeAWSClusterClient) GetIdentityArgsForCall(i int) (context.Context, *v1beta1.AWSCluster) {
+	fake.getIdentityMutex.RLock()
+	defer fake.getIdentityMutex.RUnlock()
+	argsForCall := fake.getIdentityArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeAWSClusterClient) GetIdentityReturns(result1 *v1beta1.AWSClusterRoleIdentity, result2 error) {
+	fake.getIdentityMutex.Lock()
+	defer fake.getIdentityMutex.Unlock()
+	fake.GetIdentityStub = nil
+	fake.getIdentityReturns = struct {
+		result1 *v1beta1.AWSClusterRoleIdentity
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeAWSClusterClient) GetIdentityReturnsOnCall(i int, result1 *v1beta1.AWSClusterRoleIdentity, result2 error) {
+	fake.getIdentityMutex.Lock()
+	defer fake.getIdentityMutex.Unlock()
+	fake.GetIdentityStub = nil
+	if fake.getIdentityReturnsOnCall == nil {
+		fake.getIdentityReturnsOnCall = make(map[int]struct {
+			result1 *v1beta1.AWSClusterRoleIdentity
+			result2 error
+		})
+	}
+	fake.getIdentityReturnsOnCall[i] = struct {
+		result1 *v1beta1.AWSClusterRoleIdentity
+		result2 error
+	}{result1, result2}
+}
+
 func (fake *FakeAWSClusterClient) GetOwner(arg1 context.Context, arg2 *v1beta1.AWSCluster) (*v1beta1a.Cluster, error) {
 	fake.getOwnerMutex.Lock()
 	ret, specificReturn := fake.getOwnerReturnsOnCall[len(fake.getOwnerArgsForCall)]
@@ -333,6 +412,8 @@ func (fake *FakeAWSClusterClient) Invocations() map[string][][]interface{} {
 	defer fake.addFinalizerMutex.RUnlock()
 	fake.getMutex.RLock()
 	defer fake.getMutex.RUnlock()
+	fake.getIdentityMutex.RLock()
+	defer fake.getIdentityMutex.RUnlock()
 	fake.getOwnerMutex.RLock()
 	defer fake.getOwnerMutex.RUnlock()
 	fake.removeFinalizerMutex.RLock()

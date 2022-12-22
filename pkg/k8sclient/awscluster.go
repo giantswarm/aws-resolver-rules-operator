@@ -22,9 +22,9 @@ func NewAWSCluster(client client.Client) *AWSCluster {
 	}
 }
 
-func (g *AWSCluster) Get(ctx context.Context, namespacedName types.NamespacedName) (*capa.AWSCluster, error) {
+func (a *AWSCluster) Get(ctx context.Context, namespacedName types.NamespacedName) (*capa.AWSCluster, error) {
 	awsCluster := &capa.AWSCluster{}
-	err := g.client.Get(ctx, namespacedName, awsCluster)
+	err := a.client.Get(ctx, namespacedName, awsCluster)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -32,8 +32,8 @@ func (g *AWSCluster) Get(ctx context.Context, namespacedName types.NamespacedNam
 	return awsCluster, errors.WithStack(err)
 }
 
-func (g *AWSCluster) GetOwner(ctx context.Context, awsCluster *capa.AWSCluster) (*capi.Cluster, error) {
-	cluster, err := util.GetOwnerCluster(ctx, g.client, awsCluster.ObjectMeta)
+func (a *AWSCluster) GetOwner(ctx context.Context, awsCluster *capa.AWSCluster) (*capi.Cluster, error) {
+	cluster, err := util.GetOwnerCluster(ctx, a.client, awsCluster.ObjectMeta)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -41,14 +41,24 @@ func (g *AWSCluster) GetOwner(ctx context.Context, awsCluster *capa.AWSCluster) 
 	return cluster, nil
 }
 
-func (g *AWSCluster) AddFinalizer(ctx context.Context, awsCluster *capa.AWSCluster, finalizer string) error {
+func (a *AWSCluster) AddFinalizer(ctx context.Context, awsCluster *capa.AWSCluster, finalizer string) error {
 	originalCluster := awsCluster.DeepCopy()
 	controllerutil.AddFinalizer(awsCluster, finalizer)
-	return g.client.Patch(ctx, awsCluster, client.MergeFrom(originalCluster))
+	return a.client.Patch(ctx, awsCluster, client.MergeFrom(originalCluster))
 }
 
-func (g *AWSCluster) RemoveFinalizer(ctx context.Context, awsCluster *capa.AWSCluster, finalizer string) error {
+func (a *AWSCluster) RemoveFinalizer(ctx context.Context, awsCluster *capa.AWSCluster, finalizer string) error {
 	originalCluster := awsCluster.DeepCopy()
 	controllerutil.RemoveFinalizer(awsCluster, finalizer)
-	return g.client.Patch(ctx, awsCluster, client.MergeFrom(originalCluster))
+	return a.client.Patch(ctx, awsCluster, client.MergeFrom(originalCluster))
+}
+
+func (a *AWSCluster) GetIdentity(ctx context.Context, awsCluster *capa.AWSCluster) (*capa.AWSClusterRoleIdentity, error) {
+	roleIdentity := &capa.AWSClusterRoleIdentity{}
+	err := a.client.Get(ctx, client.ObjectKey{Namespace: awsCluster.Namespace, Name: awsCluster.Spec.IdentityRef.Name}, roleIdentity)
+	if err != nil {
+		return &capa.AWSClusterRoleIdentity{}, errors.WithStack(err)
+	}
+
+	return roleIdentity, nil
 }

@@ -20,6 +20,7 @@ import (
 	"flag"
 	"os"
 
+	"go.uber.org/zap/zapcore"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -34,7 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/aws-resolver-rules-operator/controllers"
-	"github.com/aws-resolver-rules-operator/pkg/awsclient"
+	"github.com/aws-resolver-rules-operator/pkg/aws"
 	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
 	// +kubebuilder:scaffold:imports
 )
@@ -55,13 +56,27 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
+	var dnsServerAWSAccountId string
+	var dnsServerArn string
+	var dnsServerExternalId string
+	var dnsServerRegion string
+	var dnsServerVpcId string
+	var workloadClusterBaseDomain string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.StringVar(&dnsServerAWSAccountId, "dns-server-aws-account-id", "", "The AWS account id where the DNS server is.")
+	flag.StringVar(&dnsServerArn, "dns-server-arn", "", "Assumed AWS Role to associate the resolver rules.")
+	flag.StringVar(&dnsServerExternalId, "dns-server-external-id", "", "The external-id used when assuming the role passed in 'dns-server-arn'.")
+	flag.StringVar(&dnsServerRegion, "dns-server-region", "", "The AWS Region where the DNS server is.")
+	flag.StringVar(&dnsServerVpcId, "dns-server-vpc-id", "", "The AWS VPC where the DNS server is.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&workloadClusterBaseDomain, "workload-cluster-basedomain", "", "Domain for workload cluster, e.g. installation.eu-west-1.aws.domain.tld")
+
 	opts := zap.Options{
 		Development: true,
+		TimeEncoder: zapcore.RFC3339TimeEncoder,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -75,17 +90,6 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "4bb498d1.cluster.x-k8s.io",
-		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
-		// when the Manager ends. This requires the binary to immediately end when the
-		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
-		// speeds up voluntary leader transitions as the new leader don't have to wait
-		// LeaseDuration time first.
-		//
-		// In the default scaffold provided, the program ends immediately after
-		// the manager stops, so would be fine to enable this option. However,
-		// if you are doing or is intended to do any operation such as perform cleanups
-		// after the manager stops then its usage might be unsafe.
-		// LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -93,11 +97,20 @@ func main() {
 	}
 
 	awsClient := k8sclient.NewAWSCluster(mgr.GetClient())
+	awsClients := &aws.Clients{}
+	dnsServerResolverClient, err := awsClients.NewResolverClient(dnsServerRegion, dnsServerArn, dnsServerExternalId)
+	if err != nil {
+		setupLog.Error(err, "unable to create AWS Route53 Resolver client")
+		os.Exit(1)
+	}
 
-	if err = (&controllers.AwsClusterReconciler{
-		AWSClusterClient: awsClient,
-		AWSClients:       &awsclient.ClientsFactory{},
-	}).SetupWithManager(mgr); err != nil {
+	resolver, err := aws.NewResolver(awsClients, dnsServerResolverClient, dnsServerAWSAccountId, dnsServerVpcId, workloadClusterBaseDomain)
+	if err != nil {
+		setupLog.Error(err, "unable to create Resolver")
+		os.Exit(1)
+	}
+
+	if err = (controllers.NewAwsClusterReconciler(awsClient, resolver)).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AwsCluster")
 		os.Exit(1)
 	}

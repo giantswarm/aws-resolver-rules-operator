@@ -18,10 +18,7 @@ package controllers
 
 import (
 	"context"
-	"fmt"
-	"time"
 
-	awssession "github.com/aws/aws-sdk-go/aws/session"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
@@ -36,8 +33,7 @@ import (
 )
 
 const (
-	requeueAfter = time.Second * 30
-	Finalizer    = "aws-resolver-rules-operator.finalizers.giantswarm.io"
+	Finalizer = "aws-resolver-rules-operator.finalizers.giantswarm.io"
 )
 
 //counterfeiter:generate . AWSClusterClient
@@ -46,35 +42,20 @@ type AWSClusterClient interface {
 	GetOwner(context.Context, *capa.AWSCluster) (*capi.Cluster, error)
 	AddFinalizer(context.Context, *capa.AWSCluster, string) error
 	RemoveFinalizer(context.Context, *capa.AWSCluster, string) error
-}
-
-type AWSClients interface {
-	NewRoute53ResolverClient(session *awssession.Session, arn string) Route53ResolverClient
-	NewEC2Client(session *awssession.Session, arn string) EC2Client
-}
-
-//counterfeiter:generate . EC2Client
-type EC2Client interface {
-	CreateSecurityGroupWithContext(ctx context.Context, vpcId, description, groupName string) (string, error)
-	AuthorizeSecurityGroupIngressWithContext(ctx context.Context, securityGroupId, protocol string, port int) error
-}
-
-type ResolverRule struct {
-	Id   string
-	Name string
-}
-
-//counterfeiter:generate . Route53ResolverClient
-type Route53ResolverClient interface {
-	CreateResolverRuleWithContext(ctx context.Context, domainName, resolverRuleName, endpointId, kind string, targetIPs []string) (string, error)
-	AssociateResolverRuleWithContext(ctx context.Context, associationName, vpcID, resolverRuleId string) (string, error)
-	CreateResolverEndpointWithContext(ctx context.Context, direction, name string, securityGroupIds, subnetIds []string) (string, error)
+	GetIdentity(context.Context, *capa.AWSCluster) (*capa.AWSClusterRoleIdentity, error)
 }
 
 // AwsClusterReconciler reconciles a AwsCluster object
 type AwsClusterReconciler struct {
-	AWSClusterClient AWSClusterClient
-	AWSClients       AWSClients
+	awsClusterClient AWSClusterClient
+	resolver         aws.Resolver
+}
+
+func NewAwsClusterReconciler(awsClusterClient AWSClusterClient, resolver aws.Resolver) *AwsClusterReconciler {
+	return &AwsClusterReconciler{
+		awsClusterClient: awsClusterClient,
+		resolver:         resolver,
+	}
 }
 
 // +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=awsclusters,verbs=get;list;watch;create;update;patch;delete
@@ -87,12 +68,12 @@ func (r *AwsClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	logger.Info("Reconciling")
 	defer logger.Info("Done reconciling")
 
-	awsCluster, err := r.AWSClusterClient.Get(ctx, req.NamespacedName)
+	awsCluster, err := r.awsClusterClient.Get(ctx, req.NamespacedName)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
 	}
 
-	cluster, err := r.AWSClusterClient.GetOwner(ctx, awsCluster)
+	cluster, err := r.awsClusterClient.GetOwner(ctx, awsCluster)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
@@ -114,57 +95,24 @@ func (r *AwsClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return r.reconcileNormal(ctx, awsCluster)
 }
 
-// reconcileNormal takes care of creating resolver rules for the workload cluster endpoints/urls.
-// Create rule
-//   - Create SG
-//   - Create ingress rules for SG
-//   - Create resolver endpoints
-//   - Create resolver rule
-//
-// Share rule
-// Associate rule
+// reconcileNormal takes care of creating resolver rules for the workload clusters.
 func (r *AwsClusterReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AWSCluster) (ctrl.Result, error) {
-	session, err := aws.SessionFromRegion(awsCluster.Spec.Region)
+	logger := log.FromContext(ctx)
+
+	identity, err := r.awsClusterClient.GetIdentity(ctx, awsCluster)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	// aws ec2 create-security-group --description "Security group for resolver rule endpoints" --group-name ${CLUSTER}-rr-endpoints2 --vpc-id $CLUSTER_VPC_ID)
-	ec2Client := r.AWSClients.NewEC2Client(session, "arn")
-	securityGroupId, err := ec2Client.CreateSecurityGroupWithContext(ctx, awsCluster.Spec.NetworkSpec.VPC.ID, "Security group for resolver rule endpoints", fmt.Sprintf("%s-resolverrules-endpoints", awsCluster.Name))
+	if identity == nil {
+		logger.Info("AWSCluster has no identityRef set, skipping")
+		return ctrl.Result{}, nil
+	}
+
+	_, err = r.resolver.CreateRule(ctx, awsCluster.Name, awsCluster.Spec.Region, identity.Spec.RoleArn, awsCluster.Spec.NetworkSpec.VPC.ID, getSubnetIds(awsCluster))
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
-
-	err = ec2Client.AuthorizeSecurityGroupIngressWithContext(ctx, securityGroupId, "udp", 53)
-	if err != nil {
-		return ctrl.Result{}, errors.WithStack(err)
-	}
-
-	err = ec2Client.AuthorizeSecurityGroupIngressWithContext(ctx, securityGroupId, "tcp", 53)
-	if err != nil {
-		return ctrl.Result{}, errors.WithStack(err)
-	}
-
-	route53ResolverRulesClient := r.AWSClients.NewRoute53ResolverClient(session, "arn")
-	_, err = route53ResolverRulesClient.CreateResolverEndpointWithContext(ctx, "INBOUND", fmt.Sprintf("%s-inbound", awsCluster.Name), []string{securityGroupId}, []string{""})
-	if err != nil {
-		return ctrl.Result{}, errors.WithStack(err)
-	}
-
-	outboundEndpointId, err := route53ResolverRulesClient.CreateResolverEndpointWithContext(ctx, "OUTBOUND", fmt.Sprintf("%s-outbound", awsCluster.Name), []string{securityGroupId}, []string{""})
-	if err != nil {
-		return ctrl.Result{}, errors.WithStack(err)
-	}
-
-	_, err = route53ResolverRulesClient.CreateResolverRuleWithContext(ctx, "api.asdas", fmt.Sprintf("giantswarm-%s", awsCluster.Name), outboundEndpointId, "FORWARD", []string{""})
-	if err != nil {
-		return ctrl.Result{}, errors.WithStack(err)
-	}
-
-	// var urls = []string{"api.asdasd", "bastion.asdfdas"}
-	// for _, url := range urls {
-	// }
 
 	return reconcile.Result{}, nil
 }
@@ -176,7 +124,15 @@ func (r *AwsClusterReconciler) reconcileDelete(ctx context.Context, awsCluster *
 // SetupWithManager sets up the controller with the Manager.
 func (r *AwsClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		// Uncomment the following line adding a pointer to an instance of the controlled resource as an argument
 		For(&capa.AWSCluster{}).
 		Complete(r)
+}
+
+func getSubnetIds(awsCluster *capa.AWSCluster) []string {
+	var subnetIds []string
+	for _, subnet := range awsCluster.Spec.NetworkSpec.Subnets {
+		subnetIds = append(subnetIds, subnet.ID)
+	}
+
+	return subnetIds
 }
