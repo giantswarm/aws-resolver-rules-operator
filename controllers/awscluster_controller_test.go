@@ -36,6 +36,7 @@ var _ = Describe("AWSCluster", func() {
 	)
 
 	const (
+		ClusterName               = "foo"
 		DnsServerAWSAccountId     = "dns-server-aws-account-id"
 		DnsServerVPCId            = "dns-server-vpc-id"
 		WorkloadClusterBaseDomain = "eu-central-1.aws.tkp.hdi.cloud"
@@ -66,7 +67,7 @@ var _ = Describe("AWSCluster", func() {
 		}
 		awsCluster = &capa.AWSCluster{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "foo",
+				Name:      ClusterName,
 				Namespace: "bar",
 			},
 			Spec: capa.AWSClusterSpec{
@@ -92,7 +93,7 @@ var _ = Describe("AWSCluster", func() {
 		}
 		cluster = &capi.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "foo",
+				Name:      ClusterName,
 				Namespace: "bar",
 			},
 		}
@@ -101,7 +102,7 @@ var _ = Describe("AWSCluster", func() {
 	JustBeforeEach(func() {
 		request := ctrl.Request{
 			NamespacedName: types.NamespacedName{
-				Name:      "foo",
+				Name:      ClusterName,
 				Namespace: "bar",
 			},
 		}
@@ -202,7 +203,7 @@ var _ = Describe("AWSCluster", func() {
 				_, vpcId, description, groupName := ec2Client.CreateSecurityGroupWithContextArgsForCall(0)
 				Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
 				Expect(description).To(Equal("Security group for resolver rule endpoints"))
-				Expect(groupName).To(Equal("foo-resolverrules-endpoints"))
+				Expect(groupName).To(Equal(fmt.Sprintf("%s-resolverrules-endpoints", ClusterName)))
 				Expect(reconcileErr).NotTo(HaveOccurred())
 			})
 
@@ -235,8 +236,8 @@ var _ = Describe("AWSCluster", func() {
 
 			It("creates resolver rule", func() {
 				_, domainName, resolverRuleName, endpointId, kind, subnetIds := resolverClient.CreateResolverRuleWithContextArgsForCall(0)
-				Expect(domainName).To(Equal(fmt.Sprintf("foo.%s", WorkloadClusterBaseDomain)))
-				Expect(resolverRuleName).To(Equal("giantswarm-foo"))
+				Expect(domainName).To(Equal(fmt.Sprintf("%s.%s", ClusterName, WorkloadClusterBaseDomain)))
+				Expect(resolverRuleName).To(Equal(fmt.Sprintf("giantswarm-%s", ClusterName)))
 				Expect(endpointId).To(Equal("outbound-endpoint"))
 				Expect(kind).To(Equal("FORWARD"))
 				Expect(subnetIds).To(Equal([]string{"subnet-1", "subnet-2"}))
@@ -244,7 +245,7 @@ var _ = Describe("AWSCluster", func() {
 
 			It("creates ram share resource", func() {
 				_, resourceShareName, allowPrincipals, principals, resourceArns := ramClient.CreateResourceShareWithContextArgsForCall(0)
-				Expect(resourceShareName).To(Equal("giantswarm-foo-rr"))
+				Expect(resourceShareName).To(Equal(fmt.Sprintf("giantswarm-%s-rr", ClusterName)))
 				Expect(allowPrincipals).To(Equal(true))
 				Expect(principals).To(Equal([]string{"resolver-rule-principal-arn"}))
 				Expect(resourceArns).To(Equal([]string{DnsServerAWSAccountId}))
@@ -252,7 +253,7 @@ var _ = Describe("AWSCluster", func() {
 
 			It("associates resolver rule with VPC account", func() {
 				_, associationName, vpcId, resolverRuleId := dnsServerResolverClient.AssociateResolverRuleWithContextArgsForCall(0)
-				Expect(associationName).To(Equal("giantswarm-foo-rr-association"))
+				Expect(associationName).To(Equal(fmt.Sprintf("giantswarm-%s-rr-association", ClusterName)))
 				Expect(vpcId).To(Equal(DnsServerVPCId))
 				Expect(resolverRuleId).To(Equal("resolver-rule-id"))
 			})
