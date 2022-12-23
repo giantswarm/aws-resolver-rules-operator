@@ -15,8 +15,8 @@ import (
 
 	"github.com/aws-resolver-rules-operator/controllers"
 	"github.com/aws-resolver-rules-operator/controllers/controllersfakes"
-	"github.com/aws-resolver-rules-operator/pkg/aws"
-	"github.com/aws-resolver-rules-operator/pkg/aws/awsfakes"
+	"github.com/aws-resolver-rules-operator/pkg/resolver"
+	"github.com/aws-resolver-rules-operator/pkg/resolver/resolverfakes"
 )
 
 var _ = Describe("AWSCluster", func() {
@@ -29,10 +29,10 @@ var _ = Describe("AWSCluster", func() {
 		awsClusterRoleIdentity  *capa.AWSClusterRoleIdentity
 		result                  ctrl.Result
 		reconcileErr            error
-		resolverClient          *awsfakes.FakeResolverClient
-		dnsServerResolverClient *awsfakes.FakeResolverClient
-		ec2Client               *awsfakes.FakeEC2Client
-		ramClient               *awsfakes.FakeRAMClient
+		resolverClient          *resolverfakes.FakeResolverClient
+		dnsServerResolverClient *resolverfakes.FakeResolverClient
+		ec2Client               *resolverfakes.FakeEC2Client
+		ramClient               *resolverfakes.FakeRAMClient
 	)
 
 	const (
@@ -44,16 +44,16 @@ var _ = Describe("AWSCluster", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 		awsClusterClient = new(controllersfakes.FakeAWSClusterClient)
-		resolverClient = new(awsfakes.FakeResolverClient)
-		dnsServerResolverClient = new(awsfakes.FakeResolverClient)
-		ramClient = new(awsfakes.FakeRAMClient)
-		ec2Client = new(awsfakes.FakeEC2Client)
-		fakeAWSClients := &aws.FakeClients{
+		resolverClient = new(resolverfakes.FakeResolverClient)
+		dnsServerResolverClient = new(resolverfakes.FakeResolverClient)
+		ramClient = new(resolverfakes.FakeRAMClient)
+		ec2Client = new(resolverfakes.FakeEC2Client)
+		fakeAWSClients := &resolver.FakeClients{
 			ResolverClient: resolverClient,
 			EC2Client:      ec2Client,
 			RAMClient:      ramClient,
 		}
-		resolver, err := aws.NewResolver(fakeAWSClients, dnsServerResolverClient, DnsServerAWSAccountId, DnsServerVPCId, WorkloadClusterBaseDomain)
+		resolver, err := resolver.NewResolver(fakeAWSClients, dnsServerResolverClient, DnsServerAWSAccountId, DnsServerVPCId, WorkloadClusterBaseDomain)
 		Expect(err).NotTo(HaveOccurred())
 
 		reconciler = controllers.NewAwsClusterReconciler(awsClusterClient, resolver)

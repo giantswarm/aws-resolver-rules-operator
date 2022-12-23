@@ -11,37 +11,37 @@ import (
 	"github.com/aws/aws-sdk-go/service/route53resolver"
 	"github.com/pkg/errors"
 
-	"github.com/aws-resolver-rules-operator/pkg/aws/clients"
+	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
 
 type Clients struct {
 }
 
-func (c *Clients) NewResolverClient(region, arn, externalId string) (ResolverClient, error) {
+func (c *Clients) NewResolverClient(region, arn, externalId string) (resolver.ResolverClient, error) {
 	session, err := sessionFromRegion(region)
 	if err != nil {
-		return &clients.AWSResolver{}, errors.WithStack(err)
+		return &AWSResolver{}, errors.WithStack(err)
 	}
 
-	return &clients.AWSResolver{ResolverClient: route53resolver.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn, configureExternalId(externalId))})}, nil
+	return &AWSResolver{ResolverClient: route53resolver.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn, configureExternalId(externalId))})}, nil
 }
 
-func (c *Clients) NewEC2Client(region, arn string) (EC2Client, error) {
+func (c *Clients) NewEC2Client(region, arn string) (resolver.EC2Client, error) {
 	session, err := sessionFromRegion(region)
 	if err != nil {
-		return &clients.AWSEC2{}, errors.WithStack(err)
+		return &AWSEC2{}, errors.WithStack(err)
 	}
 
-	return &clients.AWSEC2{EC2Client: ec2.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn)})}, nil
+	return &AWSEC2{EC2Client: ec2.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn)})}, nil
 }
 
-func (c *Clients) NewRAMClient(region, arn string) (RAMClient, error) {
+func (c *Clients) NewRAMClient(region, arn string) (resolver.RAMClient, error) {
 	session, err := sessionFromRegion(region)
 	if err != nil {
-		return &clients.AWSRAM{}, errors.WithStack(err)
+		return &AWSRAM{}, errors.WithStack(err)
 	}
 
-	return &clients.AWSRAM{RAMClient: ram.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn)})}, nil
+	return &AWSRAM{RAMClient: ram.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn)})}, nil
 }
 
 func configureExternalId(externalId string) func(provider *stscreds.AssumeRoleProvider) {

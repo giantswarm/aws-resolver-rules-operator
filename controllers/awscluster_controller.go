@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/aws-resolver-rules-operator/pkg/aws"
+	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
 
 const (
@@ -48,10 +48,10 @@ type AWSClusterClient interface {
 // AwsClusterReconciler reconciles a AwsCluster object
 type AwsClusterReconciler struct {
 	awsClusterClient AWSClusterClient
-	resolver         aws.Resolver
+	resolver         resolver.Resolver
 }
 
-func NewAwsClusterReconciler(awsClusterClient AWSClusterClient, resolver aws.Resolver) *AwsClusterReconciler {
+func NewAwsClusterReconciler(awsClusterClient AWSClusterClient, resolver resolver.Resolver) *AwsClusterReconciler {
 	return &AwsClusterReconciler{
 		awsClusterClient: awsClusterClient,
 		resolver:         resolver,

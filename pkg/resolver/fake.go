@@ -1,4 +1,4 @@
-package aws
+package resolver
 
 type FakeClients struct {
 	EC2Client      EC2Client

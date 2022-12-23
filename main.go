@@ -37,6 +37,7 @@ import (
 	"github.com/aws-resolver-rules-operator/controllers"
 	"github.com/aws-resolver-rules-operator/pkg/aws"
 	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
+	"github.com/aws-resolver-rules-operator/pkg/resolver"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -104,7 +105,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	resolver, err := aws.NewResolver(awsClients, dnsServerResolverClient, dnsServerAWSAccountId, dnsServerVpcId, workloadClusterBaseDomain)
+	resolver, err := resolver.NewResolver(awsClients, dnsServerResolverClient, dnsServerAWSAccountId, dnsServerVpcId, workloadClusterBaseDomain)
 	if err != nil {
 		setupLog.Error(err, "unable to create Resolver")
 		os.Exit(1)
