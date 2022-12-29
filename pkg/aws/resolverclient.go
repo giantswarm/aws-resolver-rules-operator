@@ -8,7 +8,7 @@ import (
 )
 
 type AWSResolver struct {
-	ResolverClient *route53resolver.Route53Resolver
+	client *route53resolver.Route53Resolver
 }
 
 func (a *AWSResolver) CreateResolverRuleWithContext(ctx context.Context, domainName, resolverRuleName, endpointId, kind string, targetIPs []string) (string, string, error) {
@@ -18,7 +18,7 @@ func (a *AWSResolver) CreateResolverRuleWithContext(ctx context.Context, domainN
 			Ip: aws.String(ip),
 		})
 	}
-	response, err := a.ResolverClient.CreateResolverRuleWithContext(ctx, &route53resolver.CreateResolverRuleInput{
+	response, err := a.client.CreateResolverRuleWithContext(ctx, &route53resolver.CreateResolverRuleInput{
 		DomainName:         aws.String(domainName),
 		Name:               aws.String(resolverRuleName),
 		ResolverEndpointId: aws.String(endpointId),
@@ -33,7 +33,7 @@ func (a *AWSResolver) CreateResolverRuleWithContext(ctx context.Context, domainN
 }
 
 func (a *AWSResolver) AssociateResolverRuleWithContext(ctx context.Context, associationName, vpcID, resolverRuleId string) (string, error) {
-	response, err := a.ResolverClient.AssociateResolverRuleWithContext(ctx, &route53resolver.AssociateResolverRuleInput{
+	response, err := a.client.AssociateResolverRuleWithContext(ctx, &route53resolver.AssociateResolverRuleInput{
 		Name:           aws.String(associationName),
 		ResolverRuleId: aws.String(resolverRuleId),
 		VPCId:          aws.String(vpcID),
@@ -52,7 +52,7 @@ func (a *AWSResolver) CreateResolverEndpointWithContext(ctx context.Context, dir
 			SubnetId: aws.String(id),
 		})
 	}
-	response, err := a.ResolverClient.CreateResolverEndpointWithContext(ctx, &route53resolver.CreateResolverEndpointInput{
+	response, err := a.client.CreateResolverEndpointWithContext(ctx, &route53resolver.CreateResolverEndpointInput{
 		Direction:        aws.String(direction),
 		IpAddresses:      ipAddresses,
 		Name:             aws.String(name),

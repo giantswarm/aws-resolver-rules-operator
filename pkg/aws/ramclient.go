@@ -9,11 +9,11 @@ import (
 )
 
 type AWSRAM struct {
-	RAMClient *ram.RAM
+	client *ram.RAM
 }
 
 func (a *AWSRAM) CreateResourceShareWithContext(ctx context.Context, resourceShareName string, allowExternalPrincipals bool, resourceArns, principals []string) (string, error) {
-	response, err := a.RAMClient.CreateResourceShareWithContext(ctx, &ram.CreateResourceShareInput{
+	response, err := a.client.CreateResourceShareWithContext(ctx, &ram.CreateResourceShareInput{
 		AllowExternalPrincipals: aws.Bool(allowExternalPrincipals),
 		Name:                    aws.String(resourceShareName),
 		Principals:              aws.StringSlice(principals),

@@ -1,10 +1,12 @@
 package aws
 
 import (
+	"runtime/debug"
 	"sync"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
+	"github.com/aws/aws-sdk-go/aws/request"
 	awssession "github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ram"
@@ -17,13 +19,32 @@ import (
 type Clients struct {
 }
 
+var (
+	controllerName = "aws-resolver-rules-operator"
+	currentCommit  = func() string {
+		if info, ok := debug.ReadBuildInfo(); ok {
+			for _, setting := range info.Settings {
+				if setting.Key == "vcs.revision" {
+					return setting.Value
+				}
+			}
+		}
+
+		return ""
+	}()
+)
+
 func (c *Clients) NewResolverClient(region, arn, externalId string) (resolver.ResolverClient, error) {
 	session, err := sessionFromRegion(region)
 	if err != nil {
 		return &AWSResolver{}, errors.WithStack(err)
 	}
 
-	return &AWSResolver{ResolverClient: route53resolver.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn, configureExternalId(externalId))})}, nil
+	resolverClient := route53resolver.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn, configureExternalId(externalId))})
+	resolverClient.Handlers.Build.PushFront(request.MakeAddToUserAgentHandler(controllerName, currentCommit))
+	resolverClient.Handlers.CompleteAttempt.PushFront(captureRequestMetrics(controllerName))
+
+	return &AWSResolver{client: resolverClient}, nil
 }
 
 func (c *Clients) NewEC2Client(region, arn string) (resolver.EC2Client, error) {
@@ -32,7 +53,11 @@ func (c *Clients) NewEC2Client(region, arn string) (resolver.EC2Client, error) {
 		return &AWSEC2{}, errors.WithStack(err)
 	}
 
-	return &AWSEC2{EC2Client: ec2.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn)})}, nil
+	ec2Client := ec2.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn)})
+	ec2Client.Handlers.Build.PushFront(request.MakeAddToUserAgentHandler(controllerName, currentCommit))
+	ec2Client.Handlers.CompleteAttempt.PushFront(captureRequestMetrics(controllerName))
+
+	return &AWSEC2{client: ec2Client}, nil
 }
 
 func (c *Clients) NewRAMClient(region, arn string) (resolver.RAMClient, error) {
@@ -41,7 +66,11 @@ func (c *Clients) NewRAMClient(region, arn string) (resolver.RAMClient, error) {
 		return &AWSRAM{}, errors.WithStack(err)
 	}
 
-	return &AWSRAM{RAMClient: ram.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn)})}, nil
+	ramClient := ram.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn)})
+	ramClient.Handlers.Build.PushFront(request.MakeAddToUserAgentHandler(controllerName, currentCommit))
+	ramClient.Handlers.CompleteAttempt.PushFront(captureRequestMetrics(controllerName))
+
+	return &AWSRAM{client: ramClient}, nil
 }
 
 func configureExternalId(externalId string) func(provider *stscreds.AssumeRoleProvider) {

@@ -9,11 +9,11 @@ import (
 )
 
 type AWSEC2 struct {
-	EC2Client *ec2.EC2
+	client *ec2.EC2
 }
 
 func (a *AWSEC2) CreateSecurityGroupWithContext(ctx context.Context, vpcId, description, groupName string) (string, error) {
-	_, err := a.EC2Client.CreateSecurityGroupWithContext(ctx, &ec2.CreateSecurityGroupInput{
+	_, err := a.client.CreateSecurityGroupWithContext(ctx, &ec2.CreateSecurityGroupInput{
 		Description: aws.String(description),
 		GroupName:   aws.String(groupName),
 		VpcId:       aws.String(vpcId),
@@ -26,7 +26,7 @@ func (a *AWSEC2) CreateSecurityGroupWithContext(ctx context.Context, vpcId, desc
 }
 
 func (a *AWSEC2) AuthorizeSecurityGroupIngressWithContext(ctx context.Context, securityGroupId, protocol string, port int) error {
-	_, err := a.EC2Client.AuthorizeSecurityGroupIngressWithContext(ctx, &ec2.AuthorizeSecurityGroupIngressInput{
+	_, err := a.client.AuthorizeSecurityGroupIngressWithContext(ctx, &ec2.AuthorizeSecurityGroupIngressInput{
 		FromPort:   aws.Int64(int64(port)),
 		GroupId:    aws.String(securityGroupId),
 		IpProtocol: aws.String(protocol),
