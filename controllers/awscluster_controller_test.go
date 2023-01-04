@@ -39,7 +39,7 @@ var _ = Describe("AWSCluster", func() {
 		ClusterName               = "foo"
 		DnsServerAWSAccountId     = "dns-server-aws-account-id"
 		DnsServerVPCId            = "dns-server-vpc-id"
-		WorkloadClusterBaseDomain = "eu-central-1.aws.tkp.hdi.cloud"
+		WorkloadClusterBaseDomain = "eu-central-1.aws.some.domain.com"
 	)
 
 	BeforeEach(func() {

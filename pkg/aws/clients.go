@@ -17,6 +17,8 @@ import (
 )
 
 type Clients struct {
+	// endpoint is the AWS API endpoint to use
+	endpoint string
 }
 
 var (
@@ -34,8 +36,12 @@ var (
 	}()
 )
 
+func NewClients(endpoint string) resolver.AWSClients {
+	return &Clients{endpoint: endpoint}
+}
+
 func (c *Clients) NewResolverClient(region, arn, externalId string) (resolver.ResolverClient, error) {
-	session, err := sessionFromRegion(region)
+	session, err := c.sessionFromRegion(region)
 	if err != nil {
 		return &AWSResolver{}, errors.WithStack(err)
 	}
@@ -47,26 +53,26 @@ func (c *Clients) NewResolverClient(region, arn, externalId string) (resolver.Re
 	return &AWSResolver{client: resolverClient}, nil
 }
 
-func (c *Clients) NewEC2Client(region, arn string) (resolver.EC2Client, error) {
-	session, err := sessionFromRegion(region)
+func (c *Clients) NewEC2Client(region, arn, externalId string) (resolver.EC2Client, error) {
+	session, err := c.sessionFromRegion(region)
 	if err != nil {
 		return &AWSEC2{}, errors.WithStack(err)
 	}
 
-	ec2Client := ec2.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn)})
+	ec2Client := ec2.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn, configureExternalId(externalId))})
 	ec2Client.Handlers.Build.PushFront(request.MakeAddToUserAgentHandler(controllerName, currentCommit))
 	ec2Client.Handlers.CompleteAttempt.PushFront(captureRequestMetrics(controllerName))
 
 	return &AWSEC2{client: ec2Client}, nil
 }
 
-func (c *Clients) NewRAMClient(region, arn string) (resolver.RAMClient, error) {
-	session, err := sessionFromRegion(region)
+func (c *Clients) NewRAMClient(region, arn, externalId string) (resolver.RAMClient, error) {
+	session, err := c.sessionFromRegion(region)
 	if err != nil {
 		return &AWSRAM{}, errors.WithStack(err)
 	}
 
-	ramClient := ram.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn)})
+	ramClient := ram.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn, configureExternalId(externalId))})
 	ramClient.Handlers.Build.PushFront(request.MakeAddToUserAgentHandler(controllerName, currentCommit))
 	ramClient.Handlers.CompleteAttempt.PushFront(captureRequestMetrics(controllerName))
 
@@ -81,14 +87,15 @@ func configureExternalId(externalId string) func(provider *stscreds.AssumeRolePr
 	}
 }
 
-func sessionFromRegion(region string) (*awssession.Session, error) {
+func (c *Clients) sessionFromRegion(region string) (*awssession.Session, error) {
 	if s, ok := sessionCache.Load(region); ok {
 		entry := s.(*sessionCacheEntry)
 		return entry.session, nil
 	}
 
 	ns, err := awssession.NewSession(&aws.Config{
-		Region: aws.String(region),
+		Region:   aws.String(region),
+		Endpoint: aws.String(c.endpoint),
 	})
 	if err != nil {
 		return nil, err

@@ -18,8 +18,8 @@ type Resolver struct {
 
 type AWSClients interface {
 	NewResolverClient(region, arn, externalId string) (ResolverClient, error)
-	NewEC2Client(region, arn string) (EC2Client, error)
-	NewRAMClient(region, arn string) (RAMClient, error)
+	NewEC2Client(region, arn, externalId string) (EC2Client, error)
+	NewRAMClient(region, arn, externalId string) (RAMClient, error)
 }
 
 //counterfeiter:generate . EC2Client
@@ -78,7 +78,7 @@ func (r *Resolver) CreateRule(ctx context.Context, clusterName, clusterRegion, c
 func (r *Resolver) createRule(ctx context.Context, clusterName, clusterRegion, clusterArn, clusterVPCId string, clusterSubnetIds []string) (string, string, error) {
 	logger := log.FromContext(ctx)
 
-	ec2Client, err := r.awsClients.NewEC2Client(clusterRegion, clusterArn)
+	ec2Client, err := r.awsClients.NewEC2Client(clusterRegion, clusterArn, "")
 	if err != nil {
 		return "", "", errors.WithStack(err)
 	}
@@ -136,7 +136,7 @@ func (r *Resolver) createRule(ctx context.Context, clusterName, clusterRegion, c
 func (r *Resolver) associateRule(ctx context.Context, clusterName, clusterRegion, clusterArn, resolverRuleARN, resolverRuleId string) (string, error) {
 	logger := log.FromContext(ctx)
 
-	ramClient, err := r.awsClients.NewRAMClient(clusterRegion, clusterArn)
+	ramClient, err := r.awsClients.NewRAMClient(clusterRegion, clusterArn, "")
 	if err != nil {
 		return "", errors.WithStack(err)
 	}

@@ -10,10 +10,10 @@ func (f *FakeClients) NewResolverClient(region, arn, externalId string) (Resolve
 	return f.ResolverClient, nil
 }
 
-func (f *FakeClients) NewEC2Client(region, arn string) (EC2Client, error) {
+func (f *FakeClients) NewEC2Client(region, arn, externalId string) (EC2Client, error) {
 	return f.EC2Client, nil
 }
 
-func (f *FakeClients) NewRAMClient(region, arn string) (RAMClient, error) {
+func (f *FakeClients) NewRAMClient(region, arn, externalId string) (RAMClient, error) {
 	return f.RAMClient, nil
 }
