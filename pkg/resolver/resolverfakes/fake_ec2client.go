@@ -9,33 +9,18 @@ import (
 )
 
 type FakeEC2Client struct {
-	AuthorizeSecurityGroupIngressWithContextStub        func(context.Context, string, string, int) error
-	authorizeSecurityGroupIngressWithContextMutex       sync.RWMutex
-	authorizeSecurityGroupIngressWithContextArgsForCall []struct {
+	CreateSecurityGroupForResolverEndpointsStub        func(context.Context, string, string) (string, error)
+	createSecurityGroupForResolverEndpointsMutex       sync.RWMutex
+	createSecurityGroupForResolverEndpointsArgsForCall []struct {
 		arg1 context.Context
 		arg2 string
 		arg3 string
-		arg4 int
 	}
-	authorizeSecurityGroupIngressWithContextReturns struct {
-		result1 error
-	}
-	authorizeSecurityGroupIngressWithContextReturnsOnCall map[int]struct {
-		result1 error
-	}
-	CreateSecurityGroupWithContextStub        func(context.Context, string, string, string) (string, error)
-	createSecurityGroupWithContextMutex       sync.RWMutex
-	createSecurityGroupWithContextArgsForCall []struct {
-		arg1 context.Context
-		arg2 string
-		arg3 string
-		arg4 string
-	}
-	createSecurityGroupWithContextReturns struct {
+	createSecurityGroupForResolverEndpointsReturns struct {
 		result1 string
 		result2 error
 	}
-	createSecurityGroupWithContextReturnsOnCall map[int]struct {
+	createSecurityGroupForResolverEndpointsReturnsOnCall map[int]struct {
 		result1 string
 		result2 error
 	}
@@ -43,85 +28,20 @@ type FakeEC2Client struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeEC2Client) AuthorizeSecurityGroupIngressWithContext(arg1 context.Context, arg2 string, arg3 string, arg4 int) error {
-	fake.authorizeSecurityGroupIngressWithContextMutex.Lock()
-	ret, specificReturn := fake.authorizeSecurityGroupIngressWithContextReturnsOnCall[len(fake.authorizeSecurityGroupIngressWithContextArgsForCall)]
-	fake.authorizeSecurityGroupIngressWithContextArgsForCall = append(fake.authorizeSecurityGroupIngressWithContextArgsForCall, struct {
+func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpoints(arg1 context.Context, arg2 string, arg3 string) (string, error) {
+	fake.createSecurityGroupForResolverEndpointsMutex.Lock()
+	ret, specificReturn := fake.createSecurityGroupForResolverEndpointsReturnsOnCall[len(fake.createSecurityGroupForResolverEndpointsArgsForCall)]
+	fake.createSecurityGroupForResolverEndpointsArgsForCall = append(fake.createSecurityGroupForResolverEndpointsArgsForCall, struct {
 		arg1 context.Context
 		arg2 string
 		arg3 string
-		arg4 int
-	}{arg1, arg2, arg3, arg4})
-	stub := fake.AuthorizeSecurityGroupIngressWithContextStub
-	fakeReturns := fake.authorizeSecurityGroupIngressWithContextReturns
-	fake.recordInvocation("AuthorizeSecurityGroupIngressWithContext", []interface{}{arg1, arg2, arg3, arg4})
-	fake.authorizeSecurityGroupIngressWithContextMutex.Unlock()
+	}{arg1, arg2, arg3})
+	stub := fake.CreateSecurityGroupForResolverEndpointsStub
+	fakeReturns := fake.createSecurityGroupForResolverEndpointsReturns
+	fake.recordInvocation("CreateSecurityGroupForResolverEndpoints", []interface{}{arg1, arg2, arg3})
+	fake.createSecurityGroupForResolverEndpointsMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3, arg4)
-	}
-	if specificReturn {
-		return ret.result1
-	}
-	return fakeReturns.result1
-}
-
-func (fake *FakeEC2Client) AuthorizeSecurityGroupIngressWithContextCallCount() int {
-	fake.authorizeSecurityGroupIngressWithContextMutex.RLock()
-	defer fake.authorizeSecurityGroupIngressWithContextMutex.RUnlock()
-	return len(fake.authorizeSecurityGroupIngressWithContextArgsForCall)
-}
-
-func (fake *FakeEC2Client) AuthorizeSecurityGroupIngressWithContextCalls(stub func(context.Context, string, string, int) error) {
-	fake.authorizeSecurityGroupIngressWithContextMutex.Lock()
-	defer fake.authorizeSecurityGroupIngressWithContextMutex.Unlock()
-	fake.AuthorizeSecurityGroupIngressWithContextStub = stub
-}
-
-func (fake *FakeEC2Client) AuthorizeSecurityGroupIngressWithContextArgsForCall(i int) (context.Context, string, string, int) {
-	fake.authorizeSecurityGroupIngressWithContextMutex.RLock()
-	defer fake.authorizeSecurityGroupIngressWithContextMutex.RUnlock()
-	argsForCall := fake.authorizeSecurityGroupIngressWithContextArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
-}
-
-func (fake *FakeEC2Client) AuthorizeSecurityGroupIngressWithContextReturns(result1 error) {
-	fake.authorizeSecurityGroupIngressWithContextMutex.Lock()
-	defer fake.authorizeSecurityGroupIngressWithContextMutex.Unlock()
-	fake.AuthorizeSecurityGroupIngressWithContextStub = nil
-	fake.authorizeSecurityGroupIngressWithContextReturns = struct {
-		result1 error
-	}{result1}
-}
-
-func (fake *FakeEC2Client) AuthorizeSecurityGroupIngressWithContextReturnsOnCall(i int, result1 error) {
-	fake.authorizeSecurityGroupIngressWithContextMutex.Lock()
-	defer fake.authorizeSecurityGroupIngressWithContextMutex.Unlock()
-	fake.AuthorizeSecurityGroupIngressWithContextStub = nil
-	if fake.authorizeSecurityGroupIngressWithContextReturnsOnCall == nil {
-		fake.authorizeSecurityGroupIngressWithContextReturnsOnCall = make(map[int]struct {
-			result1 error
-		})
-	}
-	fake.authorizeSecurityGroupIngressWithContextReturnsOnCall[i] = struct {
-		result1 error
-	}{result1}
-}
-
-func (fake *FakeEC2Client) CreateSecurityGroupWithContext(arg1 context.Context, arg2 string, arg3 string, arg4 string) (string, error) {
-	fake.createSecurityGroupWithContextMutex.Lock()
-	ret, specificReturn := fake.createSecurityGroupWithContextReturnsOnCall[len(fake.createSecurityGroupWithContextArgsForCall)]
-	fake.createSecurityGroupWithContextArgsForCall = append(fake.createSecurityGroupWithContextArgsForCall, struct {
-		arg1 context.Context
-		arg2 string
-		arg3 string
-		arg4 string
-	}{arg1, arg2, arg3, arg4})
-	stub := fake.CreateSecurityGroupWithContextStub
-	fakeReturns := fake.createSecurityGroupWithContextReturns
-	fake.recordInvocation("CreateSecurityGroupWithContext", []interface{}{arg1, arg2, arg3, arg4})
-	fake.createSecurityGroupWithContextMutex.Unlock()
-	if stub != nil {
-		return stub(arg1, arg2, arg3, arg4)
+		return stub(arg1, arg2, arg3)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -129,46 +49,46 @@ func (fake *FakeEC2Client) CreateSecurityGroupWithContext(arg1 context.Context, 
 	return fakeReturns.result1, fakeReturns.result2
 }
 
-func (fake *FakeEC2Client) CreateSecurityGroupWithContextCallCount() int {
-	fake.createSecurityGroupWithContextMutex.RLock()
-	defer fake.createSecurityGroupWithContextMutex.RUnlock()
-	return len(fake.createSecurityGroupWithContextArgsForCall)
+func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpointsCallCount() int {
+	fake.createSecurityGroupForResolverEndpointsMutex.RLock()
+	defer fake.createSecurityGroupForResolverEndpointsMutex.RUnlock()
+	return len(fake.createSecurityGroupForResolverEndpointsArgsForCall)
 }
 
-func (fake *FakeEC2Client) CreateSecurityGroupWithContextCalls(stub func(context.Context, string, string, string) (string, error)) {
-	fake.createSecurityGroupWithContextMutex.Lock()
-	defer fake.createSecurityGroupWithContextMutex.Unlock()
-	fake.CreateSecurityGroupWithContextStub = stub
+func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpointsCalls(stub func(context.Context, string, string) (string, error)) {
+	fake.createSecurityGroupForResolverEndpointsMutex.Lock()
+	defer fake.createSecurityGroupForResolverEndpointsMutex.Unlock()
+	fake.CreateSecurityGroupForResolverEndpointsStub = stub
 }
 
-func (fake *FakeEC2Client) CreateSecurityGroupWithContextArgsForCall(i int) (context.Context, string, string, string) {
-	fake.createSecurityGroupWithContextMutex.RLock()
-	defer fake.createSecurityGroupWithContextMutex.RUnlock()
-	argsForCall := fake.createSecurityGroupWithContextArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpointsArgsForCall(i int) (context.Context, string, string) {
+	fake.createSecurityGroupForResolverEndpointsMutex.RLock()
+	defer fake.createSecurityGroupForResolverEndpointsMutex.RUnlock()
+	argsForCall := fake.createSecurityGroupForResolverEndpointsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
-func (fake *FakeEC2Client) CreateSecurityGroupWithContextReturns(result1 string, result2 error) {
-	fake.createSecurityGroupWithContextMutex.Lock()
-	defer fake.createSecurityGroupWithContextMutex.Unlock()
-	fake.CreateSecurityGroupWithContextStub = nil
-	fake.createSecurityGroupWithContextReturns = struct {
+func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpointsReturns(result1 string, result2 error) {
+	fake.createSecurityGroupForResolverEndpointsMutex.Lock()
+	defer fake.createSecurityGroupForResolverEndpointsMutex.Unlock()
+	fake.CreateSecurityGroupForResolverEndpointsStub = nil
+	fake.createSecurityGroupForResolverEndpointsReturns = struct {
 		result1 string
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeEC2Client) CreateSecurityGroupWithContextReturnsOnCall(i int, result1 string, result2 error) {
-	fake.createSecurityGroupWithContextMutex.Lock()
-	defer fake.createSecurityGroupWithContextMutex.Unlock()
-	fake.CreateSecurityGroupWithContextStub = nil
-	if fake.createSecurityGroupWithContextReturnsOnCall == nil {
-		fake.createSecurityGroupWithContextReturnsOnCall = make(map[int]struct {
+func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpointsReturnsOnCall(i int, result1 string, result2 error) {
+	fake.createSecurityGroupForResolverEndpointsMutex.Lock()
+	defer fake.createSecurityGroupForResolverEndpointsMutex.Unlock()
+	fake.CreateSecurityGroupForResolverEndpointsStub = nil
+	if fake.createSecurityGroupForResolverEndpointsReturnsOnCall == nil {
+		fake.createSecurityGroupForResolverEndpointsReturnsOnCall = make(map[int]struct {
 			result1 string
 			result2 error
 		})
 	}
-	fake.createSecurityGroupWithContextReturnsOnCall[i] = struct {
+	fake.createSecurityGroupForResolverEndpointsReturnsOnCall[i] = struct {
 		result1 string
 		result2 error
 	}{result1, result2}
@@ -177,10 +97,8 @@ func (fake *FakeEC2Client) CreateSecurityGroupWithContextReturnsOnCall(i int, re
 func (fake *FakeEC2Client) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.authorizeSecurityGroupIngressWithContextMutex.RLock()
-	defer fake.authorizeSecurityGroupIngressWithContextMutex.RUnlock()
-	fake.createSecurityGroupWithContextMutex.RLock()
-	defer fake.createSecurityGroupWithContextMutex.RUnlock()
+	fake.createSecurityGroupForResolverEndpointsMutex.RLock()
+	defer fake.createSecurityGroupForResolverEndpointsMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

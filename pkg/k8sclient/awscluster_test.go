@@ -309,33 +309,54 @@ var _ = Describe("AWSCluster", func() {
 		var awsCluster *capa.AWSCluster
 		var awsClusterRoleIdentity *capa.AWSClusterRoleIdentity
 
-		BeforeEach(func() {
-			awsCluster = &capa.AWSCluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cluster",
-					Namespace: namespace,
-				},
-				Spec: capa.AWSClusterSpec{
-					IdentityRef: &capa.AWSIdentityReference{Name: "default", Kind: capa.ClusterRoleIdentityKind},
-				},
-			}
-			Expect(k8sClient.Create(ctx, awsCluster)).To(Succeed())
+		When("the identity is set", func() {
+			BeforeEach(func() {
+				awsCluster = &capa.AWSCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-cluster",
+						Namespace: namespace,
+					},
+					Spec: capa.AWSClusterSpec{
+						IdentityRef: &capa.AWSIdentityReference{Name: "default", Kind: capa.ClusterRoleIdentityKind},
+					},
+				}
+				Expect(k8sClient.Create(ctx, awsCluster)).To(Succeed())
 
-			awsClusterRoleIdentity = &capa.AWSClusterRoleIdentity{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "default",
-					Namespace: namespace,
-				},
-				Spec: capa.AWSClusterRoleIdentitySpec{},
-			}
-			Expect(k8sClient.Create(ctx, awsClusterRoleIdentity)).To(Succeed())
+				awsClusterRoleIdentity = &capa.AWSClusterRoleIdentity{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "default",
+						Namespace: namespace,
+					},
+					Spec: capa.AWSClusterRoleIdentitySpec{},
+				}
+				Expect(k8sClient.Create(ctx, awsClusterRoleIdentity)).To(Succeed())
+			})
+
+			It("gets the identity used for this cluster", func() {
+				actualIdentity, err := awsClusterClient.GetIdentity(ctx, awsCluster)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(actualIdentity).To(Equal(awsClusterRoleIdentity))
+			})
 		})
 
-		It("gets the identity used for this cluster", func() {
-			actualIdentity, err := awsClusterClient.GetIdentity(ctx, awsCluster)
-			Expect(err).NotTo(HaveOccurred())
+		When("the identity is not set", func() {
+			BeforeEach(func() {
+				awsCluster = &capa.AWSCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-cluster",
+						Namespace: namespace,
+					},
+					Spec: capa.AWSClusterSpec{},
+				}
+				Expect(k8sClient.Create(ctx, awsCluster)).To(Succeed())
+			})
 
-			Expect(actualIdentity).To(Equal(awsClusterRoleIdentity))
+			It("returns nil", func() {
+				actualIdentity, err := awsClusterClient.GetIdentity(ctx, awsCluster)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(actualIdentity).To(BeNil())
+			})
 		})
 	})
 })

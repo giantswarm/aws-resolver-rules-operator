@@ -9,23 +9,30 @@ import (
 )
 
 type Resolver struct {
-	awsClients                AWSClients
-	dnsServerAWSAccountId     string
-	dnsServerResolverClient   ResolverClient
-	dnsServerVPCId            string
+	// awsClients is a factory to retrieve clients to talk to the AWS API using the right credentials.
+	awsClients AWSClients
+	// dnsServerAWSAccountId is the AWS account where the DNS server is deployed.
+	dnsServerAWSAccountId string
+	// dnsServerResolverClient Route53 Resolver client already configured to talk to the DNS server AWS account.
+	dnsServerResolverClient ResolverClient
+	// dnsServerVPCId is the VPC id where the DNS server is deployed.
+	dnsServerVPCId string
+	// workloadClusterBaseDomain is the root hosted zone used to create the workload cluster hosted zone, i.e. gaws.gigantic.io
 	workloadClusterBaseDomain string
 }
 
 type AWSClients interface {
-	NewResolverClient(region, arn, externalId string) (ResolverClient, error)
-	NewEC2Client(region, arn, externalId string) (EC2Client, error)
-	NewRAMClient(region, arn, externalId string) (RAMClient, error)
+	NewResolverClient(region, arn string) (ResolverClient, error)
+	NewResolverClientWithExternalId(region, arn, externalId string) (ResolverClient, error)
+	NewEC2Client(region, arn string) (EC2Client, error)
+	NewEC2ClientWithExternalId(region, arn, externalId string) (EC2Client, error)
+	NewRAMClient(region, arn string) (RAMClient, error)
+	NewRAMClientWithExternalId(region, arn, externalId string) (RAMClient, error)
 }
 
 //counterfeiter:generate . EC2Client
 type EC2Client interface {
-	CreateSecurityGroupWithContext(ctx context.Context, vpcId, description, groupName string) (string, error)
-	AuthorizeSecurityGroupIngressWithContext(ctx context.Context, securityGroupId, protocol string, port int) error
+	CreateSecurityGroupForResolverEndpoints(ctx context.Context, vpcId, groupName string) (string, error)
 }
 
 //counterfeiter:generate . RAMClient
@@ -35,21 +42,22 @@ type RAMClient interface {
 
 //counterfeiter:generate . ResolverClient
 type ResolverClient interface {
-	CreateResolverRuleWithContext(ctx context.Context, domainName, resolverRuleName, endpointId, kind string, targetIPs []string) (string, string, error)
-	AssociateResolverRuleWithContext(ctx context.Context, associationName, vpcID, resolverRuleId string) (string, error)
-	CreateResolverEndpointWithContext(ctx context.Context, direction, name string, securityGroupIds, subnetIds []string) (string, error)
+	CreateResolverRule(ctx context.Context, cluster Cluster, securityGroupId, domainName, resolverRuleName string) (string, string, error)
+	AssociateResolverRuleWithContext(ctx context.Context, associationName, vpcID, resolverRuleId string) error
+}
+
+type Cluster struct {
+	Name    string
+	Region  string
+	VPCId   string
+	ARN     string
+	Subnets []string
 }
 
 type AssociatedResolverRule struct {
-	RuleArn       string
-	RuleName      string
-	AssociationId string
+	RuleArn  string
+	RuleName string
 }
-
-const (
-	DNSPort                  = 53
-	SecurityGroupDescription = "Security group for resolver rule endpoints"
-)
 
 func NewResolver(awsClients AWSClients, dnsServerResolverClient ResolverClient, dnsServerAWSAccountId, dnsServerVPCId, workloadClusterBaseDomain string) (Resolver, error) {
 	return Resolver{
@@ -61,101 +69,71 @@ func NewResolver(awsClients AWSClients, dnsServerResolverClient ResolverClient, 
 	}, nil
 }
 
-func (r *Resolver) CreateRule(ctx context.Context, clusterName, clusterRegion, clusterArn, clusterVPCId string, clusterSubnetIds []string) (AssociatedResolverRule, error) {
-	resolverRuleARN, resolverRuleId, err := r.createRule(ctx, clusterName, clusterRegion, clusterArn, clusterVPCId, clusterSubnetIds)
+// CreateRule will create a route53 resolver Rule and associate it with a VPC where a DNS server is running.
+// Clients of the DNS server need to be able to resolve the Cluster domain, so we need to associate a resolver rule to
+// the VPC where the DNS server is running.
+func (r *Resolver) CreateRule(ctx context.Context, cluster Cluster) (AssociatedResolverRule, error) {
+	resolverRuleARN, resolverRuleId, err := r.createRule(ctx, cluster)
 	if err != nil {
 		return AssociatedResolverRule{}, errors.WithStack(err)
 	}
 
-	associationId, err := r.associateRule(ctx, clusterName, clusterRegion, clusterArn, resolverRuleARN, resolverRuleId)
+	err = r.associateRule(ctx, cluster, resolverRuleARN, resolverRuleId)
 	if err != nil {
 		return AssociatedResolverRule{}, errors.WithStack(err)
 	}
 
-	return AssociatedResolverRule{resolverRuleARN, resolverRuleId, associationId}, nil
+	return AssociatedResolverRule{resolverRuleARN, resolverRuleId}, nil
 }
 
-func (r *Resolver) createRule(ctx context.Context, clusterName, clusterRegion, clusterArn, clusterVPCId string, clusterSubnetIds []string) (string, string, error) {
+func (r *Resolver) createRule(ctx context.Context, cluster Cluster) (string, string, error) {
 	logger := log.FromContext(ctx)
 
-	ec2Client, err := r.awsClients.NewEC2Client(clusterRegion, clusterArn, "")
+	ec2Client, err := r.awsClients.NewEC2Client(cluster.Region, cluster.ARN)
 	if err != nil {
 		return "", "", errors.WithStack(err)
 	}
-	resolverClient, err := r.awsClients.NewResolverClient(clusterRegion, clusterArn, "")
+	resolverClient, err := r.awsClients.NewResolverClient(cluster.Region, cluster.ARN)
 	if err != nil {
 		return "", "", errors.WithStack(err)
 	}
 
 	logger.Info("Creating security group for the Resolver endpoints")
-	securityGroupId, err := ec2Client.CreateSecurityGroupWithContext(ctx, clusterVPCId, SecurityGroupDescription, getSecurityGroupName(clusterName))
+	securityGroupId, err := ec2Client.CreateSecurityGroupForResolverEndpoints(ctx, cluster.VPCId, getSecurityGroupName(cluster.Name))
 	if err != nil {
 		return "", "", errors.WithStack(err)
 	}
 
-	logger.WithValues("securityGroupId", securityGroupId)
-
-	logger.Info("Creating ingress rules in the security group")
-	err = ec2Client.AuthorizeSecurityGroupIngressWithContext(ctx, securityGroupId, "udp", DNSPort)
+	logger.Info("Creating resolver rule", "domainName", getResolverRuleDomainName(cluster.Name, r.workloadClusterBaseDomain))
+	resolverRuleArn, resolverRuleId, err := resolverClient.CreateResolverRule(ctx, cluster, securityGroupId, getResolverRuleDomainName(cluster.Name, r.workloadClusterBaseDomain), getResolverRuleName(cluster.Name))
 	if err != nil {
 		return "", "", errors.WithStack(err)
 	}
-
-	err = ec2Client.AuthorizeSecurityGroupIngressWithContext(ctx, securityGroupId, "tcp", DNSPort)
-	if err != nil {
-		return "", "", errors.WithStack(err)
-	}
-
-	logger.Info("Creating inbound resolver endpoint")
-	inboundEndpointId, err := resolverClient.CreateResolverEndpointWithContext(ctx, "INBOUND", getInboundEndpointName(clusterName), []string{securityGroupId}, clusterSubnetIds)
-	if err != nil {
-		return "", "", errors.WithStack(err)
-	}
-
-	logger.WithValues("inboundEndpointId", inboundEndpointId)
-
-	logger.Info("Creating outbound resolver endpoint")
-	outboundEndpointId, err := resolverClient.CreateResolverEndpointWithContext(ctx, "OUTBOUND", getOutboundEndpointName(clusterName), []string{securityGroupId}, clusterSubnetIds)
-	if err != nil {
-		return "", "", errors.WithStack(err)
-	}
-
-	logger.WithValues("outboundEndpointId", outboundEndpointId)
-
-	logger.Info("Creating resolver rule", "type", "FORWARD", "domainName", getResolverRuleDomainName(clusterName, r.workloadClusterBaseDomain))
-	resolverRuleArn, resolverRuleId, err := resolverClient.CreateResolverRuleWithContext(ctx, getResolverRuleDomainName(clusterName, r.workloadClusterBaseDomain), getResolverRuleName(clusterName), outboundEndpointId, "FORWARD", clusterSubnetIds)
-	if err != nil {
-		return "", "", errors.WithStack(err)
-	}
-
-	logger.WithValues("resolverRuleId", resolverRuleId, "resolverRuleArn", resolverRuleArn, "inboundEndpointId", inboundEndpointId, "outboundEndpointId", outboundEndpointId, "securityGroupId", securityGroupId)
 
 	return resolverRuleArn, resolverRuleId, nil
 }
 
-func (r *Resolver) associateRule(ctx context.Context, clusterName, clusterRegion, clusterArn, resolverRuleARN, resolverRuleId string) (string, error) {
+func (r *Resolver) associateRule(ctx context.Context, cluster Cluster, resolverRuleARN, resolverRuleId string) error {
 	logger := log.FromContext(ctx)
 
-	ramClient, err := r.awsClients.NewRAMClient(clusterRegion, clusterArn, "")
+	ramClient, err := r.awsClients.NewRAMClient(cluster.Region, cluster.ARN)
 	if err != nil {
-		return "", errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 
 	logger.Info("Creating resource share item so we can share resolver rule with a different aws account", "awsAccount", r.dnsServerAWSAccountId)
-	_, err = ramClient.CreateResourceShareWithContext(ctx, getResourceShareName(clusterName), true, []string{resolverRuleARN}, []string{r.dnsServerAWSAccountId})
+	_, err = ramClient.CreateResourceShareWithContext(ctx, getResourceShareName(cluster.Name), true, []string{resolverRuleARN}, []string{r.dnsServerAWSAccountId})
 	if err != nil {
-		return "", errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 
 	logger.Info("Associating resolver rule with VPC", "vpcId", r.dnsServerVPCId)
-	associationId, err := r.dnsServerResolverClient.AssociateResolverRuleWithContext(ctx, getAssociationName(clusterName), r.dnsServerVPCId, resolverRuleId)
+	err = r.dnsServerResolverClient.AssociateResolverRuleWithContext(ctx, getAssociationName(cluster.Name), r.dnsServerVPCId, resolverRuleId)
 	if err != nil {
-		return "", errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 
-	logger.WithValues("associationId", associationId)
-
-	return associationId, nil
+	return nil
 }
 
 func getSecurityGroupName(clusterName string) string {
@@ -172,14 +150,6 @@ func getResourceShareName(clusterName string) string {
 
 func getAssociationName(clusterName string) string {
 	return fmt.Sprintf("giantswarm-%s-rr-association", clusterName)
-}
-
-func getInboundEndpointName(clusterName string) string {
-	return fmt.Sprintf("%s-inbound", clusterName)
-}
-
-func getOutboundEndpointName(clusterName string) string {
-	return fmt.Sprintf("%s-outbound", clusterName)
 }
 
 func getResolverRuleDomainName(clusterName, baseDomain string) string {

@@ -54,6 +54,10 @@ func (a *AWSCluster) RemoveFinalizer(ctx context.Context, awsCluster *capa.AWSCl
 }
 
 func (a *AWSCluster) GetIdentity(ctx context.Context, awsCluster *capa.AWSCluster) (*capa.AWSClusterRoleIdentity, error) {
+	if awsCluster.Spec.IdentityRef == nil {
+		return nil, nil
+	}
+
 	roleIdentity := &capa.AWSClusterRoleIdentity{}
 	err := a.client.Get(ctx, client.ObjectKey{Namespace: awsCluster.Namespace, Name: awsCluster.Spec.IdentityRef.Name}, roleIdentity)
 	if err != nil {
