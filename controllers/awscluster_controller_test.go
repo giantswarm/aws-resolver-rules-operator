@@ -178,7 +178,7 @@ var _ = Describe("AWSCluster", func() {
 		})
 	})
 
-	When("reconciling normally", func() {
+	When("the cluster has an owner and an identity set", func() {
 		BeforeEach(func() {
 			awsClusterClient.GetReturns(awsCluster, nil)
 			awsClusterClient.GetOwnerReturns(cluster, nil)
@@ -198,23 +198,7 @@ var _ = Describe("AWSCluster", func() {
 			})
 		})
 
-		When("creating security group fails", func() {
-			BeforeEach(func() {
-				ec2Client.CreateSecurityGroupWithContextReturns("", errors.New("boom"))
-			})
-			It("returns ec2 error", func() {
-				Expect(reconcileErr).To(HaveOccurred())
-			})
-		})
-
-		When("creating security group succeeds", func() {
-			BeforeEach(func() {
-				ec2Client.CreateSecurityGroupWithContextReturns("my-security-group", nil)
-				resolverClient.CreateResolverEndpointWithContextReturnsOnCall(0, "inbound-endpoint", nil)
-				resolverClient.CreateResolverEndpointWithContextReturnsOnCall(1, "outbound-endpoint", nil)
-				resolverClient.CreateResolverRuleWithContextReturns("resolver-rule-principal-arn", "resolver-rule-id", nil)
-			})
-
+		When("is using private DNS mode", func() {
 			It("creates security group", func() {
 				Expect(ec2Client.CreateSecurityGroupWithContextCallCount()).To(Equal(1))
 				_, vpcId, description, groupName := ec2Client.CreateSecurityGroupWithContextArgsForCall(0)
@@ -224,55 +208,84 @@ var _ = Describe("AWSCluster", func() {
 				Expect(reconcileErr).NotTo(HaveOccurred())
 			})
 
-			It("creates ingress rules", func() {
-				_, securityGroupId, protocol, port := ec2Client.AuthorizeSecurityGroupIngressWithContextArgsForCall(0)
-				Expect(securityGroupId).To(Equal("my-security-group"))
-				Expect(protocol).To(Equal("udp"))
-				Expect(port).To(Equal(53))
-				Expect(reconcileErr).NotTo(HaveOccurred())
-
-				_, securityGroupId, protocol, port = ec2Client.AuthorizeSecurityGroupIngressWithContextArgsForCall(1)
-				Expect(securityGroupId).To(Equal("my-security-group"))
-				Expect(protocol).To(Equal("tcp"))
-				Expect(port).To(Equal(53))
+			When("creating security group fails", func() {
+				BeforeEach(func() {
+					ec2Client.CreateSecurityGroupWithContextReturns("", errors.New("boom"))
+				})
+				It("returns the error", func() {
+					Expect(reconcileErr).To(HaveOccurred())
+				})
 			})
 
-			It("creates resolver endpoints", func() {
-				_, direction, endpointName, securityGroupIds, subnetIds := resolverClient.CreateResolverEndpointWithContextArgsForCall(0)
-				Expect(direction).To(Equal("INBOUND"))
-				Expect(endpointName).To(Equal("foo-inbound"))
-				Expect(securityGroupIds).To(Equal([]string{"my-security-group"}))
-				Expect(subnetIds).To(Equal([]string{"subnet-1", "subnet-2"}))
+			When("creating security group succeeds", func() {
+				BeforeEach(func() {
+					ec2Client.CreateSecurityGroupWithContextReturns("my-security-group", nil)
+					resolverClient.CreateResolverEndpointWithContextReturnsOnCall(0, "inbound-endpoint", nil)
+					resolverClient.CreateResolverEndpointWithContextReturnsOnCall(1, "outbound-endpoint", nil)
+					resolverClient.CreateResolverRuleWithContextReturns("resolver-rule-principal-arn", "resolver-rule-id", nil)
+				})
 
-				_, direction, endpointName, securityGroupIds, subnetIds = resolverClient.CreateResolverEndpointWithContextArgsForCall(1)
-				Expect(direction).To(Equal("OUTBOUND"))
-				Expect(endpointName).To(Equal("foo-outbound"))
-				Expect(securityGroupIds).To(Equal([]string{"my-security-group"}))
-				Expect(subnetIds).To(Equal([]string{"subnet-1", "subnet-2"}))
-			})
+				It("creates ingress rules", func() {
+					_, securityGroupId, protocol, port := ec2Client.AuthorizeSecurityGroupIngressWithContextArgsForCall(0)
+					Expect(securityGroupId).To(Equal("my-security-group"))
+					Expect(protocol).To(Equal("udp"))
+					Expect(port).To(Equal(53))
+					Expect(reconcileErr).NotTo(HaveOccurred())
 
-			It("creates resolver rule", func() {
-				_, domainName, resolverRuleName, endpointId, kind, subnetIds := resolverClient.CreateResolverRuleWithContextArgsForCall(0)
-				Expect(domainName).To(Equal(fmt.Sprintf("%s.%s", ClusterName, WorkloadClusterBaseDomain)))
-				Expect(resolverRuleName).To(Equal(fmt.Sprintf("giantswarm-%s", ClusterName)))
-				Expect(endpointId).To(Equal("outbound-endpoint"))
-				Expect(kind).To(Equal("FORWARD"))
-				Expect(subnetIds).To(Equal([]string{"subnet-1", "subnet-2"}))
-			})
+					_, securityGroupId, protocol, port = ec2Client.AuthorizeSecurityGroupIngressWithContextArgsForCall(1)
+					Expect(securityGroupId).To(Equal("my-security-group"))
+					Expect(protocol).To(Equal("tcp"))
+					Expect(port).To(Equal(53))
+				})
 
-			It("creates ram share resource", func() {
-				_, resourceShareName, allowPrincipals, principals, resourceArns := ramClient.CreateResourceShareWithContextArgsForCall(0)
-				Expect(resourceShareName).To(Equal(fmt.Sprintf("giantswarm-%s-rr", ClusterName)))
-				Expect(allowPrincipals).To(Equal(true))
-				Expect(principals).To(Equal([]string{"resolver-rule-principal-arn"}))
-				Expect(resourceArns).To(Equal([]string{DnsServerAWSAccountId}))
-			})
+				When("creating ingress rules fails", func() {
+					BeforeEach(func() {
+						ec2Client.AuthorizeSecurityGroupIngressWithContextReturns(errors.New("boom"))
+					})
+					It("returns the error", func() {
+						Expect(reconcileErr).To(HaveOccurred())
+					})
+				})
 
-			It("associates resolver rule with VPC account", func() {
-				_, associationName, vpcId, resolverRuleId := dnsServerResolverClient.AssociateResolverRuleWithContextArgsForCall(0)
-				Expect(associationName).To(Equal(fmt.Sprintf("giantswarm-%s-rr-association", ClusterName)))
-				Expect(vpcId).To(Equal(DnsServerVPCId))
-				Expect(resolverRuleId).To(Equal("resolver-rule-id"))
+				When("creating ingress rules succeeds", func() {
+					It("creates resolver endpoints", func() {
+						_, direction, endpointName, securityGroupIds, subnetIds := resolverClient.CreateResolverEndpointWithContextArgsForCall(0)
+						Expect(direction).To(Equal("INBOUND"))
+						Expect(endpointName).To(Equal("foo-inbound"))
+						Expect(securityGroupIds).To(Equal([]string{"my-security-group"}))
+						Expect(subnetIds).To(Equal([]string{"subnet-1", "subnet-2"}))
+
+						_, direction, endpointName, securityGroupIds, subnetIds = resolverClient.CreateResolverEndpointWithContextArgsForCall(1)
+						Expect(direction).To(Equal("OUTBOUND"))
+						Expect(endpointName).To(Equal("foo-outbound"))
+						Expect(securityGroupIds).To(Equal([]string{"my-security-group"}))
+						Expect(subnetIds).To(Equal([]string{"subnet-1", "subnet-2"}))
+					})
+
+					It("creates resolver rule", func() {
+						_, domainName, resolverRuleName, endpointId, kind, subnetIds := resolverClient.CreateResolverRuleWithContextArgsForCall(0)
+						Expect(domainName).To(Equal(fmt.Sprintf("%s.%s", ClusterName, WorkloadClusterBaseDomain)))
+						Expect(resolverRuleName).To(Equal(fmt.Sprintf("giantswarm-%s", ClusterName)))
+						Expect(endpointId).To(Equal("outbound-endpoint"))
+						Expect(kind).To(Equal("FORWARD"))
+						Expect(subnetIds).To(Equal([]string{"subnet-1", "subnet-2"}))
+					})
+
+					It("creates ram share resource", func() {
+						_, resourceShareName, allowPrincipals, principals, resourceArns := ramClient.CreateResourceShareWithContextArgsForCall(0)
+						Expect(resourceShareName).To(Equal(fmt.Sprintf("giantswarm-%s-rr", ClusterName)))
+						Expect(allowPrincipals).To(Equal(true))
+						Expect(principals).To(Equal([]string{"resolver-rule-principal-arn"}))
+						Expect(resourceArns).To(Equal([]string{DnsServerAWSAccountId}))
+					})
+
+					It("associates resolver rule with VPC account", func() {
+						_, associationName, vpcId, resolverRuleId := dnsServerResolverClient.AssociateResolverRuleWithContextArgsForCall(0)
+						Expect(associationName).To(Equal(fmt.Sprintf("giantswarm-%s-rr-association", ClusterName)))
+						Expect(vpcId).To(Equal(DnsServerVPCId))
+						Expect(resolverRuleId).To(Equal("resolver-rule-id"))
+					})
+				})
 			})
 		})
 	})
