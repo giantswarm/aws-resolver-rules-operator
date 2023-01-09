@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -69,6 +70,9 @@ var _ = Describe("AWSCluster", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ClusterName,
 				Namespace: "bar",
+				Annotations: map[string]string{
+					gsannotations.AWSDNSMode: gsannotations.DNSModePrivate,
+				},
 			},
 			Spec: capa.AWSClusterSpec{
 				NetworkSpec: capa.NetworkSpec{
@@ -179,6 +183,19 @@ var _ = Describe("AWSCluster", func() {
 			awsClusterClient.GetReturns(awsCluster, nil)
 			awsClusterClient.GetOwnerReturns(cluster, nil)
 			awsClusterClient.GetIdentityReturns(awsClusterRoleIdentity, nil)
+		})
+
+		When("is not using private DNS mode", func() {
+			BeforeEach(func() {
+				awsClusterClient.GetReturns(awsCluster, nil)
+				awsCluster.Annotations = map[string]string{
+					gsannotations.AWSDNSMode: "non-private",
+				}
+			})
+			It("returns early", func() {
+				Expect(reconcileErr).NotTo(HaveOccurred())
+				Expect(ec2Client.CreateSecurityGroupWithContextCallCount()).To(BeZero())
+			})
 		})
 
 		When("creating security group fails", func() {

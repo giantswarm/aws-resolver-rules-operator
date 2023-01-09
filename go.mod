@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	github.com/aws/aws-sdk-go v1.43.29
+	github.com/giantswarm/k8smetadata v0.17.0
 	github.com/google/uuid v1.3.0
 	github.com/maxbrunsfeld/counterfeiter/v6 v6.5.0
 	github.com/onsi/ginkgo/v2 v2.6.1

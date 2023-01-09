@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 
+	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
@@ -106,6 +107,12 @@ func (r *AwsClusterReconciler) reconcileNormal(ctx context.Context, awsCluster *
 
 	if identity == nil {
 		logger.Info("AWSCluster has no identityRef set, skipping")
+		return ctrl.Result{}, nil
+	}
+
+	dnsModeAnnotation, ok := awsCluster.Annotations[gsannotations.AWSDNSMode]
+	if !ok || dnsModeAnnotation != gsannotations.DNSModePrivate {
+		logger.Info("AWSCluster is not using private DNS mode, skipping")
 		return ctrl.Result{}, nil
 	}
 
