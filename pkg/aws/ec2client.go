@@ -53,11 +53,11 @@ func (a *AWSEC2) createSecurityGroup(ctx context.Context, vpcId, groupName strin
 				securityGroupResponse, err := a.client.DescribeSecurityGroupsWithContext(ctx, &ec2.DescribeSecurityGroupsInput{
 					Filters: []*ec2.Filter{
 						{
-							Name:   aws.String("VPCId"),
+							Name:   aws.String("vpc-id"),
 							Values: aws.StringSlice([]string{vpcId}),
 						},
 						{
-							Name:   aws.String("Name"),
+							Name:   aws.String("group-name"),
 							Values: aws.StringSlice([]string{groupName}),
 						},
 					},
