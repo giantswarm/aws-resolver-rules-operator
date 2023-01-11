@@ -35,6 +35,7 @@ import (
 
 	"github.com/aws-resolver-rules-operator/pkg/aws"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
+	"github.com/aws-resolver-rules-operator/tests"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -64,6 +65,9 @@ var (
 
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+
+	tests.GetEnvOrSkip("AWS_ENDPOINT")
+
 	awsClients = aws.NewClients(os.Getenv("AWS_ENDPOINT"))
 
 	rawEC2Client, err = NewEC2Client(Region, AWS_IAM_ARN, "")
