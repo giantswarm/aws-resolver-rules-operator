@@ -107,7 +107,7 @@ func (a *AWSResolver) getResolverRule(ctx context.Context, resolverRuleName, dom
 				Values: aws.StringSlice([]string{fmt.Sprintf("%s.", domainName)}),
 			},
 			{
-				Name:   aws.String("Type"),
+				Name:   aws.String("TYPE"),
 				Values: aws.StringSlice([]string{"FORWARD"}),
 			},
 		},
