@@ -36,6 +36,7 @@ spec:
             - /manager
           args:
             - --leader-elect
+            - --workload-cluster-basedomain={{ .Values.workloadClusterBaseDomain }}
           resources:
             requests:
               cpu: 100m

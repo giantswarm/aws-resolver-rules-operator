@@ -18,3 +18,7 @@ pod:
     id: "1000"
   group:
     id: "1000"
+
+# Base domain used for the workload clusters created on the MC where this controller is deployed.
+# Normally we append the workload cluster name to this, i.e. my-cluster.${baseDomain}
+workloadClusterBaseDomain: ""
