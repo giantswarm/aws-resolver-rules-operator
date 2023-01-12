@@ -36,6 +36,11 @@ spec:
             - /manager
           args:
             - --leader-elect
+            - --dns-server-aws-account-id={{ .Values.dnsServerAWSAccountId }}
+            - --dns-server-arn={{ .Values.dnsServerARN }}
+            - --dns-server-external-id={{ .Values.dnsServerExternalId }}
+            - --dns-server-region={{ .Values.dnsServerRegion }}
+            - --dns-server-vpc-id={{ .Values.dnsServerVpcId }}
             - --workload-cluster-basedomain={{ .Values.workloadClusterBaseDomain }}
           resources:
             requests:

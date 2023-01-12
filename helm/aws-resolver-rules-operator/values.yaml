@@ -19,6 +19,21 @@ pod:
   group:
     id: "1000"
 
+# AWS account id where the DNS server is deployed.
+dnsServerAWSAccountId: ""
+
+# AWS region where the DNS server is deployed.
+dnsServerRegion: ""
+
+# AWS VPC id where the DNS server is deployed.
+dnsServerVpcId: ""
+
+# ARN for the IAM Role assumed to associate the Resolver Rule to the DNS server AWS account.
+dnsServerARN: ""
+
+# AWS external id used to be able to assume the IAM Role used by the DNS server.
+dnsServerExternalId: ""
+
 # Base domain used for the workload clusters created on the MC where this controller is deployed.
 # Normally we append the workload cluster name to this, i.e. my-cluster.${baseDomain}
 workloadClusterBaseDomain: ""
