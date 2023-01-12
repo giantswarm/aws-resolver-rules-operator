@@ -108,7 +108,7 @@ func (r *Resolver) createRule(ctx context.Context, cluster Cluster) (string, str
 }
 
 func (r *Resolver) associateRule(ctx context.Context, cluster Cluster, resolverRuleARN, resolverRuleId string) error {
-	logger := log.FromContext(ctx)
+	logger := log.FromContext(ctx).WithValues("resolverRuleId", resolverRuleId, "awsAccount", r.dnsServer.AWSAccountId, "vpcId", r.dnsServer.VPCId)
 
 	ramClient, err := r.awsClients.NewRAMClient(cluster.Region, cluster.IAMRoleARN)
 	if err != nil {
@@ -120,13 +120,13 @@ func (r *Resolver) associateRule(ctx context.Context, cluster Cluster, resolverR
 		return errors.WithStack(err)
 	}
 
-	logger.Info("Creating resource share item so we can share resolver rule with a different aws account", "awsAccount", r.dnsServer.AWSAccountId)
+	logger.Info("Creating resource share item so we can share resolver rule with a different aws account")
 	_, err = ramClient.CreateResourceShareWithContext(ctx, getResourceShareName(cluster.Name), true, []string{resolverRuleARN}, []string{r.dnsServer.AWSAccountId})
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	logger.Info("Associating resolver rule with VPC", "vpcId", r.dnsServer.VPCId)
+	logger.Info("Associating resolver rule with VPC")
 	err = dnsServerResolverClient.AssociateResolverRuleWithContext(ctx, getAssociationName(cluster.Name), r.dnsServer.VPCId, resolverRuleId)
 	if err != nil {
 		return errors.WithStack(err)
