@@ -51,11 +51,15 @@ var _ = Describe("AWSCluster", func() {
 		ramClient = new(resolverfakes.FakeRAMClient)
 		ec2Client = new(resolverfakes.FakeEC2Client)
 		fakeAWSClients := &resolver.FakeClients{
-			ResolverClient: resolverClient,
-			EC2Client:      ec2Client,
-			RAMClient:      ramClient,
+			ResolverClient:         resolverClient,
+			EC2Client:              ec2Client,
+			RAMClient:              ramClient,
+			ExternalResolverClient: dnsServerResolverClient,
 		}
-		resolver, err := resolver.NewResolver(fakeAWSClients, dnsServerResolverClient, DnsServerAWSAccountId, DnsServerVPCId, WorkloadClusterBaseDomain)
+		dnsServer, err := resolver.NewDNSServer(DnsServerAWSAccountId, "1234567890", "eu-central-1", "external-iam-role-to-assume", DnsServerVPCId)
+		Expect(err).NotTo(HaveOccurred())
+
+		resolver, err := resolver.NewResolver(fakeAWSClients, dnsServer, WorkloadClusterBaseDomain)
 		Expect(err).NotTo(HaveOccurred())
 
 		reconciler = controllers.NewAwsClusterReconciler(awsClusterClient, resolver)

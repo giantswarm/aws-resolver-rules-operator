@@ -99,13 +99,14 @@ func main() {
 
 	k8sAwsClusterClient := k8sclient.NewAWSCluster(mgr.GetClient())
 	awsClients := aws.NewClients(os.Getenv("AWS_ENDPOINT"))
-	dnsServerResolverClient, err := awsClients.NewResolverClientWithExternalId(dnsServerRegion, dnsServerArn, dnsServerExternalId)
+
+	dnsserver, err := resolver.NewDNSServer(dnsServerAWSAccountId, dnsServerExternalId, dnsServerRegion, dnsServerArn, dnsServerVpcId)
 	if err != nil {
-		setupLog.Error(err, "unable to create AWS Route53 Resolver client")
+		setupLog.Error(err, "unable to create DNSServer object")
 		os.Exit(1)
 	}
 
-	awsResolver, err := resolver.NewResolver(awsClients, dnsServerResolverClient, dnsServerAWSAccountId, dnsServerVpcId, workloadClusterBaseDomain)
+	awsResolver, err := resolver.NewResolver(awsClients, dnsserver, workloadClusterBaseDomain)
 	if err != nil {
 		setupLog.Error(err, "unable to create Resolver")
 		os.Exit(1)

@@ -27,11 +27,11 @@ var _ = Describe("AWSCluster", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		cluster = resolver.Cluster{
-			Name:    "my-cluster",
-			Region:  Region,
-			VPCId:   VPCId,
-			ARN:     AWS_IAM_ARN,
-			Subnets: subnets,
+			Name:       "my-cluster",
+			Region:     Region,
+			VPCId:      VPCId,
+			IAMRoleARN: AWS_IAM_ARN,
+			Subnets:    subnets,
 		}
 
 		createSecurityGroupResponse, err := rawEC2Client.CreateSecurityGroup(&ec2.CreateSecurityGroupInput{
@@ -81,7 +81,7 @@ var _ = Describe("AWSCluster", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(rulesResponse.ResolverRules)).To(Equal(1))
 
-		By("creating the resovler rule again it doesn't fail", func() {
+		By("creating the resolver rule again it doesn't fail", func() {
 			_, _, err = resolverClient.CreateResolverRule(ctx, cluster, resolverRulesSecurityGroupForTests, "example.com", "my-resolver-rule")
 			Expect(err).NotTo(HaveOccurred())
 

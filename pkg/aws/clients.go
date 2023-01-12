@@ -40,35 +40,39 @@ func NewClients(endpoint string) resolver.AWSClients {
 	return &Clients{endpoint: endpoint}
 }
 
-func (c *Clients) NewResolverClient(region, arn string) (resolver.ResolverClient, error) {
-	client, err := c.newResolverClient(region, arn, "")
-	if err != nil {
-		return &AWSResolver{}, errors.WithStack(err)
-	}
-
-	return &AWSResolver{client: client}, nil
-}
-
-func (c *Clients) NewResolverClientWithExternalId(region, arn, externalId string) (resolver.ResolverClient, error) {
-	client, err := c.newResolverClient(region, arn, externalId)
-	if err != nil {
-		return &AWSResolver{}, errors.WithStack(err)
-	}
-
-	return &AWSResolver{client: client}, nil
-}
-
-func (c *Clients) newResolverClient(region, arn, externalId string) (*route53resolver.Route53Resolver, error) {
+func (c *Clients) NewResolverClient(region, roleToAssume string) (resolver.ResolverClient, error) {
 	session, err := c.sessionFromRegion(region)
 	if err != nil {
-		return &route53resolver.Route53Resolver{}, errors.WithStack(err)
+		return &AWSResolver{}, errors.WithStack(err)
 	}
 
-	resolverClient := route53resolver.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn, configureExternalId(externalId))})
-	resolverClient.Handlers.Build.PushFront(request.MakeAddToUserAgentHandler(controllerName, currentCommit))
-	resolverClient.Handlers.CompleteAttempt.PushFront(captureRequestMetrics(controllerName))
+	client := route53resolver.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, roleToAssume)})
+	client.Handlers.Build.PushFront(request.MakeAddToUserAgentHandler(controllerName, currentCommit))
+	client.Handlers.CompleteAttempt.PushFront(captureRequestMetrics(controllerName))
 
-	return resolverClient, nil
+	return &AWSResolver{client: client}, nil
+}
+
+func (c *Clients) NewResolverClientWithExternalId(region, roleToAssume, externalRoleToAssume, externalId string) (resolver.ResolverClient, error) {
+	session, err := c.sessionFromRegion(region)
+	if err != nil {
+		return &AWSResolver{}, errors.WithStack(err)
+	}
+
+	assumedRoleSession, err := awssession.NewSession(&aws.Config{
+		Region:      aws.String(region),
+		Endpoint:    aws.String(c.endpoint),
+		Credentials: stscreds.NewCredentials(session, roleToAssume, configureExternalId(roleToAssume, "")),
+	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	client := route53resolver.New(assumedRoleSession, &aws.Config{Credentials: stscreds.NewCredentials(assumedRoleSession, externalRoleToAssume, configureExternalId(externalRoleToAssume, externalId))})
+	client.Handlers.Build.PushFront(request.MakeAddToUserAgentHandler(controllerName, currentCommit))
+	client.Handlers.CompleteAttempt.PushFront(captureRequestMetrics(controllerName))
+
+	return &AWSResolver{client: client}, nil
 }
 
 func (c *Clients) NewEC2Client(region, arn string) (resolver.EC2Client, error) {
@@ -95,7 +99,7 @@ func (c *Clients) newEC2Client(region, arn, externalId string) (*ec2.EC2, error)
 		return &ec2.EC2{}, errors.WithStack(err)
 	}
 
-	ec2Client := ec2.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn, configureExternalId(externalId))})
+	ec2Client := ec2.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn, configureExternalId(arn, externalId))})
 	ec2Client.Handlers.Build.PushFront(request.MakeAddToUserAgentHandler(controllerName, currentCommit))
 	ec2Client.Handlers.CompleteAttempt.PushFront(captureRequestMetrics(controllerName))
 
@@ -126,15 +130,18 @@ func (c *Clients) newRAMClient(region, arn, externalId string) (*ram.RAM, error)
 		return &ram.RAM{}, errors.WithStack(err)
 	}
 
-	ramClient := ram.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn, configureExternalId(externalId))})
+	ramClient := ram.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn, configureExternalId(arn, externalId))})
 	ramClient.Handlers.Build.PushFront(request.MakeAddToUserAgentHandler(controllerName, currentCommit))
 	ramClient.Handlers.CompleteAttempt.PushFront(captureRequestMetrics(controllerName))
 
 	return ramClient, nil
 }
 
-func configureExternalId(externalId string) func(provider *stscreds.AssumeRoleProvider) {
+func configureExternalId(roleArn, externalId string) func(provider *stscreds.AssumeRoleProvider) {
 	return func(assumeRoleProvider *stscreds.AssumeRoleProvider) {
+		if roleArn != "" {
+			assumeRoleProvider.RoleARN = roleArn
+		}
 		if externalId != "" {
 			assumeRoleProvider.ExternalID = aws.String(externalId)
 		}

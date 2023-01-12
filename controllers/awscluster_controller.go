@@ -116,7 +116,7 @@ func (r *AwsClusterReconciler) reconcileNormal(ctx context.Context, awsCluster *
 		return ctrl.Result{}, nil
 	}
 
-	cluster := resolver.Cluster{Name: awsCluster.Name, Region: awsCluster.Spec.Region, VPCId: awsCluster.Spec.NetworkSpec.VPC.ID, ARN: identity.Spec.RoleArn, Subnets: getSubnetIds(awsCluster)}
+	cluster := resolver.Cluster{Name: awsCluster.Name, Region: awsCluster.Spec.Region, VPCId: awsCluster.Spec.NetworkSpec.VPC.ID, IAMRoleARN: identity.Spec.RoleArn, Subnets: getSubnetIds(awsCluster)}
 	associatedResolverRule, err := r.resolver.CreateRule(ctx, cluster)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)

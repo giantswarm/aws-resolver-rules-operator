@@ -11,19 +11,15 @@ import (
 type Resolver struct {
 	// awsClients is a factory to retrieve clients to talk to the AWS API using the right credentials.
 	awsClients AWSClients
-	// dnsServerAWSAccountId is the AWS account where the DNS server is deployed.
-	dnsServerAWSAccountId string
-	// dnsServerResolverClient Route53 Resolver client already configured to talk to the DNS server AWS account.
-	dnsServerResolverClient ResolverClient
-	// dnsServerVPCId is the VPC id where the DNS server is deployed.
-	dnsServerVPCId string
+	// dnsServer contains details about the DNS server that needs to resolve the domain.
+	dnsServer DNSServer
 	// workloadClusterBaseDomain is the root hosted zone used to create the workload cluster hosted zone, i.e. gaws.gigantic.io
 	workloadClusterBaseDomain string
 }
 
 type AWSClients interface {
 	NewResolverClient(region, arn string) (ResolverClient, error)
-	NewResolverClientWithExternalId(region, arn, externalId string) (ResolverClient, error)
+	NewResolverClientWithExternalId(region, roleToAssume, externalRoleToAssume, externalId string) (ResolverClient, error)
 	NewEC2Client(region, arn string) (EC2Client, error)
 	NewEC2ClientWithExternalId(region, arn, externalId string) (EC2Client, error)
 	NewRAMClient(region, arn string) (RAMClient, error)
@@ -47,11 +43,11 @@ type ResolverClient interface {
 }
 
 type Cluster struct {
-	Name    string
-	Region  string
-	VPCId   string
-	ARN     string
-	Subnets []string
+	Name       string
+	Region     string
+	VPCId      string
+	IAMRoleARN string
+	Subnets    []string
 }
 
 type AssociatedResolverRule struct {
@@ -59,12 +55,10 @@ type AssociatedResolverRule struct {
 	RuleName string
 }
 
-func NewResolver(awsClients AWSClients, dnsServerResolverClient ResolverClient, dnsServerAWSAccountId, dnsServerVPCId, workloadClusterBaseDomain string) (Resolver, error) {
+func NewResolver(awsClients AWSClients, dnsServer DNSServer, workloadClusterBaseDomain string) (Resolver, error) {
 	return Resolver{
 		awsClients:                awsClients,
-		dnsServerResolverClient:   dnsServerResolverClient,
-		dnsServerAWSAccountId:     dnsServerAWSAccountId,
-		dnsServerVPCId:            dnsServerVPCId,
+		dnsServer:                 dnsServer,
 		workloadClusterBaseDomain: workloadClusterBaseDomain,
 	}, nil
 }
@@ -89,11 +83,11 @@ func (r *Resolver) CreateRule(ctx context.Context, cluster Cluster) (AssociatedR
 func (r *Resolver) createRule(ctx context.Context, cluster Cluster) (string, string, error) {
 	logger := log.FromContext(ctx)
 
-	ec2Client, err := r.awsClients.NewEC2Client(cluster.Region, cluster.ARN)
+	ec2Client, err := r.awsClients.NewEC2Client(cluster.Region, cluster.IAMRoleARN)
 	if err != nil {
 		return "", "", errors.WithStack(err)
 	}
-	resolverClient, err := r.awsClients.NewResolverClient(cluster.Region, cluster.ARN)
+	resolverClient, err := r.awsClients.NewResolverClient(cluster.Region, cluster.IAMRoleARN)
 	if err != nil {
 		return "", "", errors.WithStack(err)
 	}
@@ -116,19 +110,24 @@ func (r *Resolver) createRule(ctx context.Context, cluster Cluster) (string, str
 func (r *Resolver) associateRule(ctx context.Context, cluster Cluster, resolverRuleARN, resolverRuleId string) error {
 	logger := log.FromContext(ctx)
 
-	ramClient, err := r.awsClients.NewRAMClient(cluster.Region, cluster.ARN)
+	ramClient, err := r.awsClients.NewRAMClient(cluster.Region, cluster.IAMRoleARN)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	logger.Info("Creating resource share item so we can share resolver rule with a different aws account", "awsAccount", r.dnsServerAWSAccountId)
-	_, err = ramClient.CreateResourceShareWithContext(ctx, getResourceShareName(cluster.Name), true, []string{resolverRuleARN}, []string{r.dnsServerAWSAccountId})
+	dnsServerResolverClient, err := r.awsClients.NewResolverClientWithExternalId(r.dnsServer.AWSRegion, cluster.IAMRoleARN, r.dnsServer.IAMRoleToAssume, r.dnsServer.IAMExternalId)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	logger.Info("Associating resolver rule with VPC", "vpcId", r.dnsServerVPCId)
-	err = r.dnsServerResolverClient.AssociateResolverRuleWithContext(ctx, getAssociationName(cluster.Name), r.dnsServerVPCId, resolverRuleId)
+	logger.Info("Creating resource share item so we can share resolver rule with a different aws account", "awsAccount", r.dnsServer.AWSAccountId)
+	_, err = ramClient.CreateResourceShareWithContext(ctx, getResourceShareName(cluster.Name), true, []string{resolverRuleARN}, []string{r.dnsServer.AWSAccountId})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	logger.Info("Associating resolver rule with VPC", "vpcId", r.dnsServer.VPCId)
+	err = dnsServerResolverClient.AssociateResolverRuleWithContext(ctx, getAssociationName(cluster.Name), r.dnsServer.VPCId, resolverRuleId)
 	if err != nil {
 		return errors.WithStack(err)
 	}

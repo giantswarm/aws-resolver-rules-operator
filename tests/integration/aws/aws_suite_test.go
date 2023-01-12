@@ -28,6 +28,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/route53resolver"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/pkg/errors"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -102,7 +103,7 @@ func NewEC2Client(region, arn, externalId string) (*ec2.EC2, error) {
 		Endpoint: awssdk.String(os.Getenv("AWS_ENDPOINT")),
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	client := ec2.New(session, &awssdk.Config{Credentials: stscreds.NewCredentials(session, arn, func(assumeRoleProvider *stscreds.AssumeRoleProvider) {
@@ -120,7 +121,7 @@ func NewResolverClient(region, arn, externalId string) (*route53resolver.Route53
 		Endpoint: awssdk.String(os.Getenv("AWS_ENDPOINT")),
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	client := route53resolver.New(session, &awssdk.Config{Credentials: stscreds.NewCredentials(session, arn, func(assumeRoleProvider *stscreds.AssumeRoleProvider) {
