@@ -67,7 +67,7 @@ var _ = Describe("AWSCluster", func() {
 	})
 
 	It("creates the resolver rule successfully", func() {
-		_, resolverRuleId, err = resolverClient.CreateResolverRule(ctx, cluster, resolverRulesSecurityGroupForTests, "example.com", "my-resolver-rule")
+		_, resolverRuleId, err = resolverClient.CreateResolverRule(ctx, logger, cluster, resolverRulesSecurityGroupForTests, "example.com", "my-resolver-rule")
 		Expect(err).NotTo(HaveOccurred())
 
 		rulesResponse, err := rawResolverClient.ListResolverRulesWithContext(ctx, &route53resolver.ListResolverRulesInput{
@@ -82,7 +82,7 @@ var _ = Describe("AWSCluster", func() {
 		Expect(len(rulesResponse.ResolverRules)).To(Equal(1))
 
 		By("creating the resolver rule again it doesn't fail", func() {
-			_, _, err = resolverClient.CreateResolverRule(ctx, cluster, resolverRulesSecurityGroupForTests, "example.com", "my-resolver-rule")
+			_, _, err = resolverClient.CreateResolverRule(ctx, logger, cluster, resolverRulesSecurityGroupForTests, "example.com", "my-resolver-rule")
 			Expect(err).NotTo(HaveOccurred())
 
 			rulesResponse, err = rawResolverClient.ListResolverRulesWithContext(ctx, &route53resolver.ListResolverRulesInput{

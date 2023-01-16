@@ -226,7 +226,7 @@ var _ = Describe("AWSCluster", func() {
 				})
 
 				It("creates resolver rule", func() {
-					_, cluster, securityGroupId, domainName, resolverRuleName := resolverClient.CreateResolverRuleArgsForCall(0)
+					_, _, cluster, securityGroupId, domainName, resolverRuleName := resolverClient.CreateResolverRuleArgsForCall(0)
 					Expect(domainName).To(Equal(fmt.Sprintf("%s.%s", ClusterName, WorkloadClusterBaseDomain)))
 					Expect(resolverRuleName).To(Equal(fmt.Sprintf("giantswarm-%s", ClusterName)))
 					Expect(securityGroupId).To(Equal("my-security-group"))

@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
+	"github.com/go-logr/logr"
 )
 
 type FakeResolverClient struct {
@@ -23,14 +24,15 @@ type FakeResolverClient struct {
 	associateResolverRuleWithContextReturnsOnCall map[int]struct {
 		result1 error
 	}
-	CreateResolverRuleStub        func(context.Context, resolver.Cluster, string, string, string) (string, string, error)
+	CreateResolverRuleStub        func(context.Context, logr.Logger, resolver.Cluster, string, string, string) (string, string, error)
 	createResolverRuleMutex       sync.RWMutex
 	createResolverRuleArgsForCall []struct {
 		arg1 context.Context
-		arg2 resolver.Cluster
-		arg3 string
+		arg2 logr.Logger
+		arg3 resolver.Cluster
 		arg4 string
 		arg5 string
+		arg6 string
 	}
 	createResolverRuleReturns struct {
 		result1 string
@@ -110,22 +112,23 @@ func (fake *FakeResolverClient) AssociateResolverRuleWithContextReturnsOnCall(i 
 	}{result1}
 }
 
-func (fake *FakeResolverClient) CreateResolverRule(arg1 context.Context, arg2 resolver.Cluster, arg3 string, arg4 string, arg5 string) (string, string, error) {
+func (fake *FakeResolverClient) CreateResolverRule(arg1 context.Context, arg2 logr.Logger, arg3 resolver.Cluster, arg4 string, arg5 string, arg6 string) (string, string, error) {
 	fake.createResolverRuleMutex.Lock()
 	ret, specificReturn := fake.createResolverRuleReturnsOnCall[len(fake.createResolverRuleArgsForCall)]
 	fake.createResolverRuleArgsForCall = append(fake.createResolverRuleArgsForCall, struct {
 		arg1 context.Context
-		arg2 resolver.Cluster
-		arg3 string
+		arg2 logr.Logger
+		arg3 resolver.Cluster
 		arg4 string
 		arg5 string
-	}{arg1, arg2, arg3, arg4, arg5})
+		arg6 string
+	}{arg1, arg2, arg3, arg4, arg5, arg6})
 	stub := fake.CreateResolverRuleStub
 	fakeReturns := fake.createResolverRuleReturns
-	fake.recordInvocation("CreateResolverRule", []interface{}{arg1, arg2, arg3, arg4, arg5})
+	fake.recordInvocation("CreateResolverRule", []interface{}{arg1, arg2, arg3, arg4, arg5, arg6})
 	fake.createResolverRuleMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3, arg4, arg5)
+		return stub(arg1, arg2, arg3, arg4, arg5, arg6)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2, ret.result3
@@ -139,17 +142,17 @@ func (fake *FakeResolverClient) CreateResolverRuleCallCount() int {
 	return len(fake.createResolverRuleArgsForCall)
 }
 
-func (fake *FakeResolverClient) CreateResolverRuleCalls(stub func(context.Context, resolver.Cluster, string, string, string) (string, string, error)) {
+func (fake *FakeResolverClient) CreateResolverRuleCalls(stub func(context.Context, logr.Logger, resolver.Cluster, string, string, string) (string, string, error)) {
 	fake.createResolverRuleMutex.Lock()
 	defer fake.createResolverRuleMutex.Unlock()
 	fake.CreateResolverRuleStub = stub
 }
 
-func (fake *FakeResolverClient) CreateResolverRuleArgsForCall(i int) (context.Context, resolver.Cluster, string, string, string) {
+func (fake *FakeResolverClient) CreateResolverRuleArgsForCall(i int) (context.Context, logr.Logger, resolver.Cluster, string, string, string) {
 	fake.createResolverRuleMutex.RLock()
 	defer fake.createResolverRuleMutex.RUnlock()
 	argsForCall := fake.createResolverRuleArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5, argsForCall.arg6
 }
 
 func (fake *FakeResolverClient) CreateResolverRuleReturns(result1 string, result2 string, result3 error) {

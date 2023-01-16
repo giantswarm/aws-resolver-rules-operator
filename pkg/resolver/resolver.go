@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -38,7 +39,7 @@ type RAMClient interface {
 
 //counterfeiter:generate . ResolverClient
 type ResolverClient interface {
-	CreateResolverRule(ctx context.Context, cluster Cluster, securityGroupId, domainName, resolverRuleName string) (string, string, error)
+	CreateResolverRule(ctx context.Context, logger logr.Logger, cluster Cluster, securityGroupId, domainName, resolverRuleName string) (string, string, error)
 	AssociateResolverRuleWithContext(ctx context.Context, associationName, vpcID, resolverRuleId string) error
 }
 
@@ -99,7 +100,7 @@ func (r *Resolver) createRule(ctx context.Context, cluster Cluster) (string, str
 	}
 
 	logger.Info("Creating resolver rule", "domainName", getResolverRuleDomainName(cluster.Name, r.workloadClusterBaseDomain))
-	resolverRuleArn, resolverRuleId, err := resolverClient.CreateResolverRule(ctx, cluster, securityGroupId, getResolverRuleDomainName(cluster.Name, r.workloadClusterBaseDomain), getResolverRuleName(cluster.Name))
+	resolverRuleArn, resolverRuleId, err := resolverClient.CreateResolverRule(ctx, logger, cluster, securityGroupId, getResolverRuleDomainName(cluster.Name, r.workloadClusterBaseDomain), getResolverRuleName(cluster.Name))
 	if err != nil {
 		return "", "", errors.WithStack(err)
 	}

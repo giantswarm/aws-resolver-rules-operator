@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/route53resolver"
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
@@ -17,7 +18,7 @@ type AWSResolver struct {
 	client *route53resolver.Route53Resolver
 }
 
-func (a *AWSResolver) CreateResolverRule(ctx context.Context, cluster resolver.Cluster, securityGroupId, domainName, resolverRuleName string) (string, string, error) {
+func (a *AWSResolver) CreateResolverRule(ctx context.Context, logger logr.Logger, cluster resolver.Cluster, securityGroupId, domainName, resolverRuleName string) (string, string, error) {
 	resolverRule, err := a.getResolverRule(ctx, resolverRuleName, domainName)
 	if err != nil {
 		if !errors.Is(err, &ResolverRuleNotFoundError{}) {
@@ -31,12 +32,12 @@ func (a *AWSResolver) CreateResolverRule(ctx context.Context, cluster resolver.C
 	}
 
 	// Otherwise we create it.
-	inboundEndpointId, err := a.createResolverEndpointWithContext(ctx, "INBOUND", getInboundEndpointName(cluster.Name), []string{securityGroupId}, cluster.Subnets)
+	inboundEndpointId, err := a.createResolverEndpointWithContext(ctx, logger, "INBOUND", getInboundEndpointName(cluster.Name), []string{securityGroupId}, cluster.Subnets)
 	if err != nil {
 		return "", "", errors.WithStack(err)
 	}
 
-	outboundEndpointId, err := a.createResolverEndpointWithContext(ctx, "OUTBOUND", getOutboundEndpointName(cluster.Name), []string{securityGroupId}, cluster.Subnets)
+	outboundEndpointId, err := a.createResolverEndpointWithContext(ctx, logger, "OUTBOUND", getOutboundEndpointName(cluster.Name), []string{securityGroupId}, cluster.Subnets)
 	if err != nil {
 		return "", "", errors.WithStack(err)
 	}
@@ -148,7 +149,7 @@ func (a *AWSResolver) AssociateResolverRuleWithContext(ctx context.Context, asso
 // CreateResolverEndpointWithContext creates a Resolver endpoint.
 // It won't return an error if the endpoint already exists. Errors can be found here
 // https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_CreateResolverEndpoint.html#API_route53resolver_CreateResolverEndpoint_Errors
-func (a *AWSResolver) createResolverEndpointWithContext(ctx context.Context, direction, name string, securityGroupIds, subnetIds []string) (string, error) {
+func (a *AWSResolver) createResolverEndpointWithContext(ctx context.Context, logger logr.Logger, direction, name string, securityGroupIds, subnetIds []string) (string, error) {
 	resolverEndpoint, err := a.getResolverEndpoint(ctx, name)
 	if err != nil {
 		if !errors.Is(err, &ResolverEndpointNotFoundError{}) {
@@ -169,6 +170,7 @@ func (a *AWSResolver) createResolverEndpointWithContext(ctx context.Context, dir
 			SubnetId: aws.String(id),
 		})
 	}
+	logger.Info("Creating resolver endpoint", "direction", direction, "endpointName", name, "securityGroupId", securityGroupIds, "subnetIds", subnetIds)
 	response, err := a.client.CreateResolverEndpointWithContext(ctx, &route53resolver.CreateResolverEndpointInput{
 		CreatorRequestId: aws.String(fmt.Sprintf("%d", now.UnixNano())),
 		Direction:        aws.String(direction),

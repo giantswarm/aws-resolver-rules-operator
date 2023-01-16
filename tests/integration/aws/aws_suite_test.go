@@ -26,6 +26,7 @@ import (
 	awssession "github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/route53resolver"
+	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
@@ -56,6 +57,7 @@ var (
 	awsClients        resolver.AWSClients
 	ctx               context.Context
 	ec2Client         resolver.EC2Client
+	logger            logr.Logger
 	resolverClient    resolver.ResolverClient
 	err               error
 	rawEC2Client      *ec2.EC2
@@ -65,8 +67,8 @@ var (
 )
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
-
+	logger = zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	logf.SetLogger(logger)
 	tests.GetEnvOrSkip("AWS_ENDPOINT")
 
 	awsClients = aws.NewClients(os.Getenv("AWS_ENDPOINT"))
