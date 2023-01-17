@@ -302,13 +302,13 @@ var _ = Describe("AWSCluster", func() {
 				})
 
 				It("disassociates resolver rule from VPC", func() {
-					_, vpcId, resolverRuleName := dnsServerResolverClient.DisassociateResolverRuleWithContextArgsForCall(0)
+					_, _, vpcId, resolverRuleName := dnsServerResolverClient.DisassociateResolverRuleWithContextArgsForCall(0)
 					Expect(vpcId).To(Equal(DnsServerVPCId))
 					Expect(resolverRuleName).To(Equal("giantswarm-foo"))
 				})
 
 				It("deletes the ram share resource", func() {
-					_, resourceShareName := ramClient.DeleteResourceShareWithContextArgsForCall(0)
+					_, _, resourceShareName := ramClient.DeleteResourceShareWithContextArgsForCall(0)
 					Expect(resourceShareName).To(Equal("giantswarm-foo-rr"))
 				})
 

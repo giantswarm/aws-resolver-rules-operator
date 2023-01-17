@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
+	"github.com/go-logr/logr"
 )
 
 type FakeRAMClient struct {
@@ -26,11 +27,12 @@ type FakeRAMClient struct {
 		result1 string
 		result2 error
 	}
-	DeleteResourceShareWithContextStub        func(context.Context, string) error
+	DeleteResourceShareWithContextStub        func(context.Context, logr.Logger, string) error
 	deleteResourceShareWithContextMutex       sync.RWMutex
 	deleteResourceShareWithContextArgsForCall []struct {
 		arg1 context.Context
-		arg2 string
+		arg2 logr.Logger
+		arg3 string
 	}
 	deleteResourceShareWithContextReturns struct {
 		result1 error
@@ -120,19 +122,20 @@ func (fake *FakeRAMClient) CreateResourceShareWithContextReturnsOnCall(i int, re
 	}{result1, result2}
 }
 
-func (fake *FakeRAMClient) DeleteResourceShareWithContext(arg1 context.Context, arg2 string) error {
+func (fake *FakeRAMClient) DeleteResourceShareWithContext(arg1 context.Context, arg2 logr.Logger, arg3 string) error {
 	fake.deleteResourceShareWithContextMutex.Lock()
 	ret, specificReturn := fake.deleteResourceShareWithContextReturnsOnCall[len(fake.deleteResourceShareWithContextArgsForCall)]
 	fake.deleteResourceShareWithContextArgsForCall = append(fake.deleteResourceShareWithContextArgsForCall, struct {
 		arg1 context.Context
-		arg2 string
-	}{arg1, arg2})
+		arg2 logr.Logger
+		arg3 string
+	}{arg1, arg2, arg3})
 	stub := fake.DeleteResourceShareWithContextStub
 	fakeReturns := fake.deleteResourceShareWithContextReturns
-	fake.recordInvocation("DeleteResourceShareWithContext", []interface{}{arg1, arg2})
+	fake.recordInvocation("DeleteResourceShareWithContext", []interface{}{arg1, arg2, arg3})
 	fake.deleteResourceShareWithContextMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2)
+		return stub(arg1, arg2, arg3)
 	}
 	if specificReturn {
 		return ret.result1
@@ -146,17 +149,17 @@ func (fake *FakeRAMClient) DeleteResourceShareWithContextCallCount() int {
 	return len(fake.deleteResourceShareWithContextArgsForCall)
 }
 
-func (fake *FakeRAMClient) DeleteResourceShareWithContextCalls(stub func(context.Context, string) error) {
+func (fake *FakeRAMClient) DeleteResourceShareWithContextCalls(stub func(context.Context, logr.Logger, string) error) {
 	fake.deleteResourceShareWithContextMutex.Lock()
 	defer fake.deleteResourceShareWithContextMutex.Unlock()
 	fake.DeleteResourceShareWithContextStub = stub
 }
 
-func (fake *FakeRAMClient) DeleteResourceShareWithContextArgsForCall(i int) (context.Context, string) {
+func (fake *FakeRAMClient) DeleteResourceShareWithContextArgsForCall(i int) (context.Context, logr.Logger, string) {
 	fake.deleteResourceShareWithContextMutex.RLock()
 	defer fake.deleteResourceShareWithContextMutex.RUnlock()
 	argsForCall := fake.deleteResourceShareWithContextArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
 func (fake *FakeRAMClient) DeleteResourceShareWithContextReturns(result1 error) {

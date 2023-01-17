@@ -35,7 +35,7 @@ type EC2Client interface {
 //counterfeiter:generate . RAMClient
 type RAMClient interface {
 	CreateResourceShareWithContext(ctx context.Context, resourceShareName string, allowExternalPrincipals bool, resourceArns, principals []string) (string, error)
-	DeleteResourceShareWithContext(ctx context.Context, resourceShareName string) error
+	DeleteResourceShareWithContext(ctx context.Context, logger logr.Logger, resourceShareName string) error
 }
 
 //counterfeiter:generate . ResolverClient
@@ -43,7 +43,7 @@ type ResolverClient interface {
 	CreateResolverRule(ctx context.Context, logger logr.Logger, cluster Cluster, securityGroupId, domainName, resolverRuleName string) (string, string, error)
 	DeleteResolverRule(ctx context.Context, logger logr.Logger, cluster Cluster, resolverRuleName string) error
 	AssociateResolverRuleWithContext(ctx context.Context, associationName, vpcID, resolverRuleId string) error
-	DisassociateResolverRuleWithContext(ctx context.Context, vpcID, resolverRuleName string) error
+	DisassociateResolverRuleWithContext(ctx context.Context, logger logr.Logger, vpcID, resolverRuleName string) error
 }
 
 type Cluster struct {
@@ -90,7 +90,7 @@ func (r *Resolver) DeleteRule(ctx context.Context, logger logr.Logger, cluster C
 		return errors.WithStack(err)
 	}
 
-	err = dnsServerResolverClient.DisassociateResolverRuleWithContext(ctx, r.dnsServer.VPCId, getResolverRuleName(cluster.Name))
+	err = dnsServerResolverClient.DisassociateResolverRuleWithContext(ctx, logger, r.dnsServer.VPCId, getResolverRuleName(cluster.Name))
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -100,7 +100,7 @@ func (r *Resolver) DeleteRule(ctx context.Context, logger logr.Logger, cluster C
 		return errors.WithStack(err)
 	}
 
-	err = ramClient.DeleteResourceShareWithContext(ctx, getResourceShareName(cluster.Name))
+	err = ramClient.DeleteResourceShareWithContext(ctx, logger, getResourceShareName(cluster.Name))
 	if err != nil {
 		return errors.WithStack(err)
 	}

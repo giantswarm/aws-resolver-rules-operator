@@ -5,6 +5,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ram"
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 )
 
@@ -26,7 +27,8 @@ func (a *AWSRAM) CreateResourceShareWithContext(ctx context.Context, resourceSha
 	return *response.ResourceShare.ResourceShareArn, nil
 }
 
-func (a *AWSRAM) DeleteResourceShareWithContext(ctx context.Context, resourceShareName string) error {
+func (a *AWSRAM) DeleteResourceShareWithContext(ctx context.Context, logger logr.Logger, resourceShareName string) error {
+	logger.Info("Trying to find RAM resource share", "resourceShareName", resourceShareName)
 	resourceShare, err := a.client.GetResourceShares(&ram.GetResourceSharesInput{
 		Name:          aws.String(resourceShareName),
 		ResourceOwner: aws.String("SELF"),
@@ -35,6 +37,7 @@ func (a *AWSRAM) DeleteResourceShareWithContext(ctx context.Context, resourceSha
 		return errors.WithStack(err)
 	}
 
+	logger.Info("Deleting RAM resource share", "resourceShareName", resourceShareName)
 	_, err = a.client.DeleteResourceShareWithContext(ctx, &ram.DeleteResourceShareInput{
 		ResourceShareArn: resourceShare.ResourceShares[0].ResourceShareArn,
 	})

@@ -198,9 +198,11 @@ func (a *AWSResolver) AssociateResolverRuleWithContext(ctx context.Context, asso
 	return nil
 }
 
-func (a *AWSResolver) DisassociateResolverRuleWithContext(ctx context.Context, vpcID, resolverRuleName string) error {
+func (a *AWSResolver) DisassociateResolverRuleWithContext(ctx context.Context, logger logr.Logger, vpcID, resolverRuleName string) error {
+	logger.Info("Trying to find Resolver Rule", "resolverRuleName", resolverRuleName)
 	resolverRule, err := a.getResolverRule(ctx, resolverRuleName)
 	if errors.Is(err, &ResolverRuleNotFoundError{}) {
+		logger.Info("Resolver Rule not found", "resolverRuleName", resolverRuleName)
 		return nil
 	}
 
@@ -208,6 +210,7 @@ func (a *AWSResolver) DisassociateResolverRuleWithContext(ctx context.Context, v
 		return errors.WithStack(err)
 	}
 
+	logger.Info("Disassociating Resolver Rule from VPC", "resolverRuleName", resolverRuleName, "vpcId", vpcID)
 	_, err = a.client.DisassociateResolverRuleWithContext(ctx, &route53resolver.DisassociateResolverRuleInput{
 		ResolverRuleId: resolverRule.Id,
 		VPCId:          aws.String(vpcID),

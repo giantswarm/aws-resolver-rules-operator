@@ -12,7 +12,7 @@ import (
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
 
-var _ = Describe("AWSCluster", func() {
+var _ = Describe("Route53 Resolver client", func() {
 
 	var (
 		cluster                            resolver.Cluster

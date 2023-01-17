@@ -9,7 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("AWSCluster", func() {
+var _ = Describe("EC2 client", func() {
 
 	var (
 		resolverEndpointsSecurityGroup string
