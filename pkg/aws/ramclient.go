@@ -28,7 +28,8 @@ func (a *AWSRAM) CreateResourceShareWithContext(ctx context.Context, resourceSha
 
 func (a *AWSRAM) DeleteResourceShareWithContext(ctx context.Context, resourceShareName string) error {
 	resourceShare, err := a.client.GetResourceShares(&ram.GetResourceSharesInput{
-		Name: aws.String(resourceShareName),
+		Name:          aws.String(resourceShareName),
+		ResourceOwner: aws.String("SELF"),
 	})
 	if err != nil {
 		return errors.WithStack(err)
