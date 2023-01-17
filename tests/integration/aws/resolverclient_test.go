@@ -16,7 +16,7 @@ var _ = Describe("Route53 Resolver client", func() {
 
 	var (
 		cluster                            resolver.Cluster
-		resolverRuleId                     string
+		createdResolverRule                resolver.ResolverRule
 		resolverRulesSecurityGroupForTests string
 	)
 
@@ -44,7 +44,7 @@ var _ = Describe("Route53 Resolver client", func() {
 	})
 
 	AfterEach(func() {
-		_, err = rawResolverClient.DeleteResolverRuleWithContext(ctx, &route53resolver.DeleteResolverRuleInput{ResolverRuleId: awssdk.String(resolverRuleId)})
+		_, err = rawResolverClient.DeleteResolverRuleWithContext(ctx, &route53resolver.DeleteResolverRuleInput{ResolverRuleId: awssdk.String(createdResolverRule.RuleId)})
 		Expect(err).NotTo(HaveOccurred())
 
 		listEndpointsResponse, err := rawResolverClient.ListResolverEndpointsWithContext(ctx, &route53resolver.ListResolverEndpointsInput{
@@ -67,7 +67,7 @@ var _ = Describe("Route53 Resolver client", func() {
 	})
 
 	It("creates the resolver rule successfully", func() {
-		_, resolverRuleId, err = resolverClient.CreateResolverRule(ctx, logger, cluster, resolverRulesSecurityGroupForTests, "example.com", "my-resolver-rule")
+		createdResolverRule, err = resolverClient.CreateResolverRule(ctx, logger, cluster, resolverRulesSecurityGroupForTests, "example.com", "my-resolver-rule")
 		Expect(err).NotTo(HaveOccurred())
 
 		rulesResponse, err := rawResolverClient.ListResolverRulesWithContext(ctx, &route53resolver.ListResolverRulesInput{
@@ -82,7 +82,7 @@ var _ = Describe("Route53 Resolver client", func() {
 		Expect(len(rulesResponse.ResolverRules)).To(Equal(1))
 
 		By("creating the resolver rule again it doesn't fail", func() {
-			_, _, err = resolverClient.CreateResolverRule(ctx, logger, cluster, resolverRulesSecurityGroupForTests, "example.com", "my-resolver-rule")
+			_, err = resolverClient.CreateResolverRule(ctx, logger, cluster, resolverRulesSecurityGroupForTests, "example.com", "my-resolver-rule")
 			Expect(err).NotTo(HaveOccurred())
 
 			rulesResponse, err = rawResolverClient.ListResolverRulesWithContext(ctx, &route53resolver.ListResolverRulesInput{

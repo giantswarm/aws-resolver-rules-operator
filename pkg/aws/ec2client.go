@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 )
 
@@ -40,12 +41,14 @@ func (a *AWSEC2) CreateSecurityGroupForResolverEndpoints(ctx context.Context, vp
 	return securityGroupId, nil
 }
 
-func (a *AWSEC2) DeleteSecurityGroupForResolverEndpoints(ctx context.Context, vpcId, groupName string) error {
+func (a *AWSEC2) DeleteSecurityGroupForResolverEndpoints(ctx context.Context, logger logr.Logger, vpcId, groupName string) error {
+	logger.Info("Trying to find Resolver Rule security group", "securityGroupName", groupName, "vpcId", vpcId)
 	securityGroup, err := a.getSecurityGroupByName(ctx, vpcId, groupName)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
+	logger.Info("Deleting security group", "securityGroupName", groupName)
 	_, err = a.client.DeleteSecurityGroupWithContext(ctx, &ec2.DeleteSecurityGroupInput{GroupId: securityGroup.GroupId})
 	if err != nil {
 		return errors.WithStack(err)

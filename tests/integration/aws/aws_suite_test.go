@@ -30,6 +30,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
+	"go.uber.org/zap/zapcore"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -67,7 +68,12 @@ var (
 )
 
 var _ = BeforeSuite(func() {
-	logger = zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
+	opts := zap.Options{
+		DestWriter:  GinkgoWriter,
+		Development: true,
+		TimeEncoder: zapcore.RFC3339TimeEncoder,
+	}
+	logger = zap.New(zap.UseFlagOptions(&opts))
 	logf.SetLogger(logger)
 	tests.GetEnvOrSkip("AWS_ENDPOINT")
 

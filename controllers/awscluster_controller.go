@@ -122,7 +122,7 @@ func (r *AwsClusterReconciler) reconcileNormal(ctx context.Context, awsCluster *
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	logger.Info("Created resolver rule", "ruleName", associatedResolverRule.RuleName)
+	logger.Info("Created resolver rule", "ruleId", associatedResolverRule.RuleId, "ruleArn", associatedResolverRule.RuleArn)
 
 	return reconcile.Result{}, nil
 }

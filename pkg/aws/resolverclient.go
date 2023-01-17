@@ -18,35 +18,35 @@ type AWSResolver struct {
 	client *route53resolver.Route53Resolver
 }
 
-func (a *AWSResolver) CreateResolverRule(ctx context.Context, logger logr.Logger, cluster resolver.Cluster, securityGroupId, domainName, resolverRuleName string) (string, string, error) {
-	resolverRule, err := a.getResolverRule(ctx, resolverRuleName)
+func (a *AWSResolver) CreateResolverRule(ctx context.Context, logger logr.Logger, cluster resolver.Cluster, securityGroupId, domainName, resolverRuleName string) (resolver.ResolverRule, error) {
+	resolverRule, err := a.GetResolverRuleByName(ctx, resolverRuleName, "FORWARD")
 	if err != nil {
-		if !errors.Is(err, &ResolverRuleNotFoundError{}) {
-			return "", "", errors.WithStack(err)
+		if !errors.Is(err, &resolver.ResolverRuleNotFoundError{}) {
+			return resolver.ResolverRule{}, errors.WithStack(err)
 		}
 	}
 
 	// If we find it, we just return it.
 	if err == nil {
-		return *resolverRule.Arn, *resolverRule.Id, nil
+		return resolverRule, nil
 	}
 
 	// Otherwise we create it.
 	inboundEndpointId, err := a.createResolverEndpointWithContext(ctx, logger, "INBOUND", getInboundEndpointName(cluster.Name), []string{securityGroupId}, cluster.Subnets)
 	if err != nil {
-		return "", "", errors.WithStack(err)
+		return resolver.ResolverRule{}, errors.WithStack(err)
 	}
 
 	outboundEndpointId, err := a.createResolverEndpointWithContext(ctx, logger, "OUTBOUND", getOutboundEndpointName(cluster.Name), []string{securityGroupId}, cluster.Subnets)
 	if err != nil {
-		return "", "", errors.WithStack(err)
+		return resolver.ResolverRule{}, errors.WithStack(err)
 	}
 
 	endpointIpsResponse, err := a.client.ListResolverEndpointIpAddressesWithContext(ctx, &route53resolver.ListResolverEndpointIpAddressesInput{
 		ResolverEndpointId: aws.String(inboundEndpointId),
 	})
 	if err != nil {
-		return "", "", errors.WithStack(err)
+		return resolver.ResolverRule{}, errors.WithStack(err)
 	}
 
 	var targetAddress []*route53resolver.TargetAddress
@@ -58,15 +58,15 @@ func (a *AWSResolver) CreateResolverRule(ctx context.Context, logger logr.Logger
 	}
 	resolverRuleArn, resolverRuleId, err := a.createResolverRule(ctx, domainName, resolverRuleName, outboundEndpointId, targetAddress)
 	if err != nil {
-		return "", "", errors.WithStack(err)
+		return resolver.ResolverRule{}, errors.WithStack(err)
 	}
 
-	return resolverRuleArn, resolverRuleId, nil
+	return resolver.ResolverRule{RuleArn: resolverRuleArn, RuleId: resolverRuleId}, nil
 }
 
-func (a *AWSResolver) DeleteResolverRule(ctx context.Context, logger logr.Logger, cluster resolver.Cluster, resolverRuleName string) error {
-	logger.Info("Deleting resolver rule", "resolverRuleName", resolverRuleName)
-	err := a.deleteResolverRule(ctx, resolverRuleName)
+func (a *AWSResolver) DeleteResolverRule(ctx context.Context, logger logr.Logger, cluster resolver.Cluster, resolverRuleId string) error {
+	logger.Info("Deleting resolver rule", "resolverRuleId", resolverRuleId)
+	_, err := a.client.DeleteResolverRuleWithContext(ctx, &route53resolver.DeleteResolverRuleInput{ResolverRuleId: aws.String(resolverRuleId)})
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -86,26 +86,9 @@ func (a *AWSResolver) DeleteResolverRule(ctx context.Context, logger logr.Logger
 	return nil
 }
 
-func (a *AWSResolver) deleteResolverRule(ctx context.Context, resolverRuleName string) error {
-	resolverRule, err := a.getResolverRule(ctx, resolverRuleName)
-	if errors.Is(err, &ResolverRuleNotFoundError{}) {
-		return nil
-	}
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	_, err = a.client.DeleteResolverRuleWithContext(ctx, &route53resolver.DeleteResolverRuleInput{ResolverRuleId: resolverRule.Id})
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	return nil
-}
-
 func (a *AWSResolver) deleteResolverEndpoint(ctx context.Context, resolverEndpointName string) error {
 	resolverEndpoint, err := a.getResolverEndpoint(ctx, resolverEndpointName)
-	if errors.Is(err, &ResolverEndpointNotFoundError{}) {
+	if errors.Is(err, &resolver.ResolverEndpointNotFoundError{}) {
 		return nil
 	}
 	if err != nil {
@@ -136,11 +119,11 @@ func (a *AWSResolver) createResolverRule(ctx context.Context, domainName, resolv
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
 			case route53resolver.ErrCodeResourceExistsException:
-				resolverRule, err := a.getResolverRule(ctx, resolverRuleName)
+				resolverRule, err := a.GetResolverRuleByName(ctx, resolverRuleName, "FORWARD")
 				if err != nil {
 					return "", "", errors.WithStack(err)
 				}
-				return *resolverRule.Arn, *resolverRule.Id, nil
+				return resolverRule.RuleArn, resolverRule.RuleId, nil
 			default:
 				return "", "", errors.WithStack(err)
 			}
@@ -152,7 +135,7 @@ func (a *AWSResolver) createResolverRule(ctx context.Context, domainName, resolv
 	return *response.ResolverRule.Arn, *response.ResolverRule.Id, nil
 }
 
-func (a *AWSResolver) getResolverRule(ctx context.Context, resolverRuleName string) (*route53resolver.ResolverRule, error) {
+func (a *AWSResolver) GetResolverRuleByName(ctx context.Context, resolverRuleName, resolverRuleType string) (resolver.ResolverRule, error) {
 	listRulesResponse, err := a.client.ListResolverRulesWithContext(ctx, &route53resolver.ListResolverRulesInput{
 		Filters: []*route53resolver.Filter{
 			{
@@ -161,19 +144,22 @@ func (a *AWSResolver) getResolverRule(ctx context.Context, resolverRuleName stri
 			},
 			{
 				Name:   aws.String("TYPE"),
-				Values: aws.StringSlice([]string{"FORWARD"}),
+				Values: aws.StringSlice([]string{resolverRuleType}),
 			},
 		},
 	})
 	if err != nil {
-		return &route53resolver.ResolverRule{}, errors.WithStack(err)
+		return resolver.ResolverRule{}, errors.WithStack(err)
 	}
 
 	if len(listRulesResponse.ResolverRules) > 0 {
-		return listRulesResponse.ResolverRules[0], nil
+		return resolver.ResolverRule{
+			RuleId:  *listRulesResponse.ResolverRules[0].Id,
+			RuleArn: *listRulesResponse.ResolverRules[0].Arn,
+		}, nil
 	}
 
-	return nil, &ResolverRuleNotFoundError{}
+	return resolver.ResolverRule{}, &resolver.ResolverRuleNotFoundError{}
 }
 
 func (a *AWSResolver) AssociateResolverRuleWithContext(ctx context.Context, associationName, vpcID, resolverRuleId string) error {
@@ -198,21 +184,12 @@ func (a *AWSResolver) AssociateResolverRuleWithContext(ctx context.Context, asso
 	return nil
 }
 
-func (a *AWSResolver) DisassociateResolverRuleWithContext(ctx context.Context, logger logr.Logger, vpcID, resolverRuleName string) error {
-	logger.Info("Trying to find Resolver Rule", "resolverRuleName", resolverRuleName)
-	resolverRule, err := a.getResolverRule(ctx, resolverRuleName)
-	if errors.Is(err, &ResolverRuleNotFoundError{}) {
-		logger.Info("Resolver Rule not found", "resolverRuleName", resolverRuleName)
-		return nil
-	}
+func (a *AWSResolver) DisassociateResolverRuleWithContext(ctx context.Context, logger logr.Logger, vpcID, resolverRuleId string) error {
+	logger = logger.WithValues("resolverRuleId", resolverRuleId, "resolverRuleType", "FORWARD", "vpcId", vpcID)
 
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	logger.Info("Disassociating Resolver Rule from VPC", "resolverRuleName", resolverRuleName, "vpcId", vpcID)
-	_, err = a.client.DisassociateResolverRuleWithContext(ctx, &route53resolver.DisassociateResolverRuleInput{
-		ResolverRuleId: resolverRule.Id,
+	logger.Info("Disassociating Resolver Rule from VPC")
+	_, err := a.client.DisassociateResolverRuleWithContext(ctx, &route53resolver.DisassociateResolverRuleInput{
+		ResolverRuleId: aws.String(resolverRuleId),
 		VPCId:          aws.String(vpcID),
 	})
 	if err != nil {
@@ -237,7 +214,7 @@ func (a *AWSResolver) DisassociateResolverRuleWithContext(ctx context.Context, l
 func (a *AWSResolver) createResolverEndpointWithContext(ctx context.Context, logger logr.Logger, direction, name string, securityGroupIds, subnetIds []string) (string, error) {
 	resolverEndpoint, err := a.getResolverEndpoint(ctx, name)
 	if err != nil {
-		if !errors.Is(err, &ResolverEndpointNotFoundError{}) {
+		if !errors.Is(err, &resolver.ResolverEndpointNotFoundError{}) {
 			return "", errors.WithStack(err)
 		}
 	}
@@ -309,7 +286,7 @@ func (a *AWSResolver) getResolverEndpoint(ctx context.Context, resolverEndpointN
 		return listRulesResponse.ResolverEndpoints[0], nil
 	}
 
-	return nil, &ResolverEndpointNotFoundError{}
+	return nil, &resolver.ResolverEndpointNotFoundError{}
 }
 
 func getInboundEndpointName(clusterName string) string {

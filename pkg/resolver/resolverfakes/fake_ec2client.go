@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
+	"github.com/go-logr/logr"
 )
 
 type FakeEC2Client struct {
@@ -24,12 +25,13 @@ type FakeEC2Client struct {
 		result1 string
 		result2 error
 	}
-	DeleteSecurityGroupForResolverEndpointsStub        func(context.Context, string, string) error
+	DeleteSecurityGroupForResolverEndpointsStub        func(context.Context, logr.Logger, string, string) error
 	deleteSecurityGroupForResolverEndpointsMutex       sync.RWMutex
 	deleteSecurityGroupForResolverEndpointsArgsForCall []struct {
 		arg1 context.Context
-		arg2 string
+		arg2 logr.Logger
 		arg3 string
+		arg4 string
 	}
 	deleteSecurityGroupForResolverEndpointsReturns struct {
 		result1 error
@@ -107,20 +109,21 @@ func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpointsReturnsOnCall(
 	}{result1, result2}
 }
 
-func (fake *FakeEC2Client) DeleteSecurityGroupForResolverEndpoints(arg1 context.Context, arg2 string, arg3 string) error {
+func (fake *FakeEC2Client) DeleteSecurityGroupForResolverEndpoints(arg1 context.Context, arg2 logr.Logger, arg3 string, arg4 string) error {
 	fake.deleteSecurityGroupForResolverEndpointsMutex.Lock()
 	ret, specificReturn := fake.deleteSecurityGroupForResolverEndpointsReturnsOnCall[len(fake.deleteSecurityGroupForResolverEndpointsArgsForCall)]
 	fake.deleteSecurityGroupForResolverEndpointsArgsForCall = append(fake.deleteSecurityGroupForResolverEndpointsArgsForCall, struct {
 		arg1 context.Context
-		arg2 string
+		arg2 logr.Logger
 		arg3 string
-	}{arg1, arg2, arg3})
+		arg4 string
+	}{arg1, arg2, arg3, arg4})
 	stub := fake.DeleteSecurityGroupForResolverEndpointsStub
 	fakeReturns := fake.deleteSecurityGroupForResolverEndpointsReturns
-	fake.recordInvocation("DeleteSecurityGroupForResolverEndpoints", []interface{}{arg1, arg2, arg3})
+	fake.recordInvocation("DeleteSecurityGroupForResolverEndpoints", []interface{}{arg1, arg2, arg3, arg4})
 	fake.deleteSecurityGroupForResolverEndpointsMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3)
+		return stub(arg1, arg2, arg3, arg4)
 	}
 	if specificReturn {
 		return ret.result1
@@ -134,17 +137,17 @@ func (fake *FakeEC2Client) DeleteSecurityGroupForResolverEndpointsCallCount() in
 	return len(fake.deleteSecurityGroupForResolverEndpointsArgsForCall)
 }
 
-func (fake *FakeEC2Client) DeleteSecurityGroupForResolverEndpointsCalls(stub func(context.Context, string, string) error) {
+func (fake *FakeEC2Client) DeleteSecurityGroupForResolverEndpointsCalls(stub func(context.Context, logr.Logger, string, string) error) {
 	fake.deleteSecurityGroupForResolverEndpointsMutex.Lock()
 	defer fake.deleteSecurityGroupForResolverEndpointsMutex.Unlock()
 	fake.DeleteSecurityGroupForResolverEndpointsStub = stub
 }
 
-func (fake *FakeEC2Client) DeleteSecurityGroupForResolverEndpointsArgsForCall(i int) (context.Context, string, string) {
+func (fake *FakeEC2Client) DeleteSecurityGroupForResolverEndpointsArgsForCall(i int) (context.Context, logr.Logger, string, string) {
 	fake.deleteSecurityGroupForResolverEndpointsMutex.RLock()
 	defer fake.deleteSecurityGroupForResolverEndpointsMutex.RUnlock()
 	argsForCall := fake.deleteSecurityGroupForResolverEndpointsArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
 }
 
 func (fake *FakeEC2Client) DeleteSecurityGroupForResolverEndpointsReturns(result1 error) {
