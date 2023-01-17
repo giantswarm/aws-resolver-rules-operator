@@ -40,6 +40,40 @@ func (a *AWSEC2) CreateSecurityGroupForResolverEndpoints(ctx context.Context, vp
 	return securityGroupId, nil
 }
 
+func (a *AWSEC2) DeleteSecurityGroupForResolverEndpoints(ctx context.Context, vpcId, groupName string) error {
+	securityGroup, err := a.getSecurityGroupByName(ctx, vpcId, groupName)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	_, err = a.client.DeleteSecurityGroupWithContext(ctx, &ec2.DeleteSecurityGroupInput{GroupId: securityGroup.GroupId})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
+}
+
+func (a *AWSEC2) getSecurityGroupByName(ctx context.Context, vpcId, groupName string) (*ec2.SecurityGroup, error) {
+	securityGroupResponse, err := a.client.DescribeSecurityGroupsWithContext(ctx, &ec2.DescribeSecurityGroupsInput{
+		Filters: []*ec2.Filter{
+			{
+				Name:   aws.String("vpc-id"),
+				Values: aws.StringSlice([]string{vpcId}),
+			},
+			{
+				Name:   aws.String("group-name"),
+				Values: aws.StringSlice([]string{groupName}),
+			},
+		},
+	})
+	if err != nil {
+		return &ec2.SecurityGroup{}, errors.WithStack(err)
+	}
+
+	return securityGroupResponse.SecurityGroups[0], nil
+}
+
 func (a *AWSEC2) createSecurityGroup(ctx context.Context, vpcId, groupName string) (string, error) {
 	response, err := a.client.CreateSecurityGroupWithContext(ctx, &ec2.CreateSecurityGroupInput{
 		Description: aws.String(SecurityGroupDescription),
@@ -50,23 +84,12 @@ func (a *AWSEC2) createSecurityGroup(ctx context.Context, vpcId, groupName strin
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
 			case "InvalidGroup.Duplicate":
-				securityGroupResponse, err := a.client.DescribeSecurityGroupsWithContext(ctx, &ec2.DescribeSecurityGroupsInput{
-					Filters: []*ec2.Filter{
-						{
-							Name:   aws.String("vpc-id"),
-							Values: aws.StringSlice([]string{vpcId}),
-						},
-						{
-							Name:   aws.String("group-name"),
-							Values: aws.StringSlice([]string{groupName}),
-						},
-					},
-				})
+				securityGroup, err := a.getSecurityGroupByName(ctx, vpcId, groupName)
 				if err != nil {
 					return "", errors.WithStack(err)
 				}
 
-				return *securityGroupResponse.SecurityGroups[0].GroupId, nil
+				return *securityGroup.GroupId, nil
 			default:
 				return "", errors.WithStack(err)
 			}

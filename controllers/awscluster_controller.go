@@ -89,17 +89,6 @@ func (r *AwsClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	}
 
-	if !awsCluster.DeletionTimestamp.IsZero() {
-		return r.reconcileDelete(ctx, awsCluster)
-	}
-
-	return r.reconcileNormal(ctx, awsCluster)
-}
-
-// reconcileNormal takes care of creating resolver rules for the workload clusters.
-func (r *AwsClusterReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AWSCluster) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
-
 	identity, err := r.awsClusterClient.GetIdentity(ctx, awsCluster)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
@@ -110,6 +99,17 @@ func (r *AwsClusterReconciler) reconcileNormal(ctx context.Context, awsCluster *
 		return ctrl.Result{}, nil
 	}
 
+	if !awsCluster.DeletionTimestamp.IsZero() {
+		return r.reconcileDelete(ctx, awsCluster, identity)
+	}
+
+	return r.reconcileNormal(ctx, awsCluster, identity)
+}
+
+// reconcileNormal takes care of creating resolver rules for the workload clusters.
+func (r *AwsClusterReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
 	dnsModeAnnotation, ok := awsCluster.Annotations[gsannotations.AWSDNSMode]
 	if !ok || dnsModeAnnotation != gsannotations.DNSModePrivate {
 		logger.Info("AWSCluster is not using private DNS mode, skipping")
@@ -117,7 +117,7 @@ func (r *AwsClusterReconciler) reconcileNormal(ctx context.Context, awsCluster *
 	}
 
 	cluster := resolver.Cluster{Name: awsCluster.Name, Region: awsCluster.Spec.Region, VPCId: awsCluster.Spec.NetworkSpec.VPC.ID, IAMRoleARN: identity.Spec.RoleArn, Subnets: getSubnetIds(awsCluster)}
-	associatedResolverRule, err := r.resolver.CreateRule(ctx, cluster)
+	associatedResolverRule, err := r.resolver.CreateRule(ctx, logger, cluster)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
@@ -127,7 +127,17 @@ func (r *AwsClusterReconciler) reconcileNormal(ctx context.Context, awsCluster *
 	return reconcile.Result{}, nil
 }
 
-func (r *AwsClusterReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AWSCluster) (ctrl.Result, error) {
+func (r *AwsClusterReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
+	cluster := resolver.Cluster{Name: awsCluster.Name, Region: awsCluster.Spec.Region, VPCId: awsCluster.Spec.NetworkSpec.VPC.ID, IAMRoleARN: identity.Spec.RoleArn, Subnets: getSubnetIds(awsCluster)}
+	err := r.resolver.DeleteRule(ctx, logger, cluster)
+	if err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
+	logger.Info("Deleted resolver rule")
+
 	return reconcile.Result{}, nil
 }
 

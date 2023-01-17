@@ -25,3 +25,21 @@ func (a *AWSRAM) CreateResourceShareWithContext(ctx context.Context, resourceSha
 
 	return *response.ResourceShare.ResourceShareArn, nil
 }
+
+func (a *AWSRAM) DeleteResourceShareWithContext(ctx context.Context, resourceShareName string) error {
+	resourceShare, err := a.client.GetResourceShares(&ram.GetResourceSharesInput{
+		Name: aws.String(resourceShareName),
+	})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	_, err = a.client.DeleteResourceShareWithContext(ctx, &ram.DeleteResourceShareInput{
+		ResourceShareArn: resourceShare.ResourceShares[0].ResourceShareArn,
+	})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
+}

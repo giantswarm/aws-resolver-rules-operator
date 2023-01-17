@@ -6,7 +6,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type Resolver struct {
@@ -30,17 +29,21 @@ type AWSClients interface {
 //counterfeiter:generate . EC2Client
 type EC2Client interface {
 	CreateSecurityGroupForResolverEndpoints(ctx context.Context, vpcId, groupName string) (string, error)
+	DeleteSecurityGroupForResolverEndpoints(ctx context.Context, vpcId, groupName string) error
 }
 
 //counterfeiter:generate . RAMClient
 type RAMClient interface {
 	CreateResourceShareWithContext(ctx context.Context, resourceShareName string, allowExternalPrincipals bool, resourceArns, principals []string) (string, error)
+	DeleteResourceShareWithContext(ctx context.Context, resourceShareName string) error
 }
 
 //counterfeiter:generate . ResolverClient
 type ResolverClient interface {
 	CreateResolverRule(ctx context.Context, logger logr.Logger, cluster Cluster, securityGroupId, domainName, resolverRuleName string) (string, string, error)
+	DeleteResolverRule(ctx context.Context, logger logr.Logger, cluster Cluster, resolverRuleName string) error
 	AssociateResolverRuleWithContext(ctx context.Context, associationName, vpcID, resolverRuleId string) error
+	DisassociateResolverRuleWithContext(ctx context.Context, vpcID, resolverRuleName string) error
 }
 
 type Cluster struct {
@@ -67,13 +70,13 @@ func NewResolver(awsClients AWSClients, dnsServer DNSServer, workloadClusterBase
 // CreateRule will create a route53 resolver Rule and associate it with a VPC where a DNS server is running.
 // Clients of the DNS server need to be able to resolve the Cluster domain, so we need to associate a resolver rule to
 // the VPC where the DNS server is running.
-func (r *Resolver) CreateRule(ctx context.Context, cluster Cluster) (AssociatedResolverRule, error) {
-	resolverRuleARN, resolverRuleId, err := r.createRule(ctx, cluster)
+func (r *Resolver) CreateRule(ctx context.Context, logger logr.Logger, cluster Cluster) (AssociatedResolverRule, error) {
+	resolverRuleARN, resolverRuleId, err := r.createRule(ctx, logger, cluster)
 	if err != nil {
 		return AssociatedResolverRule{}, errors.WithStack(err)
 	}
 
-	err = r.associateRule(ctx, cluster, resolverRuleARN, resolverRuleId)
+	err = r.associateRule(ctx, logger, cluster, resolverRuleARN, resolverRuleId)
 	if err != nil {
 		return AssociatedResolverRule{}, errors.WithStack(err)
 	}
@@ -81,9 +84,51 @@ func (r *Resolver) CreateRule(ctx context.Context, cluster Cluster) (AssociatedR
 	return AssociatedResolverRule{resolverRuleARN, resolverRuleId}, nil
 }
 
-func (r *Resolver) createRule(ctx context.Context, cluster Cluster) (string, string, error) {
-	logger := log.FromContext(ctx)
+func (r *Resolver) DeleteRule(ctx context.Context, logger logr.Logger, cluster Cluster) error {
+	dnsServerResolverClient, err := r.awsClients.NewResolverClientWithExternalId(r.dnsServer.AWSRegion, cluster.IAMRoleARN, r.dnsServer.IAMRoleToAssume, r.dnsServer.IAMExternalId)
+	if err != nil {
+		return errors.WithStack(err)
+	}
 
+	err = dnsServerResolverClient.DisassociateResolverRuleWithContext(ctx, r.dnsServer.VPCId, getResolverRuleName(cluster.Name))
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	ramClient, err := r.awsClients.NewRAMClient(cluster.Region, cluster.IAMRoleARN)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	err = ramClient.DeleteResourceShareWithContext(ctx, getResourceShareName(cluster.Name))
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	resolverClient, err := r.awsClients.NewResolverClient(cluster.Region, cluster.IAMRoleARN)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	err = resolverClient.DeleteResolverRule(ctx, logger, cluster, getResolverRuleName(cluster.Name))
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	ec2Client, err := r.awsClients.NewEC2Client(cluster.Region, cluster.IAMRoleARN)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	err = ec2Client.DeleteSecurityGroupForResolverEndpoints(ctx, cluster.VPCId, getSecurityGroupName(cluster.Name))
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
+}
+
+func (r *Resolver) createRule(ctx context.Context, logger logr.Logger, cluster Cluster) (string, string, error) {
 	ec2Client, err := r.awsClients.NewEC2Client(cluster.Region, cluster.IAMRoleARN)
 	if err != nil {
 		return "", "", errors.WithStack(err)
@@ -108,8 +153,8 @@ func (r *Resolver) createRule(ctx context.Context, cluster Cluster) (string, str
 	return resolverRuleArn, resolverRuleId, nil
 }
 
-func (r *Resolver) associateRule(ctx context.Context, cluster Cluster, resolverRuleARN, resolverRuleId string) error {
-	logger := log.FromContext(ctx).WithValues("resolverRuleId", resolverRuleId, "awsAccount", r.dnsServer.AWSAccountId, "vpcId", r.dnsServer.VPCId)
+func (r *Resolver) associateRule(ctx context.Context, logger logr.Logger, cluster Cluster, resolverRuleARN, resolverRuleId string) error {
+	logger = logger.WithValues("resolverRuleId", resolverRuleId, "awsAccount", r.dnsServer.AWSAccountId, "vpcId", r.dnsServer.VPCId)
 
 	ramClient, err := r.awsClients.NewRAMClient(cluster.Region, cluster.IAMRoleARN)
 	if err != nil {

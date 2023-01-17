@@ -41,6 +41,7 @@ var _ = Describe("AWSCluster", func() {
 		DnsServerAWSAccountId     = "dns-server-aws-account-id"
 		DnsServerVPCId            = "dns-server-vpc-id"
 		WorkloadClusterBaseDomain = "eu-central-1.aws.some.domain.com"
+		WorkloadClusterVPCId      = "myvpc-1a2b3c4d"
 	)
 
 	BeforeEach(func() {
@@ -81,7 +82,7 @@ var _ = Describe("AWSCluster", func() {
 			Spec: capa.AWSClusterSpec{
 				NetworkSpec: capa.NetworkSpec{
 					VPC: capa.VPCSpec{
-						ID: "myvpc-1a2b3c4d",
+						ID: WorkloadClusterVPCId,
 					},
 					Subnets: []capa.SubnetSpec{
 						{
@@ -159,106 +160,85 @@ var _ = Describe("AWSCluster", func() {
 		})
 	})
 
-	When("the cluster has an owner, it's not paused, it's not marked for deletion but has no identity set", func() {
+	When("the cluster has an owner and it's not paused", func() {
 		BeforeEach(func() {
 			awsClusterClient.GetReturns(awsCluster, nil)
 			awsClusterClient.GetOwnerReturns(cluster, nil)
-			awsClusterClient.GetIdentityReturns(nil, nil)
 		})
 
-		It("gets the cluster and owner cluster", func() {
-			Expect(awsClusterClient.GetCallCount()).To(Equal(1))
-			Expect(awsClusterClient.GetOwnerCallCount()).To(Equal(1))
-
-			_, actualCluster := awsClusterClient.GetOwnerArgsForCall(0)
-			Expect(actualCluster).To(Equal(awsCluster))
-			Expect(reconcileErr).NotTo(HaveOccurred())
-		})
-
-		It("doesn't reconcile if no Identity is set", func() {
-			Expect(result.Requeue).To(BeFalse())
-			Expect(result.RequeueAfter).To(BeZero())
-			Expect(reconcileErr).NotTo(HaveOccurred())
-		})
-	})
-
-	When("the cluster has an owner and an identity set", func() {
-		BeforeEach(func() {
-			awsClusterClient.GetReturns(awsCluster, nil)
-			awsClusterClient.GetOwnerReturns(cluster, nil)
-			awsClusterClient.GetIdentityReturns(awsClusterRoleIdentity, nil)
-		})
-
-		When("is not using private DNS mode", func() {
+		When("the cluster has no identity set", func() {
 			BeforeEach(func() {
-				awsClusterClient.GetReturns(awsCluster, nil)
-				awsCluster.Annotations = map[string]string{
-					gsannotations.AWSDNSMode: "non-private",
-				}
+				awsClusterClient.GetIdentityReturns(nil, nil)
 			})
-			It("returns early", func() {
+
+			It("gets the cluster and owner cluster", func() {
+				Expect(awsClusterClient.GetCallCount()).To(Equal(1))
+				Expect(awsClusterClient.GetOwnerCallCount()).To(Equal(1))
+
+				_, actualCluster := awsClusterClient.GetOwnerArgsForCall(0)
+				Expect(actualCluster).To(Equal(awsCluster))
 				Expect(reconcileErr).NotTo(HaveOccurred())
-				Expect(ec2Client.CreateSecurityGroupForResolverEndpointsCallCount()).To(BeZero())
+			})
+
+			It("doesn't reconcile if no Identity is set", func() {
+				Expect(result.Requeue).To(BeFalse())
+				Expect(result.RequeueAfter).To(BeZero())
+				Expect(reconcileErr).NotTo(HaveOccurred())
 			})
 		})
 
-		When("is using private DNS mode", func() {
-			It("creates security group", func() {
-				Expect(ec2Client.CreateSecurityGroupForResolverEndpointsCallCount()).To(Equal(1))
-				_, vpcId, groupName := ec2Client.CreateSecurityGroupForResolverEndpointsArgsForCall(0)
-				Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
-				Expect(groupName).To(Equal(fmt.Sprintf("%s-resolverrules-endpoints", ClusterName)))
-				Expect(reconcileErr).NotTo(HaveOccurred())
+		When("the cluster has an identity set", func() {
+			BeforeEach(func() {
+				awsClusterClient.GetIdentityReturns(awsClusterRoleIdentity, nil)
 			})
 
-			When("creating security group fails", func() {
+			When("is not using private DNS mode", func() {
 				BeforeEach(func() {
-					ec2Client.CreateSecurityGroupForResolverEndpointsReturns("", errors.New("error creating security group"))
+					awsClusterClient.GetReturns(awsCluster, nil)
+					awsCluster.Annotations = map[string]string{
+						gsannotations.AWSDNSMode: "non-private",
+					}
 				})
-				It("returns the error", func() {
-					Expect(reconcileErr).To(HaveOccurred())
+				It("returns early", func() {
+					Expect(reconcileErr).NotTo(HaveOccurred())
+					Expect(ec2Client.CreateSecurityGroupForResolverEndpointsCallCount()).To(BeZero())
 				})
 			})
 
-			When("creating security group succeeds", func() {
-				BeforeEach(func() {
-					ec2Client.CreateSecurityGroupForResolverEndpointsReturns("my-security-group", nil)
+			When("is using private DNS mode", func() {
+				It("creates security group", func() {
+					Expect(ec2Client.CreateSecurityGroupForResolverEndpointsCallCount()).To(Equal(1))
+					_, vpcId, groupName := ec2Client.CreateSecurityGroupForResolverEndpointsArgsForCall(0)
+					Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
+					Expect(groupName).To(Equal(fmt.Sprintf("%s-resolverrules-endpoints", ClusterName)))
+					Expect(reconcileErr).NotTo(HaveOccurred())
 				})
 
-				It("creates resolver rule", func() {
-					_, _, cluster, securityGroupId, domainName, resolverRuleName := resolverClient.CreateResolverRuleArgsForCall(0)
-					Expect(domainName).To(Equal(fmt.Sprintf("%s.%s", ClusterName, WorkloadClusterBaseDomain)))
-					Expect(resolverRuleName).To(Equal(fmt.Sprintf("giantswarm-%s", ClusterName)))
-					Expect(securityGroupId).To(Equal("my-security-group"))
-					Expect(cluster.Name).To(Equal("foo"))
-				})
-
-				When("creating resolver rule fails", func() {
+				When("creating security group fails", func() {
 					BeforeEach(func() {
-						resolverClient.CreateResolverRuleReturns("", "", errors.New("error creating resolver rule"))
+						ec2Client.CreateSecurityGroupForResolverEndpointsReturns("", errors.New("error creating security group"))
 					})
-
 					It("returns the error", func() {
 						Expect(reconcileErr).To(HaveOccurred())
 					})
 				})
 
-				When("creating resolver rule succeeds", func() {
+				When("creating security group succeeds", func() {
 					BeforeEach(func() {
-						resolverClient.CreateResolverRuleReturns("resolver-rule-principal-arn", "resolver-rule-id", nil)
+						ec2Client.CreateSecurityGroupForResolverEndpointsReturns("my-security-group", nil)
 					})
 
-					It("creates ram share resource", func() {
-						_, resourceShareName, allowPrincipals, principals, resourceArns := ramClient.CreateResourceShareWithContextArgsForCall(0)
-						Expect(resourceShareName).To(Equal(fmt.Sprintf("giantswarm-%s-rr", ClusterName)))
-						Expect(allowPrincipals).To(Equal(true))
-						Expect(principals).To(Equal([]string{"resolver-rule-principal-arn"}))
-						Expect(resourceArns).To(Equal([]string{DnsServerAWSAccountId}))
+					It("creates resolver rule", func() {
+						_, _, cluster, securityGroupId, domainName, resolverRuleName := resolverClient.CreateResolverRuleArgsForCall(0)
+						Expect(domainName).To(Equal(fmt.Sprintf("%s.%s", ClusterName, WorkloadClusterBaseDomain)))
+						Expect(resolverRuleName).To(Equal(fmt.Sprintf("giantswarm-%s", ClusterName)))
+						Expect(securityGroupId).To(Equal("my-security-group"))
+						Expect(cluster.Name).To(Equal("foo"))
 					})
 
-					When("creating ram share resource fails", func() {
+					When("creating resolver rule fails", func() {
 						BeforeEach(func() {
-							ramClient.CreateResourceShareWithContextReturns("", errors.New("error creating ram"))
+							resolverClient.CreateResolverRuleReturns("", "", errors.New("error creating resolver rule"))
 						})
 
 						It("returns the error", func() {
@@ -266,28 +246,82 @@ var _ = Describe("AWSCluster", func() {
 						})
 					})
 
-					When("creating ram share resource succeeds", func() {
+					When("creating resolver rule succeeds", func() {
 						BeforeEach(func() {
-							ramClient.CreateResourceShareWithContextReturns("resource-share-arn", nil)
+							resolverClient.CreateResolverRuleReturns("resolver-rule-principal-arn", "resolver-rule-id", nil)
 						})
 
-						It("associates resolver rule with VPC account", func() {
-							_, associationName, vpcId, resolverRuleId := dnsServerResolverClient.AssociateResolverRuleWithContextArgsForCall(0)
-							Expect(associationName).To(Equal(fmt.Sprintf("giantswarm-%s-rr-association", ClusterName)))
-							Expect(vpcId).To(Equal(DnsServerVPCId))
-							Expect(resolverRuleId).To(Equal("resolver-rule-id"))
+						It("creates ram share resource", func() {
+							_, resourceShareName, allowPrincipals, principals, resourceArns := ramClient.CreateResourceShareWithContextArgsForCall(0)
+							Expect(resourceShareName).To(Equal(fmt.Sprintf("giantswarm-%s-rr", ClusterName)))
+							Expect(allowPrincipals).To(Equal(true))
+							Expect(principals).To(Equal([]string{"resolver-rule-principal-arn"}))
+							Expect(resourceArns).To(Equal([]string{DnsServerAWSAccountId}))
 						})
 
-						When("creating associating resolver rule fails", func() {
+						When("creating ram share resource fails", func() {
 							BeforeEach(func() {
-								dnsServerResolverClient.AssociateResolverRuleWithContextReturns(errors.New("error associating resolver rule with vpc"))
+								ramClient.CreateResourceShareWithContextReturns("", errors.New("error creating ram"))
 							})
 
 							It("returns the error", func() {
 								Expect(reconcileErr).To(HaveOccurred())
 							})
 						})
+
+						When("creating ram share resource succeeds", func() {
+							BeforeEach(func() {
+								ramClient.CreateResourceShareWithContextReturns("resource-share-arn", nil)
+							})
+
+							It("associates resolver rule with VPC account", func() {
+								_, associationName, vpcId, resolverRuleId := dnsServerResolverClient.AssociateResolverRuleWithContextArgsForCall(0)
+								Expect(associationName).To(Equal(fmt.Sprintf("giantswarm-%s-rr-association", ClusterName)))
+								Expect(vpcId).To(Equal(DnsServerVPCId))
+								Expect(resolverRuleId).To(Equal("resolver-rule-id"))
+							})
+
+							When("creating associating resolver rule fails", func() {
+								BeforeEach(func() {
+									dnsServerResolverClient.AssociateResolverRuleWithContextReturns(errors.New("error associating resolver rule with vpc"))
+								})
+
+								It("returns the error", func() {
+									Expect(reconcileErr).To(HaveOccurred())
+								})
+							})
+						})
 					})
+				})
+			})
+
+			When("the cluster is being deleted", func() {
+				BeforeEach(func() {
+					deletionTime := metav1.Now()
+					awsCluster.DeletionTimestamp = &deletionTime
+				})
+
+				It("disassociates resolver rule from VPC", func() {
+					_, vpcId, resolverRuleName := dnsServerResolverClient.DisassociateResolverRuleWithContextArgsForCall(0)
+					Expect(vpcId).To(Equal(DnsServerVPCId))
+					Expect(resolverRuleName).To(Equal("giantswarm-foo"))
+				})
+
+				It("deletes the ram share resource", func() {
+					_, resourceShareName := ramClient.DeleteResourceShareWithContextArgsForCall(0)
+					Expect(resourceShareName).To(Equal("giantswarm-foo-rr"))
+				})
+
+				It("deletes the resolver rule", func() {
+					_, _, cluster, resolverRuleName := resolverClient.DeleteResolverRuleArgsForCall(0)
+					Expect(resolverRuleName).To(Equal("giantswarm-foo"))
+					Expect(cluster.Name).To(Equal("foo"))
+				})
+
+				It("deletes the security group", func() {
+					_, vpcId, groupName := ec2Client.DeleteSecurityGroupForResolverEndpointsArgsForCall(0)
+					Expect(vpcId).To(Equal(WorkloadClusterVPCId))
+					Expect(groupName).To(Equal("foo-resolverrules-endpoints"))
 				})
 			})
 		})

@@ -19,7 +19,7 @@ type AWSResolver struct {
 }
 
 func (a *AWSResolver) CreateResolverRule(ctx context.Context, logger logr.Logger, cluster resolver.Cluster, securityGroupId, domainName, resolverRuleName string) (string, string, error) {
-	resolverRule, err := a.getResolverRule(ctx, resolverRuleName, domainName)
+	resolverRule, err := a.getResolverRule(ctx, resolverRuleName)
 	if err != nil {
 		if !errors.Is(err, &ResolverRuleNotFoundError{}) {
 			return "", "", errors.WithStack(err)
@@ -64,6 +64,62 @@ func (a *AWSResolver) CreateResolverRule(ctx context.Context, logger logr.Logger
 	return resolverRuleArn, resolverRuleId, nil
 }
 
+func (a *AWSResolver) DeleteResolverRule(ctx context.Context, logger logr.Logger, cluster resolver.Cluster, resolverRuleName string) error {
+	logger.Info("Deleting resolver rule", "resolverRuleName", resolverRuleName)
+	err := a.deleteResolverRule(ctx, resolverRuleName)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	logger.Info("Deleting inbound resolver endpoint", "resolverEndpointName", getInboundEndpointName(cluster.Name))
+	err = a.deleteResolverEndpoint(ctx, getInboundEndpointName(cluster.Name))
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	logger.Info("Deleting outbound resolver endpoint", "resolverEndpointName", getOutboundEndpointName(cluster.Name))
+	err = a.deleteResolverEndpoint(ctx, getOutboundEndpointName(cluster.Name))
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
+}
+
+func (a *AWSResolver) deleteResolverRule(ctx context.Context, resolverRuleName string) error {
+	resolverRule, err := a.getResolverRule(ctx, resolverRuleName)
+	if errors.Is(err, &ResolverRuleNotFoundError{}) {
+		return nil
+	}
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	_, err = a.client.DeleteResolverRuleWithContext(ctx, &route53resolver.DeleteResolverRuleInput{ResolverRuleId: resolverRule.Id})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
+}
+
+func (a *AWSResolver) deleteResolverEndpoint(ctx context.Context, resolverEndpointName string) error {
+	resolverEndpoint, err := a.getResolverEndpoint(ctx, resolverEndpointName)
+	if errors.Is(err, &ResolverEndpointNotFoundError{}) {
+		return nil
+	}
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	_, err = a.client.DeleteResolverEndpointWithContext(ctx, &route53resolver.DeleteResolverEndpointInput{ResolverEndpointId: resolverEndpoint.Id})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
+}
+
 // createResolverRule will create a new Resolver Rule.
 // If the Rule already exists, it will try to fetch it to return the Rule ARN and ID.
 func (a *AWSResolver) createResolverRule(ctx context.Context, domainName, resolverRuleName, endpointId string, targetIps []*route53resolver.TargetAddress) (string, string, error) {
@@ -80,7 +136,7 @@ func (a *AWSResolver) createResolverRule(ctx context.Context, domainName, resolv
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
 			case route53resolver.ErrCodeResourceExistsException:
-				resolverRule, err := a.getResolverRule(ctx, resolverRuleName, domainName)
+				resolverRule, err := a.getResolverRule(ctx, resolverRuleName)
 				if err != nil {
 					return "", "", errors.WithStack(err)
 				}
@@ -96,16 +152,12 @@ func (a *AWSResolver) createResolverRule(ctx context.Context, domainName, resolv
 	return *response.ResolverRule.Arn, *response.ResolverRule.Id, nil
 }
 
-func (a *AWSResolver) getResolverRule(ctx context.Context, resolverRuleName, domainName string) (*route53resolver.ResolverRule, error) {
+func (a *AWSResolver) getResolverRule(ctx context.Context, resolverRuleName string) (*route53resolver.ResolverRule, error) {
 	listRulesResponse, err := a.client.ListResolverRulesWithContext(ctx, &route53resolver.ListResolverRulesInput{
 		Filters: []*route53resolver.Filter{
 			{
 				Name:   aws.String("Name"),
 				Values: aws.StringSlice([]string{resolverRuleName}),
-			},
-			{
-				Name:   aws.String("DomainName"),
-				Values: aws.StringSlice([]string{fmt.Sprintf("%s.", domainName)}),
 			},
 			{
 				Name:   aws.String("TYPE"),
@@ -134,6 +186,36 @@ func (a *AWSResolver) AssociateResolverRuleWithContext(ctx context.Context, asso
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
 			case route53resolver.ErrCodeResourceExistsException:
+				return nil
+			default:
+				return errors.WithStack(err)
+			}
+		}
+
+		return errors.WithStack(err)
+	}
+
+	return nil
+}
+
+func (a *AWSResolver) DisassociateResolverRuleWithContext(ctx context.Context, vpcID, resolverRuleName string) error {
+	resolverRule, err := a.getResolverRule(ctx, resolverRuleName)
+	if errors.Is(err, &ResolverRuleNotFoundError{}) {
+		return nil
+	}
+
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	_, err = a.client.DisassociateResolverRuleWithContext(ctx, &route53resolver.DisassociateResolverRuleInput{
+		ResolverRuleId: resolverRule.Id,
+		VPCId:          aws.String(vpcID),
+	})
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case route53resolver.ErrCodeResourceNotFoundException:
 				return nil
 			default:
 				return errors.WithStack(err)

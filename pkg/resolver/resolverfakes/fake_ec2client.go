@@ -24,6 +24,19 @@ type FakeEC2Client struct {
 		result1 string
 		result2 error
 	}
+	DeleteSecurityGroupForResolverEndpointsStub        func(context.Context, string, string) error
+	deleteSecurityGroupForResolverEndpointsMutex       sync.RWMutex
+	deleteSecurityGroupForResolverEndpointsArgsForCall []struct {
+		arg1 context.Context
+		arg2 string
+		arg3 string
+	}
+	deleteSecurityGroupForResolverEndpointsReturns struct {
+		result1 error
+	}
+	deleteSecurityGroupForResolverEndpointsReturnsOnCall map[int]struct {
+		result1 error
+	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
@@ -94,11 +107,76 @@ func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpointsReturnsOnCall(
 	}{result1, result2}
 }
 
+func (fake *FakeEC2Client) DeleteSecurityGroupForResolverEndpoints(arg1 context.Context, arg2 string, arg3 string) error {
+	fake.deleteSecurityGroupForResolverEndpointsMutex.Lock()
+	ret, specificReturn := fake.deleteSecurityGroupForResolverEndpointsReturnsOnCall[len(fake.deleteSecurityGroupForResolverEndpointsArgsForCall)]
+	fake.deleteSecurityGroupForResolverEndpointsArgsForCall = append(fake.deleteSecurityGroupForResolverEndpointsArgsForCall, struct {
+		arg1 context.Context
+		arg2 string
+		arg3 string
+	}{arg1, arg2, arg3})
+	stub := fake.DeleteSecurityGroupForResolverEndpointsStub
+	fakeReturns := fake.deleteSecurityGroupForResolverEndpointsReturns
+	fake.recordInvocation("DeleteSecurityGroupForResolverEndpoints", []interface{}{arg1, arg2, arg3})
+	fake.deleteSecurityGroupForResolverEndpointsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeEC2Client) DeleteSecurityGroupForResolverEndpointsCallCount() int {
+	fake.deleteSecurityGroupForResolverEndpointsMutex.RLock()
+	defer fake.deleteSecurityGroupForResolverEndpointsMutex.RUnlock()
+	return len(fake.deleteSecurityGroupForResolverEndpointsArgsForCall)
+}
+
+func (fake *FakeEC2Client) DeleteSecurityGroupForResolverEndpointsCalls(stub func(context.Context, string, string) error) {
+	fake.deleteSecurityGroupForResolverEndpointsMutex.Lock()
+	defer fake.deleteSecurityGroupForResolverEndpointsMutex.Unlock()
+	fake.DeleteSecurityGroupForResolverEndpointsStub = stub
+}
+
+func (fake *FakeEC2Client) DeleteSecurityGroupForResolverEndpointsArgsForCall(i int) (context.Context, string, string) {
+	fake.deleteSecurityGroupForResolverEndpointsMutex.RLock()
+	defer fake.deleteSecurityGroupForResolverEndpointsMutex.RUnlock()
+	argsForCall := fake.deleteSecurityGroupForResolverEndpointsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeEC2Client) DeleteSecurityGroupForResolverEndpointsReturns(result1 error) {
+	fake.deleteSecurityGroupForResolverEndpointsMutex.Lock()
+	defer fake.deleteSecurityGroupForResolverEndpointsMutex.Unlock()
+	fake.DeleteSecurityGroupForResolverEndpointsStub = nil
+	fake.deleteSecurityGroupForResolverEndpointsReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeEC2Client) DeleteSecurityGroupForResolverEndpointsReturnsOnCall(i int, result1 error) {
+	fake.deleteSecurityGroupForResolverEndpointsMutex.Lock()
+	defer fake.deleteSecurityGroupForResolverEndpointsMutex.Unlock()
+	fake.DeleteSecurityGroupForResolverEndpointsStub = nil
+	if fake.deleteSecurityGroupForResolverEndpointsReturnsOnCall == nil {
+		fake.deleteSecurityGroupForResolverEndpointsReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.deleteSecurityGroupForResolverEndpointsReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakeEC2Client) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
 	fake.createSecurityGroupForResolverEndpointsMutex.RLock()
 	defer fake.createSecurityGroupForResolverEndpointsMutex.RUnlock()
+	fake.deleteSecurityGroupForResolverEndpointsMutex.RLock()
+	defer fake.deleteSecurityGroupForResolverEndpointsMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value
