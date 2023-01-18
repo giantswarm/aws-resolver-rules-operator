@@ -116,6 +116,11 @@ func (r *AwsClusterReconciler) reconcileNormal(ctx context.Context, awsCluster *
 		return ctrl.Result{}, nil
 	}
 
+	err := r.awsClusterClient.AddFinalizer(ctx, awsCluster, Finalizer)
+	if err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
 	cluster := resolver.Cluster{Name: awsCluster.Name, Region: awsCluster.Spec.Region, VPCId: awsCluster.Spec.NetworkSpec.VPC.ID, IAMRoleARN: identity.Spec.RoleArn, Subnets: getSubnetIds(awsCluster)}
 	associatedResolverRule, err := r.resolver.CreateRule(ctx, logger, cluster)
 	if err != nil {
@@ -137,6 +142,11 @@ func (r *AwsClusterReconciler) reconcileDelete(ctx context.Context, awsCluster *
 	}
 
 	logger.Info("Deleted resolver rule")
+
+	err = r.awsClusterClient.RemoveFinalizer(ctx, awsCluster, Finalizer)
+	if err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	}
 
 	return reconcile.Result{}, nil
 }
