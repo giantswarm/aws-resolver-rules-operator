@@ -308,10 +308,19 @@ var _ = Describe("AWSCluster", func() {
 
 					It("does not tries to delete the resolver rule", func() {
 						Expect(dnsServerResolverClient.DisassociateResolverRuleWithContextCallCount()).To(Equal(0))
-						Expect(ramClient.DeleteResourceShareWithContextCallCount()).To(Equal(0))
 						Expect(resolverClient.DeleteResolverRuleCallCount()).To(Equal(0))
-						Expect(ec2Client.DeleteSecurityGroupForResolverEndpointsCallCount()).To(Equal(0))
 						Expect(reconcileErr).NotTo(HaveOccurred())
+					})
+
+					It("deletes the ram share resource", func() {
+						_, _, resourceShareName := ramClient.DeleteResourceShareWithContextArgsForCall(0)
+						Expect(resourceShareName).To(Equal("giantswarm-foo-rr"))
+					})
+
+					It("deletes the security group", func() {
+						_, _, vpcId, groupName := ec2Client.DeleteSecurityGroupForResolverEndpointsArgsForCall(0)
+						Expect(vpcId).To(Equal(WorkloadClusterVPCId))
+						Expect(groupName).To(Equal("foo-resolverrules-endpoints"))
 					})
 				})
 

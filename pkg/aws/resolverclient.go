@@ -66,7 +66,7 @@ func (a *AWSResolver) CreateResolverRule(ctx context.Context, logger logr.Logger
 
 func (a *AWSResolver) DeleteResolverRule(ctx context.Context, logger logr.Logger, cluster resolver.Cluster, resolverRuleId string) error {
 	logger.Info("Deleting resolver rule", "resolverRuleId", resolverRuleId)
-	_, err := a.client.DeleteResolverRuleWithContext(ctx, &route53resolver.DeleteResolverRuleInput{ResolverRuleId: aws.String(resolverRuleId)})
+	err := a.deleteResolverRule(ctx, resolverRuleId)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -86,6 +86,24 @@ func (a *AWSResolver) DeleteResolverRule(ctx context.Context, logger logr.Logger
 	return nil
 }
 
+func (a *AWSResolver) deleteResolverRule(ctx context.Context, resolverRuleId string) error {
+	_, err := a.client.DeleteResolverRuleWithContext(ctx, &route53resolver.DeleteResolverRuleInput{ResolverRuleId: aws.String(resolverRuleId)})
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case route53resolver.ErrCodeResourceNotFoundException:
+				return nil
+			default:
+				return errors.WithStack(err)
+			}
+		}
+
+		return errors.WithStack(err)
+	}
+
+	return nil
+}
+
 func (a *AWSResolver) deleteResolverEndpoint(ctx context.Context, resolverEndpointName string) error {
 	resolverEndpoint, err := a.getResolverEndpoint(ctx, resolverEndpointName)
 	if errors.Is(err, &resolver.ResolverEndpointNotFoundError{}) {
@@ -97,6 +115,15 @@ func (a *AWSResolver) deleteResolverEndpoint(ctx context.Context, resolverEndpoi
 
 	_, err = a.client.DeleteResolverEndpointWithContext(ctx, &route53resolver.DeleteResolverEndpointInput{ResolverEndpointId: resolverEndpoint.Id})
 	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case route53resolver.ErrCodeResourceNotFoundException:
+				return nil
+			default:
+				return errors.WithStack(err)
+			}
+		}
+
 		return errors.WithStack(err)
 	}
 

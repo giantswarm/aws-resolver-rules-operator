@@ -37,6 +37,10 @@ func (a *AWSRAM) DeleteResourceShareWithContext(ctx context.Context, logger logr
 		return errors.WithStack(err)
 	}
 
+	if len(resourceShare.ResourceShares) < 1 {
+		return nil
+	}
+
 	logger.Info("Deleting RAM resource share", "resourceShareName", resourceShareName)
 	_, err = a.client.DeleteResourceShareWithContext(ctx, &ram.DeleteResourceShareInput{
 		ResourceShareArn: resourceShare.ResourceShares[0].ResourceShareArn,

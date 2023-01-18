@@ -44,6 +44,9 @@ func (a *AWSEC2) CreateSecurityGroupForResolverEndpoints(ctx context.Context, vp
 func (a *AWSEC2) DeleteSecurityGroupForResolverEndpoints(ctx context.Context, logger logr.Logger, vpcId, groupName string) error {
 	logger.Info("Trying to find Resolver Rule security group", "securityGroupName", groupName, "vpcId", vpcId)
 	securityGroup, err := a.getSecurityGroupByName(ctx, vpcId, groupName)
+	if errors.Is(err, &SecurityGroupNotFoundError{}) {
+		return nil
+	}
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -51,6 +54,15 @@ func (a *AWSEC2) DeleteSecurityGroupForResolverEndpoints(ctx context.Context, lo
 	logger.Info("Deleting security group", "securityGroupName", groupName)
 	_, err = a.client.DeleteSecurityGroupWithContext(ctx, &ec2.DeleteSecurityGroupInput{GroupId: securityGroup.GroupId})
 	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case "InvalidGroup.NotFound":
+				return nil
+			default:
+				return errors.WithStack(err)
+			}
+		}
+
 		return errors.WithStack(err)
 	}
 
@@ -72,6 +84,10 @@ func (a *AWSEC2) getSecurityGroupByName(ctx context.Context, vpcId, groupName st
 	})
 	if err != nil {
 		return &ec2.SecurityGroup{}, errors.WithStack(err)
+	}
+
+	if len(securityGroupResponse.SecurityGroups) < 1 {
+		return &ec2.SecurityGroup{}, &SecurityGroupNotFoundError{}
 	}
 
 	return securityGroupResponse.SecurityGroups[0], nil

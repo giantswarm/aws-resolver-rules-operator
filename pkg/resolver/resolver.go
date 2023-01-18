@@ -91,21 +91,7 @@ func (r *Resolver) DeleteRule(ctx context.Context, logger logr.Logger, cluster C
 		return errors.WithStack(err)
 	}
 
-	resolverRule, err := resolverClient.GetResolverRuleByName(ctx, getResolverRuleName(cluster.Name), "FORWARD")
-	if errors.Is(err, &ResolverRuleNotFoundError{}) {
-		logger.Info("The Resolver Rule was not found, it must have been already deleted", "resolverRuleName", getResolverRuleName(cluster.Name), "dnsServerVPCId", r.dnsServer.VPCId)
-		return nil
-	}
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
 	dnsServerResolverClient, err := r.awsClients.NewResolverClientWithExternalId(r.dnsServer.AWSRegion, cluster.IAMRoleARN, r.dnsServer.IAMRoleToAssume, r.dnsServer.IAMExternalId)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	err = dnsServerResolverClient.DisassociateResolverRuleWithContext(ctx, logger, r.dnsServer.VPCId, resolverRule.RuleId)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -115,17 +101,30 @@ func (r *Resolver) DeleteRule(ctx context.Context, logger logr.Logger, cluster C
 		return errors.WithStack(err)
 	}
 
-	err = ramClient.DeleteResourceShareWithContext(ctx, logger, getResourceShareName(cluster.Name))
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	err = resolverClient.DeleteResolverRule(ctx, logger, cluster, resolverRule.RuleId)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
 	ec2Client, err := r.awsClients.NewEC2Client(cluster.Region, cluster.IAMRoleARN)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	resolverRule, err := resolverClient.GetResolverRuleByName(ctx, getResolverRuleName(cluster.Name), "FORWARD")
+	if err != nil && !errors.Is(err, &ResolverRuleNotFoundError{}) {
+		return errors.WithStack(err)
+	}
+
+	// Only if we found the resolver rule, try to delete it
+	if err == nil {
+		err = dnsServerResolverClient.DisassociateResolverRuleWithContext(ctx, logger, r.dnsServer.VPCId, resolverRule.RuleId)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		err = resolverClient.DeleteResolverRule(ctx, logger, cluster, resolverRule.RuleId)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+	}
+
+	err = ramClient.DeleteResourceShareWithContext(ctx, logger, getResourceShareName(cluster.Name))
 	if err != nil {
 		return errors.WithStack(err)
 	}
