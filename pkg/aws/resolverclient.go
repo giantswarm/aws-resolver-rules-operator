@@ -162,22 +162,42 @@ func (a *AWSResolver) GetResolverRuleByName(ctx context.Context, resolverRuleNam
 	return resolver.ResolverRule{}, &resolver.ResolverRuleNotFoundError{}
 }
 
-func (a *AWSResolver) AssociateResolverRuleWithContext(ctx context.Context, associationName, vpcID, resolverRuleId string) error {
-	_, err := a.client.AssociateResolverRuleWithContext(ctx, &route53resolver.AssociateResolverRuleInput{
-		Name:           aws.String(associationName),
-		ResolverRuleId: aws.String(resolverRuleId),
-		VPCId:          aws.String(vpcID),
+func (a *AWSResolver) AssociateResolverRuleWithContext(ctx context.Context, logger logr.Logger, associationName, vpcId, resolverRuleId string) error {
+	logger = logger.WithValues("resolverRuleId", resolverRuleId, "vpcId", vpcId, "associationName", associationName)
+	logger.Info("Checking if Resolver Rule is already associated to VPC")
+	listResolverRuleAssociationsResponse, err := a.client.ListResolverRuleAssociationsWithContext(ctx, &route53resolver.ListResolverRuleAssociationsInput{
+		Filters: []*route53resolver.Filter{
+			{
+				Name:   aws.String("Name"),
+				Values: aws.StringSlice([]string{associationName}),
+			},
+			{
+				Name:   aws.String("ResolverRuleId"),
+				Values: aws.StringSlice([]string{resolverRuleId}),
+			},
+			{
+				Name:   aws.String("VPCId"),
+				Values: aws.StringSlice([]string{vpcId}),
+			},
+		},
 	})
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case route53resolver.ErrCodeResourceExistsException:
-				return nil
-			default:
-				return errors.WithStack(err)
-			}
-		}
+		return errors.WithStack(err)
+	}
 
+	// If the rule is already associated we just return.
+	if len(listResolverRuleAssociationsResponse.ResolverRuleAssociations) > 0 {
+		logger.Info("The Resolver Rule was already associated with the VPC")
+		return nil
+	}
+
+	logger.Info("Associating Resolver Rule to VPC")
+	_, err = a.client.AssociateResolverRuleWithContext(ctx, &route53resolver.AssociateResolverRuleInput{
+		Name:           aws.String(associationName),
+		ResolverRuleId: aws.String(resolverRuleId),
+		VPCId:          aws.String(vpcId),
+	})
+	if err != nil {
 		return errors.WithStack(err)
 	}
 

@@ -10,13 +10,14 @@ import (
 )
 
 type FakeResolverClient struct {
-	AssociateResolverRuleWithContextStub        func(context.Context, string, string, string) error
+	AssociateResolverRuleWithContextStub        func(context.Context, logr.Logger, string, string, string) error
 	associateResolverRuleWithContextMutex       sync.RWMutex
 	associateResolverRuleWithContextArgsForCall []struct {
 		arg1 context.Context
-		arg2 string
+		arg2 logr.Logger
 		arg3 string
 		arg4 string
+		arg5 string
 	}
 	associateResolverRuleWithContextReturns struct {
 		result1 error
@@ -89,21 +90,22 @@ type FakeResolverClient struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeResolverClient) AssociateResolverRuleWithContext(arg1 context.Context, arg2 string, arg3 string, arg4 string) error {
+func (fake *FakeResolverClient) AssociateResolverRuleWithContext(arg1 context.Context, arg2 logr.Logger, arg3 string, arg4 string, arg5 string) error {
 	fake.associateResolverRuleWithContextMutex.Lock()
 	ret, specificReturn := fake.associateResolverRuleWithContextReturnsOnCall[len(fake.associateResolverRuleWithContextArgsForCall)]
 	fake.associateResolverRuleWithContextArgsForCall = append(fake.associateResolverRuleWithContextArgsForCall, struct {
 		arg1 context.Context
-		arg2 string
+		arg2 logr.Logger
 		arg3 string
 		arg4 string
-	}{arg1, arg2, arg3, arg4})
+		arg5 string
+	}{arg1, arg2, arg3, arg4, arg5})
 	stub := fake.AssociateResolverRuleWithContextStub
 	fakeReturns := fake.associateResolverRuleWithContextReturns
-	fake.recordInvocation("AssociateResolverRuleWithContext", []interface{}{arg1, arg2, arg3, arg4})
+	fake.recordInvocation("AssociateResolverRuleWithContext", []interface{}{arg1, arg2, arg3, arg4, arg5})
 	fake.associateResolverRuleWithContextMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3, arg4)
+		return stub(arg1, arg2, arg3, arg4, arg5)
 	}
 	if specificReturn {
 		return ret.result1
@@ -117,17 +119,17 @@ func (fake *FakeResolverClient) AssociateResolverRuleWithContextCallCount() int 
 	return len(fake.associateResolverRuleWithContextArgsForCall)
 }
 
-func (fake *FakeResolverClient) AssociateResolverRuleWithContextCalls(stub func(context.Context, string, string, string) error) {
+func (fake *FakeResolverClient) AssociateResolverRuleWithContextCalls(stub func(context.Context, logr.Logger, string, string, string) error) {
 	fake.associateResolverRuleWithContextMutex.Lock()
 	defer fake.associateResolverRuleWithContextMutex.Unlock()
 	fake.AssociateResolverRuleWithContextStub = stub
 }
 
-func (fake *FakeResolverClient) AssociateResolverRuleWithContextArgsForCall(i int) (context.Context, string, string, string) {
+func (fake *FakeResolverClient) AssociateResolverRuleWithContextArgsForCall(i int) (context.Context, logr.Logger, string, string, string) {
 	fake.associateResolverRuleWithContextMutex.RLock()
 	defer fake.associateResolverRuleWithContextMutex.RUnlock()
 	argsForCall := fake.associateResolverRuleWithContextArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5
 }
 
 func (fake *FakeResolverClient) AssociateResolverRuleWithContextReturns(result1 error) {

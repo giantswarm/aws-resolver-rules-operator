@@ -43,7 +43,7 @@ type ResolverClient interface {
 	GetResolverRuleByName(ctx context.Context, resolverRuleName, resolverRuleType string) (ResolverRule, error)
 	CreateResolverRule(ctx context.Context, logger logr.Logger, cluster Cluster, securityGroupId, domainName, resolverRuleName string) (ResolverRule, error)
 	DeleteResolverRule(ctx context.Context, logger logr.Logger, cluster Cluster, resolverRuleId string) error
-	AssociateResolverRuleWithContext(ctx context.Context, associationName, vpcID, resolverRuleId string) error
+	AssociateResolverRuleWithContext(ctx context.Context, logger logr.Logger, associationName, vpcID, resolverRuleId string) error
 	DisassociateResolverRuleWithContext(ctx context.Context, logger logr.Logger, vpcID, resolverRuleId string) error
 }
 
@@ -183,7 +183,7 @@ func (r *Resolver) associateRule(ctx context.Context, logger logr.Logger, cluste
 	}
 
 	logger.Info("Associating resolver rule with VPC")
-	err = dnsServerResolverClient.AssociateResolverRuleWithContext(ctx, getAssociationName(cluster.Name), r.dnsServer.VPCId, resolverRule.RuleId)
+	err = dnsServerResolverClient.AssociateResolverRuleWithContext(ctx, logger, getAssociationName(cluster.Name), r.dnsServer.VPCId, resolverRule.RuleId)
 	if err != nil {
 		return errors.WithStack(err)
 	}

@@ -27,3 +27,15 @@ func (e *ResolverEndpointNotFoundError) Error() string {
 func (e *ResolverEndpointNotFoundError) Is(target error) bool {
 	return reflect.TypeOf(target) == reflect.TypeOf(e)
 }
+
+type ResolverEndpointIpNotFoundError struct {
+	error
+}
+
+func (e *ResolverEndpointIpNotFoundError) Error() string {
+	return "resolver endpoint ip not found"
+}
+
+func (e *ResolverEndpointIpNotFoundError) Is(target error) bool {
+	return reflect.TypeOf(target) == reflect.TypeOf(e)
+}

@@ -275,7 +275,7 @@ var _ = Describe("AWSCluster", func() {
 							})
 
 							It("associates resolver rule with VPC account", func() {
-								_, associationName, vpcId, resolverRuleId := dnsServerResolverClient.AssociateResolverRuleWithContextArgsForCall(0)
+								_, _, associationName, vpcId, resolverRuleId := dnsServerResolverClient.AssociateResolverRuleWithContextArgsForCall(0)
 								Expect(associationName).To(Equal(fmt.Sprintf("giantswarm-%s-rr-association", ClusterName)))
 								Expect(vpcId).To(Equal(DnsServerVPCId))
 								Expect(resolverRuleId).To(Equal("resolver-rule-id"))
