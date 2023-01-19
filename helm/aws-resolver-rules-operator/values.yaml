@@ -35,5 +35,5 @@ dnsServerARN: ""
 dnsServerExternalId: ""
 
 # Base domain used for the workload clusters created on the MC where this controller is deployed.
-# Normally we append the workload cluster name to this, i.e. my-cluster.${baseDomain}
-workloadClusterBaseDomain: ""
+# Normally we prepend the workload cluster name to this, i.e. my-cluster.${baseDomain}
+baseDomain: ""

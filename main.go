@@ -73,7 +73,7 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&workloadClusterBaseDomain, "workload-cluster-basedomain", "", "Domain for workload cluster, e.g. installation.eu-west-1.aws.domain.tld")
+	flag.StringVar(&workloadClusterBaseDomain, "basedomain", "", "Domain for workload cluster, e.g. installation.eu-west-1.aws.domain.tld")
 
 	opts := zap.Options{
 		Development: true,
@@ -97,7 +97,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	k8sAwsClusterClient := k8sclient.NewAWSCluster(mgr.GetClient())
+	k8sAwsClusterClient := k8sclient.NewAWSClusterClient(mgr.GetClient())
 	awsClients := aws.NewClients(os.Getenv("AWS_ENDPOINT"))
 
 	dnsserver, err := resolver.NewDNSServer(dnsServerAWSAccountId, dnsServerExternalId, dnsServerRegion, dnsServerArn, dnsServerVpcId)

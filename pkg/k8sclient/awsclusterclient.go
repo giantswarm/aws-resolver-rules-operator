@@ -12,17 +12,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-type AWSCluster struct {
+type AWSClusterClient struct {
 	client client.Client
 }
 
-func NewAWSCluster(client client.Client) *AWSCluster {
-	return &AWSCluster{
+func NewAWSClusterClient(client client.Client) *AWSClusterClient {
+	return &AWSClusterClient{
 		client: client,
 	}
 }
 
-func (a *AWSCluster) Get(ctx context.Context, namespacedName types.NamespacedName) (*capa.AWSCluster, error) {
+func (a *AWSClusterClient) Get(ctx context.Context, namespacedName types.NamespacedName) (*capa.AWSCluster, error) {
 	awsCluster := &capa.AWSCluster{}
 	err := a.client.Get(ctx, namespacedName, awsCluster)
 	if err != nil {
@@ -32,7 +32,7 @@ func (a *AWSCluster) Get(ctx context.Context, namespacedName types.NamespacedNam
 	return awsCluster, errors.WithStack(err)
 }
 
-func (a *AWSCluster) GetOwner(ctx context.Context, awsCluster *capa.AWSCluster) (*capi.Cluster, error) {
+func (a *AWSClusterClient) GetOwner(ctx context.Context, awsCluster *capa.AWSCluster) (*capi.Cluster, error) {
 	cluster, err := util.GetOwnerCluster(ctx, a.client, awsCluster.ObjectMeta)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -41,19 +41,19 @@ func (a *AWSCluster) GetOwner(ctx context.Context, awsCluster *capa.AWSCluster) 
 	return cluster, nil
 }
 
-func (a *AWSCluster) AddFinalizer(ctx context.Context, awsCluster *capa.AWSCluster, finalizer string) error {
+func (a *AWSClusterClient) AddFinalizer(ctx context.Context, awsCluster *capa.AWSCluster, finalizer string) error {
 	originalCluster := awsCluster.DeepCopy()
 	controllerutil.AddFinalizer(awsCluster, finalizer)
 	return a.client.Patch(ctx, awsCluster, client.MergeFrom(originalCluster))
 }
 
-func (a *AWSCluster) RemoveFinalizer(ctx context.Context, awsCluster *capa.AWSCluster, finalizer string) error {
+func (a *AWSClusterClient) RemoveFinalizer(ctx context.Context, awsCluster *capa.AWSCluster, finalizer string) error {
 	originalCluster := awsCluster.DeepCopy()
 	controllerutil.RemoveFinalizer(awsCluster, finalizer)
 	return a.client.Patch(ctx, awsCluster, client.MergeFrom(originalCluster))
 }
 
-func (a *AWSCluster) GetIdentity(ctx context.Context, awsCluster *capa.AWSCluster) (*capa.AWSClusterRoleIdentity, error) {
+func (a *AWSClusterClient) GetIdentity(ctx context.Context, awsCluster *capa.AWSCluster) (*capa.AWSClusterRoleIdentity, error) {
 	if awsCluster.Spec.IdentityRef == nil {
 		return nil, nil
 	}

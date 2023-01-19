@@ -41,7 +41,7 @@ spec:
             - --dns-server-external-id={{ .Values.dnsServerExternalId }}
             - --dns-server-region={{ .Values.dnsServerRegion }}
             - --dns-server-vpc-id={{ .Values.dnsServerVpcId }}
-            - --workload-cluster-basedomain={{ .Values.workloadClusterBaseDomain }}
+            - --basedomain={{ .Values.baseDomain }}
           resources:
             requests:
               cpu: 100m

@@ -16,16 +16,16 @@ import (
 	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
 )
 
-var _ = Describe("AWSCluster", func() {
+var _ = Describe("AWSClusterClient", func() {
 	var (
 		ctx context.Context
 
-		awsClusterClient k8sclient.AWSCluster
+		awsClusterClient k8sclient.AWSClusterClient
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
-		awsClusterClient = *k8sclient.NewAWSCluster(k8sClient)
+		awsClusterClient = *k8sclient.NewAWSClusterClient(k8sClient)
 	})
 
 	Describe("Get", func() {

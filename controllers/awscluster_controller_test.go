@@ -124,7 +124,8 @@ var _ = Describe("AWSCluster", func() {
 			awsClusterClient.GetOwnerReturns(nil, nil)
 		})
 
-		It("does not requeue the event", func() {
+		It("does not really reconcile", func() {
+			Expect(awsClusterClient.AddFinalizerCallCount()).To(Equal(0))
 			Expect(result.Requeue).To(BeFalse())
 			Expect(result.RequeueAfter).To(BeZero())
 			Expect(reconcileErr).NotTo(HaveOccurred())
@@ -138,7 +139,8 @@ var _ = Describe("AWSCluster", func() {
 			awsClusterClient.GetOwnerReturns(cluster, nil)
 		})
 
-		It("does not reconcile", func() {
+		It("does not really reconcile", func() {
+			Expect(awsClusterClient.AddFinalizerCallCount()).To(Equal(0))
 			Expect(result.Requeue).To(BeFalse())
 			Expect(result.RequeueAfter).To(BeZero())
 			Expect(reconcileErr).NotTo(HaveOccurred())
@@ -153,7 +155,8 @@ var _ = Describe("AWSCluster", func() {
 			}
 		})
 
-		It("does not reconcile", func() {
+		It("does not really reconcile", func() {
+			Expect(awsClusterClient.AddFinalizerCallCount()).To(Equal(0))
 			Expect(result.Requeue).To(BeFalse())
 			Expect(result.RequeueAfter).To(BeZero())
 			Expect(reconcileErr).NotTo(HaveOccurred())
@@ -180,7 +183,8 @@ var _ = Describe("AWSCluster", func() {
 				Expect(reconcileErr).NotTo(HaveOccurred())
 			})
 
-			It("doesn't reconcile if no Identity is set", func() {
+			It("doesn't really reconcile", func() {
+				Expect(awsClusterClient.AddFinalizerCallCount()).To(Equal(0))
 				Expect(result.Requeue).To(BeFalse())
 				Expect(result.RequeueAfter).To(BeZero())
 				Expect(reconcileErr).NotTo(HaveOccurred())
@@ -199,7 +203,8 @@ var _ = Describe("AWSCluster", func() {
 						gsannotations.AWSDNSMode: "non-private",
 					}
 				})
-				It("returns early", func() {
+				It("doesn't really reconcile", func() {
+					Expect(awsClusterClient.AddFinalizerCallCount()).To(Equal(0))
 					Expect(reconcileErr).NotTo(HaveOccurred())
 					Expect(ec2Client.CreateSecurityGroupForResolverEndpointsCallCount()).To(BeZero())
 				})
