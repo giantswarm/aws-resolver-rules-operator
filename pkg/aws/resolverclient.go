@@ -56,12 +56,125 @@ func (a *AWSResolver) CreateResolverRule(ctx context.Context, logger logr.Logger
 			Port: aws.Int64(53),
 		})
 	}
-	resolverRuleArn, resolverRuleId, err := a.createResolverRule(ctx, domainName, resolverRuleName, outboundEndpointId, targetAddress)
+	resolverRule, err = a.createResolverRule(ctx, domainName, resolverRuleName, outboundEndpointId, targetAddress)
 	if err != nil {
 		return resolver.ResolverRule{}, errors.WithStack(err)
 	}
 
-	return resolver.ResolverRule{RuleArn: resolverRuleArn, RuleId: resolverRuleId}, nil
+	return resolverRule, nil
+}
+
+// createResolverRule will create a new Resolver Rule.
+// If the Rule already exists, it will try to fetch it to return the Rule ARN and ID.
+func (a *AWSResolver) createResolverRule(ctx context.Context, domainName, resolverRuleName, endpointId string, targetIps []*route53resolver.TargetAddress) (resolver.ResolverRule, error) {
+	now := time.Now()
+	response, err := a.client.CreateResolverRuleWithContext(ctx, &route53resolver.CreateResolverRuleInput{
+		CreatorRequestId:   aws.String(fmt.Sprintf("%d", now.UnixNano())),
+		DomainName:         aws.String(domainName),
+		Name:               aws.String(resolverRuleName),
+		ResolverEndpointId: aws.String(endpointId),
+		RuleType:           aws.String("FORWARD"),
+		TargetIps:          targetIps,
+	})
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case route53resolver.ErrCodeResourceExistsException:
+				resolverRule, err := a.GetResolverRuleByName(ctx, resolverRuleName, "FORWARD")
+				if err != nil {
+					return resolver.ResolverRule{}, errors.WithStack(err)
+				}
+				return resolverRule, nil
+			default:
+				return resolver.ResolverRule{}, errors.WithStack(err)
+			}
+		}
+
+		return resolver.ResolverRule{}, errors.WithStack(err)
+	}
+
+	return resolver.ResolverRule{RuleArn: *response.ResolverRule.Arn, RuleId: *response.ResolverRule.Id}, nil
+}
+
+// CreateResolverEndpointWithContext creates a Resolver endpoint.
+// It won't return an error if the endpoint already exists. Errors can be found here
+// https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_CreateResolverEndpoint.html#API_route53resolver_CreateResolverEndpoint_Errors
+func (a *AWSResolver) createResolverEndpointWithContext(ctx context.Context, logger logr.Logger, direction, name string, securityGroupIds, subnetIds []string) (string, error) {
+	resolverEndpoint, err := a.getResolverEndpoint(ctx, name)
+	if err != nil {
+		if !errors.Is(err, &resolver.ResolverEndpointNotFoundError{}) {
+			return "", errors.WithStack(err)
+		}
+	}
+
+	// If we find it, we just return it.
+	if err == nil {
+		return *resolverEndpoint.Id, nil
+	}
+
+	// Otherwise we create it.
+	now := time.Now()
+	var ipAddresses []*route53resolver.IpAddressRequest
+	for _, id := range subnetIds {
+		ipAddresses = append(ipAddresses, &route53resolver.IpAddressRequest{
+			SubnetId: aws.String(id),
+		})
+	}
+	logger.Info("Creating resolver endpoint", "direction", direction, "endpointName", name, "securityGroupId", securityGroupIds, "subnetIds", subnetIds)
+	response, err := a.client.CreateResolverEndpointWithContext(ctx, &route53resolver.CreateResolverEndpointInput{
+		CreatorRequestId: aws.String(fmt.Sprintf("%d", now.UnixNano())),
+		Direction:        aws.String(direction),
+		IpAddresses:      ipAddresses,
+		Name:             aws.String(name),
+		SecurityGroupIds: aws.StringSlice(securityGroupIds),
+	})
+
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case route53resolver.ErrCodeResourceExistsException:
+				endpointsResponse, err := a.client.ListResolverEndpointsWithContext(ctx, &route53resolver.ListResolverEndpointsInput{
+					Filters: []*route53resolver.Filter{
+						{
+							Name:   aws.String("Name"),
+							Values: aws.StringSlice([]string{name}),
+						},
+					},
+				})
+				if err != nil {
+					return "", errors.WithStack(err)
+				}
+
+				return *endpointsResponse.ResolverEndpoints[0].Id, nil
+			default:
+				return "", errors.WithStack(err)
+			}
+		}
+
+		return "", errors.WithStack(err)
+	}
+
+	return *response.ResolverEndpoint.Id, nil
+}
+
+func (a *AWSResolver) getResolverEndpoint(ctx context.Context, resolverEndpointName string) (*route53resolver.ResolverEndpoint, error) {
+	listRulesResponse, err := a.client.ListResolverEndpointsWithContext(ctx, &route53resolver.ListResolverEndpointsInput{
+		Filters: []*route53resolver.Filter{
+			{
+				Name:   aws.String("Name"),
+				Values: aws.StringSlice([]string{resolverEndpointName}),
+			},
+		},
+	})
+	if err != nil {
+		return &route53resolver.ResolverEndpoint{}, errors.WithStack(err)
+	}
+
+	if len(listRulesResponse.ResolverEndpoints) > 0 {
+		return listRulesResponse.ResolverEndpoints[0], nil
+	}
+
+	return nil, &resolver.ResolverEndpointNotFoundError{}
 }
 
 func (a *AWSResolver) DeleteResolverRule(ctx context.Context, logger logr.Logger, cluster resolver.Cluster, resolverRuleId string) error {
@@ -128,38 +241,6 @@ func (a *AWSResolver) deleteResolverEndpoint(ctx context.Context, resolverEndpoi
 	}
 
 	return nil
-}
-
-// createResolverRule will create a new Resolver Rule.
-// If the Rule already exists, it will try to fetch it to return the Rule ARN and ID.
-func (a *AWSResolver) createResolverRule(ctx context.Context, domainName, resolverRuleName, endpointId string, targetIps []*route53resolver.TargetAddress) (string, string, error) {
-	now := time.Now()
-	response, err := a.client.CreateResolverRuleWithContext(ctx, &route53resolver.CreateResolverRuleInput{
-		CreatorRequestId:   aws.String(fmt.Sprintf("%d", now.UnixNano())),
-		DomainName:         aws.String(domainName),
-		Name:               aws.String(resolverRuleName),
-		ResolverEndpointId: aws.String(endpointId),
-		RuleType:           aws.String("FORWARD"),
-		TargetIps:          targetIps,
-	})
-	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case route53resolver.ErrCodeResourceExistsException:
-				resolverRule, err := a.GetResolverRuleByName(ctx, resolverRuleName, "FORWARD")
-				if err != nil {
-					return "", "", errors.WithStack(err)
-				}
-				return resolverRule.RuleArn, resolverRule.RuleId, nil
-			default:
-				return "", "", errors.WithStack(err)
-			}
-		}
-
-		return "", "", errors.WithStack(err)
-	}
-
-	return *response.ResolverRule.Arn, *response.ResolverRule.Id, nil
 }
 
 func (a *AWSResolver) GetResolverRuleByName(ctx context.Context, resolverRuleName, resolverRuleType string) (resolver.ResolverRule, error) {
@@ -253,87 +334,6 @@ func (a *AWSResolver) DisassociateResolverRuleWithContext(ctx context.Context, l
 	}
 
 	return nil
-}
-
-// CreateResolverEndpointWithContext creates a Resolver endpoint.
-// It won't return an error if the endpoint already exists. Errors can be found here
-// https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_CreateResolverEndpoint.html#API_route53resolver_CreateResolverEndpoint_Errors
-func (a *AWSResolver) createResolverEndpointWithContext(ctx context.Context, logger logr.Logger, direction, name string, securityGroupIds, subnetIds []string) (string, error) {
-	resolverEndpoint, err := a.getResolverEndpoint(ctx, name)
-	if err != nil {
-		if !errors.Is(err, &resolver.ResolverEndpointNotFoundError{}) {
-			return "", errors.WithStack(err)
-		}
-	}
-
-	// If we find it, we just return it.
-	if err == nil {
-		return *resolverEndpoint.Id, nil
-	}
-
-	// Otherwise we create it.
-	now := time.Now()
-	var ipAddresses []*route53resolver.IpAddressRequest
-	for _, id := range subnetIds {
-		ipAddresses = append(ipAddresses, &route53resolver.IpAddressRequest{
-			SubnetId: aws.String(id),
-		})
-	}
-	logger.Info("Creating resolver endpoint", "direction", direction, "endpointName", name, "securityGroupId", securityGroupIds, "subnetIds", subnetIds)
-	response, err := a.client.CreateResolverEndpointWithContext(ctx, &route53resolver.CreateResolverEndpointInput{
-		CreatorRequestId: aws.String(fmt.Sprintf("%d", now.UnixNano())),
-		Direction:        aws.String(direction),
-		IpAddresses:      ipAddresses,
-		Name:             aws.String(name),
-		SecurityGroupIds: aws.StringSlice(securityGroupIds),
-	})
-
-	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case route53resolver.ErrCodeResourceExistsException:
-				endpointsResponse, err := a.client.ListResolverEndpointsWithContext(ctx, &route53resolver.ListResolverEndpointsInput{
-					Filters: []*route53resolver.Filter{
-						{
-							Name:   aws.String("Name"),
-							Values: aws.StringSlice([]string{name}),
-						},
-					},
-				})
-				if err != nil {
-					return "", errors.WithStack(err)
-				}
-
-				return *endpointsResponse.ResolverEndpoints[0].Id, nil
-			default:
-				return "", errors.WithStack(err)
-			}
-		}
-
-		return "", errors.WithStack(err)
-	}
-
-	return *response.ResolverEndpoint.Id, nil
-}
-
-func (a *AWSResolver) getResolverEndpoint(ctx context.Context, resolverEndpointName string) (*route53resolver.ResolverEndpoint, error) {
-	listRulesResponse, err := a.client.ListResolverEndpointsWithContext(ctx, &route53resolver.ListResolverEndpointsInput{
-		Filters: []*route53resolver.Filter{
-			{
-				Name:   aws.String("Name"),
-				Values: aws.StringSlice([]string{resolverEndpointName}),
-			},
-		},
-	})
-	if err != nil {
-		return &route53resolver.ResolverEndpoint{}, errors.WithStack(err)
-	}
-
-	if len(listRulesResponse.ResolverEndpoints) > 0 {
-		return listRulesResponse.ResolverEndpoints[0], nil
-	}
-
-	return nil, &resolver.ResolverEndpointNotFoundError{}
 }
 
 func getInboundEndpointName(clusterName string) string {
