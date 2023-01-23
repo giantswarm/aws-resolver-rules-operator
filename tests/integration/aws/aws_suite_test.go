@@ -50,8 +50,9 @@ func TestControllers(t *testing.T) {
 }
 
 const (
-	AWS_IAM_ARN = "arn:aws:iam::1234567890:role/IamRole"
-	Region      = "eu-central-1"
+	AWS_IAM_ARN            = "arn:aws:iam::1234567890:role/IamRole"
+	Region                 = "eu-central-1"
+	LocalstackAWSAccountId = "000000000000"
 )
 
 var (

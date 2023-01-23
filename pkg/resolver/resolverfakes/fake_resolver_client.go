@@ -71,6 +71,21 @@ type FakeResolverClient struct {
 	disassociateResolverRuleWithContextReturnsOnCall map[int]struct {
 		result1 error
 	}
+	FindResolverRulesByAWSAccountIdStub        func(context.Context, logr.Logger, string) ([]resolver.ResolverRule, error)
+	findResolverRulesByAWSAccountIdMutex       sync.RWMutex
+	findResolverRulesByAWSAccountIdArgsForCall []struct {
+		arg1 context.Context
+		arg2 logr.Logger
+		arg3 string
+	}
+	findResolverRulesByAWSAccountIdReturns struct {
+		result1 []resolver.ResolverRule
+		result2 error
+	}
+	findResolverRulesByAWSAccountIdReturnsOnCall map[int]struct {
+		result1 []resolver.ResolverRule
+		result2 error
+	}
 	GetResolverRuleByNameStub        func(context.Context, string, string) (resolver.ResolverRule, error)
 	getResolverRuleByNameMutex       sync.RWMutex
 	getResolverRuleByNameArgsForCall []struct {
@@ -352,6 +367,72 @@ func (fake *FakeResolverClient) DisassociateResolverRuleWithContextReturnsOnCall
 	}{result1}
 }
 
+func (fake *FakeResolverClient) FindResolverRulesByAWSAccountId(arg1 context.Context, arg2 logr.Logger, arg3 string) ([]resolver.ResolverRule, error) {
+	fake.findResolverRulesByAWSAccountIdMutex.Lock()
+	ret, specificReturn := fake.findResolverRulesByAWSAccountIdReturnsOnCall[len(fake.findResolverRulesByAWSAccountIdArgsForCall)]
+	fake.findResolverRulesByAWSAccountIdArgsForCall = append(fake.findResolverRulesByAWSAccountIdArgsForCall, struct {
+		arg1 context.Context
+		arg2 logr.Logger
+		arg3 string
+	}{arg1, arg2, arg3})
+	stub := fake.FindResolverRulesByAWSAccountIdStub
+	fakeReturns := fake.findResolverRulesByAWSAccountIdReturns
+	fake.recordInvocation("FindResolverRulesByAWSAccountId", []interface{}{arg1, arg2, arg3})
+	fake.findResolverRulesByAWSAccountIdMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeResolverClient) FindResolverRulesByAWSAccountIdCallCount() int {
+	fake.findResolverRulesByAWSAccountIdMutex.RLock()
+	defer fake.findResolverRulesByAWSAccountIdMutex.RUnlock()
+	return len(fake.findResolverRulesByAWSAccountIdArgsForCall)
+}
+
+func (fake *FakeResolverClient) FindResolverRulesByAWSAccountIdCalls(stub func(context.Context, logr.Logger, string) ([]resolver.ResolverRule, error)) {
+	fake.findResolverRulesByAWSAccountIdMutex.Lock()
+	defer fake.findResolverRulesByAWSAccountIdMutex.Unlock()
+	fake.FindResolverRulesByAWSAccountIdStub = stub
+}
+
+func (fake *FakeResolverClient) FindResolverRulesByAWSAccountIdArgsForCall(i int) (context.Context, logr.Logger, string) {
+	fake.findResolverRulesByAWSAccountIdMutex.RLock()
+	defer fake.findResolverRulesByAWSAccountIdMutex.RUnlock()
+	argsForCall := fake.findResolverRulesByAWSAccountIdArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeResolverClient) FindResolverRulesByAWSAccountIdReturns(result1 []resolver.ResolverRule, result2 error) {
+	fake.findResolverRulesByAWSAccountIdMutex.Lock()
+	defer fake.findResolverRulesByAWSAccountIdMutex.Unlock()
+	fake.FindResolverRulesByAWSAccountIdStub = nil
+	fake.findResolverRulesByAWSAccountIdReturns = struct {
+		result1 []resolver.ResolverRule
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeResolverClient) FindResolverRulesByAWSAccountIdReturnsOnCall(i int, result1 []resolver.ResolverRule, result2 error) {
+	fake.findResolverRulesByAWSAccountIdMutex.Lock()
+	defer fake.findResolverRulesByAWSAccountIdMutex.Unlock()
+	fake.FindResolverRulesByAWSAccountIdStub = nil
+	if fake.findResolverRulesByAWSAccountIdReturnsOnCall == nil {
+		fake.findResolverRulesByAWSAccountIdReturnsOnCall = make(map[int]struct {
+			result1 []resolver.ResolverRule
+			result2 error
+		})
+	}
+	fake.findResolverRulesByAWSAccountIdReturnsOnCall[i] = struct {
+		result1 []resolver.ResolverRule
+		result2 error
+	}{result1, result2}
+}
+
 func (fake *FakeResolverClient) GetResolverRuleByName(arg1 context.Context, arg2 string, arg3 string) (resolver.ResolverRule, error) {
 	fake.getResolverRuleByNameMutex.Lock()
 	ret, specificReturn := fake.getResolverRuleByNameReturnsOnCall[len(fake.getResolverRuleByNameArgsForCall)]
@@ -429,6 +510,8 @@ func (fake *FakeResolverClient) Invocations() map[string][][]interface{} {
 	defer fake.deleteResolverRuleMutex.RUnlock()
 	fake.disassociateResolverRuleWithContextMutex.RLock()
 	defer fake.disassociateResolverRuleWithContextMutex.RUnlock()
+	fake.findResolverRulesByAWSAccountIdMutex.RLock()
+	defer fake.findResolverRulesByAWSAccountIdMutex.RUnlock()
 	fake.getResolverRuleByNameMutex.RLock()
 	defer fake.getResolverRuleByNameMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}

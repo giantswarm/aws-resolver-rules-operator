@@ -94,7 +94,7 @@ func (a *AWSResolver) createResolverRule(ctx context.Context, logger logr.Logger
 		return resolver.ResolverRule{}, errors.WithStack(err)
 	}
 
-	resolverRule := resolver.ResolverRule{RuleArn: *response.ResolverRule.Arn, RuleId: *response.ResolverRule.Id}
+	resolverRule := a.buildResolverRule(response.ResolverRule)
 	logger.Info("Created resolver rule", "rule", resolverRule)
 
 	return resolverRule, nil
@@ -266,10 +266,7 @@ func (a *AWSResolver) GetResolverRuleByName(ctx context.Context, resolverRuleNam
 	}
 
 	if len(listRulesResponse.ResolverRules) > 0 {
-		return resolver.ResolverRule{
-			RuleId:  *listRulesResponse.ResolverRules[0].Id,
-			RuleArn: *listRulesResponse.ResolverRules[0].Arn,
-		}, nil
+		return a.buildResolverRule(listRulesResponse.ResolverRules[0]), nil
 	}
 
 	return resolver.ResolverRule{}, &resolver.ResolverRuleNotFoundError{}
@@ -338,6 +335,55 @@ func (a *AWSResolver) DisassociateResolverRuleWithContext(ctx context.Context, l
 	}
 
 	return nil
+}
+
+func (a *AWSResolver) FindResolverRulesByAWSAccountId(ctx context.Context, logger logr.Logger, awsAccountId string) ([]resolver.ResolverRule, error) {
+	// Fetch first page of resolver rules.
+	unfilteredResolverRules := []*route53resolver.ResolverRule{}
+	listResolverRulesResponse, err := a.client.ListResolverRulesWithContext(ctx, &route53resolver.ListResolverRulesInput{
+		MaxResults: aws.Int64(100),
+		NextToken:  nil,
+	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	unfilteredResolverRules = append(unfilteredResolverRules, listResolverRulesResponse.ResolverRules...)
+
+	// If the response contains `NexToken` we need to keep sending requests including the token to get all rules.
+	for listResolverRulesResponse.NextToken != nil && *listResolverRulesResponse.NextToken != "" {
+		listResolverRulesResponse, err = a.client.ListResolverRulesWithContext(ctx, &route53resolver.ListResolverRulesInput{
+			MaxResults: aws.Int64(100),
+			NextToken:  listResolverRulesResponse.NextToken,
+		})
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to list resolver rules")
+		}
+		unfilteredResolverRules = append(unfilteredResolverRules, listResolverRulesResponse.ResolverRules...)
+	}
+
+	resolverRulesInAccount := []resolver.ResolverRule{}
+	for _, rule := range unfilteredResolverRules {
+		if *rule.OwnerId == awsAccountId {
+			resolverRulesInAccount = append(resolverRulesInAccount, a.buildResolverRule(rule))
+		}
+	}
+
+	return resolverRulesInAccount, nil
+}
+
+func (a *AWSResolver) buildResolverRule(rule *route53resolver.ResolverRule) resolver.ResolverRule {
+	ruleIPs := []string{}
+	for _, ip := range rule.TargetIps {
+		ruleIPs = append(ruleIPs, *ip.Ip)
+	}
+
+	return resolver.ResolverRule{
+		Arn:  *rule.Arn,
+		Id:   *rule.Id,
+		IPs:  ruleIPs,
+		Name: *rule.Name,
+	}
 }
 
 func getInboundEndpointName(clusterName string) string {

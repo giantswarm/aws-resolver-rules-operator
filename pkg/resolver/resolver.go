@@ -45,19 +45,16 @@ type ResolverClient interface {
 	DeleteResolverRule(ctx context.Context, logger logr.Logger, cluster Cluster, resolverRuleId string) error
 	AssociateResolverRuleWithContext(ctx context.Context, logger logr.Logger, associationName, vpcID, resolverRuleId string) error
 	DisassociateResolverRuleWithContext(ctx context.Context, logger logr.Logger, vpcID, resolverRuleId string) error
+	FindResolverRulesByAWSAccountId(ctx context.Context, logger logr.Logger, awsAccountId string) ([]ResolverRule, error)
 }
 
 type Cluster struct {
 	Name       string
 	Region     string
+	VPCCidr    string
 	VPCId      string
 	IAMRoleARN string
 	Subnets    []string
-}
-
-type ResolverRule struct {
-	RuleId  string
-	RuleArn string
 }
 
 func NewResolver(awsClients AWSClients, dnsServer DNSServer, workloadClusterBaseDomain string) (Resolver, error) {
@@ -83,6 +80,66 @@ func (r *Resolver) CreateRule(ctx context.Context, logger logr.Logger, cluster C
 	}
 
 	return resolverRule, nil
+}
+
+func (r *Resolver) AssociateResolverRulesInAccountWithClusterVPC(ctx context.Context, logger logr.Logger, cluster Cluster, awsAccountId string) error {
+	resolverClient, err := r.awsClients.NewResolverClient(cluster.Region, cluster.IAMRoleARN)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	logger.Info("Finding resolver rules created/owned by AWS account specified in AWSCluster annotation", "awsAccountId", awsAccountId)
+	resolverRules, err := resolverClient.FindResolverRulesByAWSAccountId(ctx, logger, awsAccountId)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	logger.Info("Filtering out resolver rules with target IPs that belong to the workload cluster VPC cidr", "vpcCidr", cluster.VPCCidr)
+	resolverRulesInAccount := []ResolverRule{}
+	for _, rule := range resolverRules {
+		targetIPsBelongToVPC, err := rule.TargetIPsBelongToCidr(cluster.VPCCidr)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if !targetIPsBelongToVPC {
+			resolverRulesInAccount = append(resolverRulesInAccount, rule)
+		}
+	}
+
+	for _, rule := range resolverRulesInAccount {
+		logger.Info("associating rule to VPC", "resolverRule", rule, "cidr", cluster.VPCCidr)
+		err = resolverClient.AssociateResolverRuleWithContext(ctx, logger, rule.Name, cluster.VPCId, rule.Id)
+		if err != nil {
+			logger.Error(err, "failed to associate resolver rule to VPC", "resolverRuleId", rule.Id, "resolverRuleArn", rule.Arn, "vpcId", cluster.VPCId)
+			continue
+		}
+	}
+
+	return nil
+}
+
+func (r *Resolver) DisassociateResolverRulesInAccountWithClusterVPC(ctx context.Context, logger logr.Logger, cluster Cluster, awsAccountId string) error {
+	resolverClient, err := r.awsClients.NewResolverClient(cluster.Region, cluster.IAMRoleARN)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	logger.Info("Finding resolver rules created/owned by AWS account specified in AWSCluster annotation", "awsAccountId", awsAccountId)
+	resolverRules, err := resolverClient.FindResolverRulesByAWSAccountId(ctx, logger, awsAccountId)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	for _, rule := range resolverRules {
+		logger.Info("disassociating rule from VPC", "resolverRule", rule, "cidr", cluster.VPCCidr)
+		err = resolverClient.DisassociateResolverRuleWithContext(ctx, logger, cluster.VPCId, rule.Id)
+		if err != nil {
+			logger.Error(err, "failed to disassociate resolver rule from VPC", "resolverRule", rule, "vpcId", cluster.VPCId)
+			continue
+		}
+	}
+
+	return nil
 }
 
 func (r *Resolver) DeleteRule(ctx context.Context, logger logr.Logger, cluster Cluster) error {
@@ -113,12 +170,12 @@ func (r *Resolver) DeleteRule(ctx context.Context, logger logr.Logger, cluster C
 
 	// Only if we found the resolver rule, try to delete it
 	if err == nil {
-		err = dnsServerResolverClient.DisassociateResolverRuleWithContext(ctx, logger, r.dnsServer.VPCId, resolverRule.RuleId)
+		err = dnsServerResolverClient.DisassociateResolverRuleWithContext(ctx, logger, r.dnsServer.VPCId, resolverRule.Id)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 
-		err = resolverClient.DeleteResolverRule(ctx, logger, cluster, resolverRule.RuleId)
+		err = resolverClient.DeleteResolverRule(ctx, logger, cluster, resolverRule.Id)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -163,7 +220,7 @@ func (r *Resolver) createRule(ctx context.Context, logger logr.Logger, cluster C
 }
 
 func (r *Resolver) associateRule(ctx context.Context, logger logr.Logger, cluster Cluster, resolverRule ResolverRule) error {
-	logger = logger.WithValues("resolverRuleId", resolverRule.RuleId, "awsAccount", r.dnsServer.AWSAccountId, "vpcId", r.dnsServer.VPCId)
+	logger = logger.WithValues("resolverRuleId", resolverRule.Id, "awsAccount", r.dnsServer.AWSAccountId, "vpcId", r.dnsServer.VPCId)
 
 	ramClient, err := r.awsClients.NewRAMClient(cluster.Region, cluster.IAMRoleARN)
 	if err != nil {
@@ -175,13 +232,14 @@ func (r *Resolver) associateRule(ctx context.Context, logger logr.Logger, cluste
 		return errors.WithStack(err)
 	}
 
-	_, err = ramClient.CreateResourceShareWithContext(ctx, logger, getResourceShareName(cluster.Name), resolverRule.RuleArn, r.dnsServer.AWSAccountId)
+	logger.Info("Creating resource share item so we can share resolver rule with a different aws account")
+	_, err = ramClient.CreateResourceShareWithContext(ctx, logger, getResourceShareName(cluster.Name), resolverRule.Arn, r.dnsServer.AWSAccountId)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
 	logger.Info("Associating resolver rule with VPC")
-	err = dnsServerResolverClient.AssociateResolverRuleWithContext(ctx, logger, getAssociationName(cluster.Name), r.dnsServer.VPCId, resolverRule.RuleId)
+	err = dnsServerResolverClient.AssociateResolverRuleWithContext(ctx, logger, getAssociationName(cluster.Name), r.dnsServer.VPCId, resolverRule.Id)
 	if err != nil {
 		return errors.WithStack(err)
 	}
