@@ -19,8 +19,12 @@ package controllers_test
 import (
 	"testing"
 
+	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"go.uber.org/zap/zapcore"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -31,3 +35,17 @@ func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Controller Suite")
 }
+
+var (
+	logger logr.Logger
+)
+
+var _ = BeforeSuite(func() {
+	opts := zap.Options{
+		DestWriter:  GinkgoWriter,
+		Development: true,
+		TimeEncoder: zapcore.RFC3339TimeEncoder,
+	}
+	logger = zap.New(zap.UseFlagOptions(&opts))
+	logf.SetLogger(logger)
+})
