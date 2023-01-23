@@ -158,7 +158,7 @@ func (r *ResolverRulesDNSServerReconciler) reconcileDelete(ctx context.Context, 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ResolverRulesDNSServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		Named("capa_resolverrules_dnsserver").
+		Named("resolverrules_dnsserver").
 		For(&capa.AWSCluster{}).
 		WithEventFilter(predicates.ResourceNotPaused(mgr.GetLogger())).
 		Complete(r)
