@@ -81,22 +81,6 @@ workflows:
             tags:
               only: /^v.*/
 
-      # Ensure that for every commit to master, and for every new release tag,
-      # an image gets pushed to the Aliyun registry.
-      - architect/push-to-docker:
-          context: "architect"
-          name: push-aws-resolver-rules-operator-to-aliyun
-          image: "registry-intl.cn-shanghai.aliyuncs.com/giantswarm/aws-resolver-rules-operator"
-          username_envar: "ALIYUN_USERNAME"
-          password_envar: "ALIYUN_PASSWORD"
-          requires:
-          - go-build
-          filters:
-            branches:
-              only: master
-            tags:
-              only: /^v.*/
-
       - architect/push-to-app-catalog:
           context: "architect"
           # executor: "app-build-suite" # uncomment this if you want automatic metadata generation and helm chart linting
