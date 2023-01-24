@@ -20,8 +20,11 @@ import (
 	"context"
 
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/predicates"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -33,13 +36,24 @@ import (
 )
 
 const (
-	Finalizer = "aws-resolver-rules-operator.account.finalizers.giantswarm.io"
+	Finalizer = "aws-resolver-rules-operator.finalizers.giantswarm.io"
 )
 
-// ResolverRulesReconciler reconciles AWSClusters by associating resolver rules with the workload cluster VPC.
+//counterfeiter:generate . AWSClusterClient
+type AWSClusterClient interface {
+	Get(context.Context, types.NamespacedName) (*capa.AWSCluster, error)
+	GetOwner(context.Context, *capa.AWSCluster) (*capi.Cluster, error)
+	AddFinalizer(context.Context, *capa.AWSCluster, string) error
+	RemoveFinalizer(context.Context, *capa.AWSCluster, string) error
+	GetIdentity(context.Context, *capa.AWSCluster) (*capa.AWSClusterRoleIdentity, error)
+}
+
+// ResolverRulesReconciler reconciles AWSClusters.
 // It only reconciles AWSCluster using the private DNS mode, set by the `aws.giantswarm.io/dns-mode` annotation.
+// It creates a Resolver Rule for the workload cluster k8s API endpoint and associates it with the DNS Server VPC.
+// That way, other clients using the DNS Server will be able to resolve the workload cluster k8s API endpoint.
 //
-// It will loop through all the resolver rules that belong to a specific AWS account and associate them with the WC VPC.
+// It will also loop through all the resolver rules that belong to a specific AWS account and associate them with the AWSCluster VPC.
 // The AWS account is specified using the `aws.giantswarm.io/resolver-rules-owner-account` annotation.
 // When a workload cluster is deleted, the resolver rules will be disassociated.
 type ResolverRulesReconciler struct {
@@ -100,12 +114,7 @@ func (r *ResolverRulesReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, nil
 	}
 
-	awsAccountOwnerOfRulesToAssociate, ok := awsCluster.Annotations[gsannotations.ResolverRulesOwnerAWSAccountId]
-	if !ok {
-		logger.Info("AWSCluster is missing the annotation to specify the AWS Account id that owns the resolver rules to associate with the workload cluster VPC, skipping")
-		return ctrl.Result{}, nil
-	}
-
+	awsAccountOwnerOfRulesToAssociate, _ := awsCluster.Annotations[gsannotations.ResolverRulesOwnerAWSAccountId]
 	if !awsCluster.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, awsCluster, identity, awsAccountOwnerOfRulesToAssociate)
 	}
@@ -113,7 +122,8 @@ func (r *ResolverRulesReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return r.reconcileNormal(ctx, awsCluster, identity, awsAccountOwnerOfRulesToAssociate)
 }
 
-// reconcileNormal takes care of associating resolver rules in the desired AWS account with the workload cluster's VPC.
+// reconcileNormal associates the Resolver Rules in the specified AWS account with the AWSCluster VPC, and creates a
+// Resolver Rule for the workload cluster k8s API endpoint.
 func (r *ResolverRulesReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity, awsAccountOwnerOfRulesToAssociate string) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
@@ -122,23 +132,53 @@ func (r *ResolverRulesReconciler) reconcileNormal(ctx context.Context, awsCluste
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	cluster := resolver.Cluster{Name: awsCluster.Name, Region: awsCluster.Spec.Region, VPCCidr: awsCluster.Spec.NetworkSpec.VPC.CidrBlock, VPCId: awsCluster.Spec.NetworkSpec.VPC.ID, IAMRoleARN: identity.Spec.RoleArn, Subnets: getSubnetIds(awsCluster)}
-	err = r.resolver.AssociateResolverRulesInAccountWithClusterVPC(ctx, logger, cluster, awsAccountOwnerOfRulesToAssociate)
+	cluster := buildCluster(awsCluster, identity)
+	err = r.associateResolverRulesInAccountWithClusterVPC(ctx, logger, cluster, awsAccountOwnerOfRulesToAssociate)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
+
+	associatedResolverRule, err := r.resolver.CreateRule(ctx, logger, cluster)
+	if err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
+	logger.Info("Created resolver rule", "ruleId", associatedResolverRule.Id, "ruleArn", associatedResolverRule.Arn)
 
 	return reconcile.Result{}, nil
 }
 
+func (r *ResolverRulesReconciler) associateResolverRulesInAccountWithClusterVPC(ctx context.Context, logger logr.Logger, cluster resolver.Cluster, awsAccountOwnerOfRulesToAssociate string) error {
+	if awsAccountOwnerOfRulesToAssociate == "" {
+		logger.Info("AWSCluster is missing the annotation to specify the AWS Account id that owns the resolver rules to associate with the workload cluster VPC, skipping")
+		return nil
+	}
+
+	err := r.resolver.AssociateResolverRulesInAccountWithClusterVPC(ctx, logger, cluster, awsAccountOwnerOfRulesToAssociate)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
+}
+
+// reconcileDelete disassociates the Resolver Rules in the specified AWS account from the AWSCluster VPC, and deletes
+// the Resolver Rule created for the workload cluster k8s API endpoint.
 func (r *ResolverRulesReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity, awsAccountOwnerOfRulesToAssociate string) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	cluster := resolver.Cluster{Name: awsCluster.Name, Region: awsCluster.Spec.Region, VPCCidr: awsCluster.Spec.NetworkSpec.VPC.CidrBlock, VPCId: awsCluster.Spec.NetworkSpec.VPC.ID, IAMRoleARN: identity.Spec.RoleArn, Subnets: getSubnetIds(awsCluster)}
-	err := r.resolver.DisassociateResolverRulesInAccountWithClusterVPC(ctx, logger, cluster, awsAccountOwnerOfRulesToAssociate)
+	cluster := buildCluster(awsCluster, identity)
+	err := r.disassociateResolverRulesInAccountFromClusterVPC(ctx, logger, cluster, awsAccountOwnerOfRulesToAssociate)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
+
+	err = r.resolver.DeleteRule(ctx, logger, cluster)
+	if err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
+	logger.Info("Deleted resolver rule")
 
 	err = r.awsClusterClient.RemoveFinalizer(ctx, awsCluster, Finalizer)
 	if err != nil {
@@ -148,11 +188,45 @@ func (r *ResolverRulesReconciler) reconcileDelete(ctx context.Context, awsCluste
 	return reconcile.Result{}, nil
 }
 
+func (r *ResolverRulesReconciler) disassociateResolverRulesInAccountFromClusterVPC(ctx context.Context, logger logr.Logger, cluster resolver.Cluster, awsAccountOwnerOfRulesToAssociate string) error {
+	if awsAccountOwnerOfRulesToAssociate == "" {
+		logger.Info("AWSCluster is missing the annotation to specify the AWS Account id that owns the resolver rules to associate with the workload cluster VPC, skipping")
+		return nil
+	}
+
+	err := r.resolver.DisassociateResolverRulesInAccountWithClusterVPC(ctx, logger, cluster, awsAccountOwnerOfRulesToAssociate)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *ResolverRulesReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		Named("resolverrules_aws_account").
+		Named("resolverrules").
 		For(&capa.AWSCluster{}).
 		WithEventFilter(predicates.ResourceNotPaused(mgr.GetLogger())).
 		Complete(r)
+}
+
+func getSubnetIds(awsCluster *capa.AWSCluster) []string {
+	var subnetIds []string
+	for _, subnet := range awsCluster.Spec.NetworkSpec.Subnets {
+		subnetIds = append(subnetIds, subnet.ID)
+	}
+
+	return subnetIds
+}
+
+func buildCluster(awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity) resolver.Cluster {
+	return resolver.Cluster{
+		Name:       awsCluster.Name,
+		Region:     awsCluster.Spec.Region,
+		VPCCidr:    awsCluster.Spec.NetworkSpec.VPC.CidrBlock,
+		VPCId:      awsCluster.Spec.NetworkSpec.VPC.ID,
+		IAMRoleARN: identity.Spec.RoleArn,
+		Subnets:    getSubnetIds(awsCluster),
+	}
 }
