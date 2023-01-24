@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Initial implementation.
+
 ## [0.0.1] - 2022-12-20
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
