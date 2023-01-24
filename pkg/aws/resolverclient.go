@@ -275,15 +275,14 @@ func (a *AWSResolver) GetResolverRuleByName(ctx context.Context, resolverRuleNam
 	return resolver.ResolverRule{}, &resolver.ResolverRuleNotFoundError{}
 }
 
+// AssociateResolverRuleWithContext creates an association between a resolver rule and a VPC.
+// It will try to find an existing association for that Resolver Rule and VPC, and only create a new association if it
+// does not find any.
 func (a *AWSResolver) AssociateResolverRuleWithContext(ctx context.Context, logger logr.Logger, associationName, vpcId, resolverRuleId string) error {
-	logger = logger.WithValues("resolverRuleId", resolverRuleId, "vpcId", vpcId, "associationName", associationName)
+	logger = logger.WithValues("resolverRuleId", resolverRuleId, "vpcId", vpcId)
 	logger.Info("Checking if Resolver Rule is already associated to VPC")
 	listResolverRuleAssociationsResponse, err := a.client.ListResolverRuleAssociationsWithContext(ctx, &route53resolver.ListResolverRuleAssociationsInput{
 		Filters: []*route53resolver.Filter{
-			{
-				Name:   aws.String("Name"),
-				Values: aws.StringSlice([]string{associationName}),
-			},
 			{
 				Name:   aws.String("ResolverRuleId"),
 				Values: aws.StringSlice([]string{resolverRuleId}),
