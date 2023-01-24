@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Don't try to find resolver rules associations filtering by association name, but only use resolver rule id and vpc id.
+
 ## [0.1.0] - 2023-01-24
 
 ### Added
