@@ -114,7 +114,7 @@ func (r *ResolverRulesReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, nil
 	}
 
-	awsAccountOwnerOfRulesToAssociate, _ := awsCluster.Annotations[gsannotations.ResolverRulesOwnerAWSAccountId]
+	awsAccountOwnerOfRulesToAssociate := awsCluster.Annotations[gsannotations.ResolverRulesOwnerAWSAccountId]
 	if !awsCluster.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, awsCluster, identity, awsAccountOwnerOfRulesToAssociate)
 	}
