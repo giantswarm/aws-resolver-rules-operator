@@ -20,11 +20,11 @@ import (
 	"github.com/aws-resolver-rules-operator/pkg/resolver/resolverfakes"
 )
 
-var _ = Describe("Resolver rules DNS Server reconciler", func() {
+var _ = Describe("Resolver rules reconciler", func() {
 	var (
 		awsClusterClient        *controllersfakes.FakeAWSClusterClient
 		ctx                     context.Context
-		reconciler              *controllers.ResolverRulesDNSServerReconciler
+		reconciler              *controllers.ResolverRulesReconciler
 		cluster                 *capi.Cluster
 		awsCluster              *capa.AWSCluster
 		awsClusterRoleIdentity  *capa.AWSClusterRoleIdentity
@@ -64,7 +64,7 @@ var _ = Describe("Resolver rules DNS Server reconciler", func() {
 		resolver, err := resolver.NewResolver(fakeAWSClients, dnsServer, WorkloadClusterBaseDomain)
 		Expect(err).NotTo(HaveOccurred())
 
-		reconciler = controllers.NewResolverRulesDNSServerReconciler(awsClusterClient, resolver)
+		reconciler = controllers.NewResolverRulesReconciler(awsClusterClient, resolver)
 		awsClusterRoleIdentity = &capa.AWSClusterRoleIdentity{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "bar",
@@ -127,7 +127,7 @@ var _ = Describe("Resolver rules DNS Server reconciler", func() {
 		})
 
 		It("does not really reconcile", func() {
-			Expect(awsClusterClient.AddFinalizerCallCount()).To(Equal(0))
+			Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
 			Expect(result.Requeue).To(BeFalse())
 			Expect(result.RequeueAfter).To(BeZero())
 			Expect(reconcileErr).NotTo(HaveOccurred())
@@ -142,7 +142,7 @@ var _ = Describe("Resolver rules DNS Server reconciler", func() {
 		})
 
 		It("does not really reconcile", func() {
-			Expect(awsClusterClient.AddFinalizerCallCount()).To(Equal(0))
+			Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
 			Expect(result.Requeue).To(BeFalse())
 			Expect(result.RequeueAfter).To(BeZero())
 			Expect(reconcileErr).NotTo(HaveOccurred())
@@ -158,7 +158,7 @@ var _ = Describe("Resolver rules DNS Server reconciler", func() {
 		})
 
 		It("does not really reconcile", func() {
-			Expect(awsClusterClient.AddFinalizerCallCount()).To(Equal(0))
+			Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
 			Expect(result.Requeue).To(BeFalse())
 			Expect(result.RequeueAfter).To(BeZero())
 			Expect(reconcileErr).NotTo(HaveOccurred())
@@ -186,7 +186,7 @@ var _ = Describe("Resolver rules DNS Server reconciler", func() {
 			})
 
 			It("doesn't really reconcile", func() {
-				Expect(awsClusterClient.AddFinalizerCallCount()).To(Equal(0))
+				Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
 				Expect(result.Requeue).To(BeFalse())
 				Expect(result.RequeueAfter).To(BeZero())
 				Expect(reconcileErr).NotTo(HaveOccurred())
@@ -206,7 +206,7 @@ var _ = Describe("Resolver rules DNS Server reconciler", func() {
 					}
 				})
 				It("doesn't really reconcile", func() {
-					Expect(awsClusterClient.AddFinalizerCallCount()).To(Equal(0))
+					Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
 					Expect(reconcileErr).NotTo(HaveOccurred())
 					Expect(ec2Client.CreateSecurityGroupForResolverEndpointsCallCount()).To(BeZero())
 					Expect(ramClient.DeleteResourceShareWithContextCallCount()).To(BeZero())
@@ -214,7 +214,15 @@ var _ = Describe("Resolver rules DNS Server reconciler", func() {
 			})
 
 			When("is using private DNS mode", func() {
+				BeforeEach(func() {
+					awsClusterClient.GetReturns(awsCluster, nil)
+					awsCluster.Annotations = map[string]string{
+						gsannotations.AWSDNSMode: gsannotations.DNSModePrivate,
+					}
+				})
+
 				When("the cluster is not being deleted", func() {
+
 					It("adds the finalizer to the AWSCluster", func() {
 						Expect(awsClusterClient.AddFinalizerCallCount()).To(Equal(1))
 						Expect(reconcileErr).NotTo(HaveOccurred())
@@ -307,6 +315,110 @@ var _ = Describe("Resolver rules DNS Server reconciler", func() {
 							})
 						})
 					})
+
+					When("the AWS Account id annotation is missing", func() {
+						BeforeEach(func() {
+							delete(awsCluster.Annotations, gsannotations.ResolverRulesOwnerAWSAccountId)
+						})
+
+						It("doesn't really reconcile", func() {
+							Expect(resolverClient.FindResolverRulesByAWSAccountIdCallCount()).To(BeZero())
+							Expect(reconcileErr).NotTo(HaveOccurred())
+						})
+					})
+
+					When("the AWS Account id annotation is set", func() {
+						BeforeEach(func() {
+							awsCluster.Annotations[gsannotations.ResolverRulesOwnerAWSAccountId] = "0000000000"
+						})
+
+						When("finding resolver rules on AWS account fails", func() {
+							BeforeEach(func() {
+								resolverClient.FindResolverRulesByAWSAccountIdReturns([]resolver.ResolverRule{}, errors.New("failed trying to find resolver rules on AWS account"))
+							})
+
+							It("it doesn't associate resolver rules and returns error", func() {
+								Expect(resolverClient.AssociateResolverRuleWithContextCallCount()).To(BeZero())
+							})
+						})
+
+						When("finding resolver rules on AWS account succeeds", func() {
+							var existingResolverRules = []resolver.ResolverRule{
+								{
+									Id:   "a1",
+									Arn:  "a1",
+									Name: "resolver-rule-a1",
+								},
+								{
+									Id:   "b2",
+									Arn:  "b2",
+									Name: "resolver-rule-b2",
+								},
+								{
+									Id:   "c3",
+									Arn:  "c3",
+									Name: "resolver-rule-c3",
+								},
+								{
+									Id:   "d4",
+									Arn:  "d4",
+									Name: "resolver-rule-d4",
+								},
+							}
+							BeforeEach(func() {
+								resolverClient.FindResolverRulesByAWSAccountIdReturns(existingResolverRules, nil)
+								resolverClient.AssociateResolverRuleWithContextReturnsOnCall(1, errors.New("failed trying to associate resolver rule"))
+								resolverClient.AssociateResolverRuleWithContextReturnsOnCall(2, errors.New("failed trying to associate resolver rule"))
+							})
+
+							It("associates resolver rules even when it fails associating some of them ", func() {
+								Expect(resolverClient.AssociateResolverRuleWithContextCallCount()).To(Equal(len(existingResolverRules)))
+								_, _, associationName, vpcId, resolverRuleId := resolverClient.AssociateResolverRuleWithContextArgsForCall(0)
+								Expect(associationName).To(Equal(existingResolverRules[0].Name))
+								Expect(resolverRuleId).To(Equal(existingResolverRules[0].Id))
+								Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
+							})
+
+							When("some rules belong to the workload cluster VPC cidr", func() {
+								var existingResolverRules = []resolver.ResolverRule{
+									{
+										Id:   "a1",
+										Arn:  "a1",
+										Name: "resolver-rule-a1",
+										IPs:  []string{"10.0.0.2"},
+									},
+									{
+										Id:   "b2",
+										Arn:  "b2",
+										Name: "resolver-rule-b2",
+										IPs:  []string{"10.0.0.3"},
+									},
+									{
+										Id:   "c3",
+										Arn:  "c3",
+										Name: "resolver-rule-c3",
+										IPs:  []string{"10.0.0.4"},
+									},
+									{
+										Id:   "d4",
+										Arn:  "d4",
+										Name: "resolver-rule-d4",
+									},
+								}
+								BeforeEach(func() {
+									resolverClient.FindResolverRulesByAWSAccountIdReturns(existingResolverRules, nil)
+								})
+
+								It("does not associate the rules that belong to the WC VPC cidr", func() {
+									Expect(resolverClient.AssociateResolverRuleWithContextCallCount()).To(Equal(1))
+									_, _, associationName, vpcId, resolverRuleId := resolverClient.AssociateResolverRuleWithContextArgsForCall(0)
+									Expect(associationName).To(Equal(existingResolverRules[3].Name))
+									Expect(resolverRuleId).To(Equal(existingResolverRules[3].Id))
+									Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
+								})
+							})
+						})
+					})
 				})
 
 				When("the cluster is being deleted", func() {
@@ -326,7 +438,7 @@ var _ = Describe("Resolver rules DNS Server reconciler", func() {
 						})
 
 						It("does not delete the finalizer", func() {
-							Expect(awsClusterClient.RemoveFinalizerCallCount()).To(Equal(0))
+							Expect(awsClusterClient.RemoveFinalizerCallCount()).To(BeZero())
 						})
 					})
 
@@ -337,91 +449,161 @@ var _ = Describe("Resolver rules DNS Server reconciler", func() {
 							Expect(groupName).To(Equal("foo-resolverrules-endpoints"))
 						})
 
-						It("deletes the finalizer", func() {
-							Expect(awsClusterClient.RemoveFinalizerCallCount()).To(Equal(1))
-						})
-
 						When("removing the security group fails", func() {
 							BeforeEach(func() {
 								ec2Client.DeleteSecurityGroupForResolverEndpointsReturns(errors.New("failed deleting security group"))
 							})
 
 							It("does not delete the finalizer", func() {
-								Expect(awsClusterClient.RemoveFinalizerCallCount()).To(Equal(0))
+								Expect(awsClusterClient.RemoveFinalizerCallCount()).To(BeZero())
+							})
+						})
+
+						When("removing the security group succeeds", func() {
+							When("it fails trying to fetch the Resolver Rule", func() {
+								BeforeEach(func() {
+									resolverClient.GetResolverRuleByNameReturns(resolver.ResolverRule{}, errors.New("failed trying to fetch resolver rule"))
+								})
+
+								It("does not tries to delete the resolver rule", func() {
+									Expect(reconcileErr).To(HaveOccurred())
+								})
+
+								It("does not delete the finalizer", func() {
+									Expect(awsClusterClient.RemoveFinalizerCallCount()).To(BeZero())
+								})
+							})
+
+							When("the resolver rule is already deleted", func() {
+								BeforeEach(func() {
+									resolverClient.GetResolverRuleByNameReturns(resolver.ResolverRule{}, &resolver.ResolverRuleNotFoundError{})
+								})
+
+								It("does not tries to delete the resolver rule", func() {
+									Expect(dnsServerResolverClient.DisassociateResolverRuleWithContextCallCount()).To(BeZero())
+									Expect(resolverClient.DeleteResolverRuleCallCount()).To(BeZero())
+									Expect(reconcileErr).NotTo(HaveOccurred())
+								})
+
+								It("deletes the finalizer", func() {
+									Expect(awsClusterClient.RemoveFinalizerCallCount()).To(Equal(1))
+								})
+							})
+
+							When("the resolver rule still exists", func() {
+								BeforeEach(func() {
+									resolverClient.GetResolverRuleByNameReturns(resolver.ResolverRule{Id: "resolver-rule-id", Arn: "resolver-rule-arn"}, nil)
+								})
+
+								It("disassociates resolver rule from VPC", func() {
+									_, _, vpcId, resolverRuleId := dnsServerResolverClient.DisassociateResolverRuleWithContextArgsForCall(0)
+									Expect(vpcId).To(Equal(DnsServerVPCId))
+									Expect(resolverRuleId).To(Equal("resolver-rule-id"))
+								})
+
+								When("disassociating resolver rule from VPC fails", func() {
+									BeforeEach(func() {
+										dnsServerResolverClient.DisassociateResolverRuleWithContextReturns(errors.New("failing disassociating resolver rule"))
+									})
+
+									It("does not delete the finalizer", func() {
+										Expect(awsClusterClient.RemoveFinalizerCallCount()).To(BeZero())
+									})
+								})
+
+								When("disassociating resolver rule succeeded", func() {
+									It("deletes the resolver rule", func() {
+										_, _, cluster, resolverRuleId := resolverClient.DeleteResolverRuleArgsForCall(0)
+										Expect(resolverRuleId).To(Equal("resolver-rule-id"))
+										Expect(cluster.Name).To(Equal("foo"))
+									})
+
+									It("deletes the finalizer", func() {
+										Expect(awsClusterClient.RemoveFinalizerCallCount()).To(Equal(1))
+									})
+
+									When("removing the resolver rule fails", func() {
+										BeforeEach(func() {
+											resolverClient.DeleteResolverRuleReturns(errors.New("failing removing resolver rule"))
+										})
+
+										It("does not delete the finalizer", func() {
+											Expect(awsClusterClient.RemoveFinalizerCallCount()).To(BeZero())
+										})
+									})
+								})
 							})
 						})
 					})
 
-					When("it fails trying to fetch the Resolver Rule", func() {
+					When("the AWS Account id annotation is missing", func() {
 						BeforeEach(func() {
-							resolverClient.GetResolverRuleByNameReturns(resolver.ResolverRule{}, errors.New("failed trying to fetch resolver rule"))
+							delete(awsCluster.Annotations, gsannotations.ResolverRulesOwnerAWSAccountId)
 						})
 
-						It("does not tries to delete the resolver rule", func() {
-							Expect(reconcileErr).To(HaveOccurred())
-						})
-
-						It("does not delete the finalizer", func() {
-							Expect(awsClusterClient.RemoveFinalizerCallCount()).To(Equal(0))
-						})
-					})
-
-					When("the resolver rule is already deleted", func() {
-						BeforeEach(func() {
-							resolverClient.GetResolverRuleByNameReturns(resolver.ResolverRule{}, &resolver.ResolverRuleNotFoundError{})
-						})
-
-						It("does not tries to delete the resolver rule", func() {
-							Expect(dnsServerResolverClient.DisassociateResolverRuleWithContextCallCount()).To(Equal(0))
-							Expect(resolverClient.DeleteResolverRuleCallCount()).To(Equal(0))
+						It("doesn't disassociate resolver rules but removes the finalizer", func() {
+							Expect(resolverClient.FindResolverRulesByAWSAccountIdCallCount()).To(BeZero())
 							Expect(reconcileErr).NotTo(HaveOccurred())
-						})
-
-						It("deletes the finalizer", func() {
 							Expect(awsClusterClient.RemoveFinalizerCallCount()).To(Equal(1))
 						})
 					})
 
-					When("the resolver rule still exists", func() {
+					When("the AWS Account id annotation is set", func() {
 						BeforeEach(func() {
-							resolverClient.GetResolverRuleByNameReturns(resolver.ResolverRule{Id: "resolver-rule-id", Arn: "resolver-rule-arn"}, nil)
+							awsCluster.Annotations[gsannotations.ResolverRulesOwnerAWSAccountId] = "0000000000"
 						})
 
-						It("disassociates resolver rule from VPC", func() {
-							_, _, vpcId, resolverRuleId := dnsServerResolverClient.DisassociateResolverRuleWithContextArgsForCall(0)
-							Expect(vpcId).To(Equal(DnsServerVPCId))
-							Expect(resolverRuleId).To(Equal("resolver-rule-id"))
-						})
-
-						When("disassociating resolver rule from VPC fails", func() {
+						When("finding resolver rules on AWS account fails", func() {
 							BeforeEach(func() {
-								dnsServerResolverClient.DisassociateResolverRuleWithContextReturns(errors.New("failing disassociating resolver rule"))
+								resolverClient.FindResolverRulesByAWSAccountIdReturns([]resolver.ResolverRule{}, errors.New("failed trying to find resolver rules on AWS account"))
+							})
+
+							It("does not try to disassociate AWS account resolver rules with workload cluster", func() {
+								Expect(resolverClient.DisassociateResolverRuleWithContextCallCount()).To(BeZero())
 							})
 
 							It("does not delete the finalizer", func() {
-								Expect(awsClusterClient.RemoveFinalizerCallCount()).To(Equal(0))
+								Expect(awsClusterClient.RemoveFinalizerCallCount()).To(BeZero())
 							})
 						})
 
-						When("disassociating resolver rule succeeded", func() {
-							It("deletes the resolver rule", func() {
-								_, _, cluster, resolverRuleId := resolverClient.DeleteResolverRuleArgsForCall(0)
-								Expect(resolverRuleId).To(Equal("resolver-rule-id"))
-								Expect(cluster.Name).To(Equal("foo"))
+						When("finding resolver rules on AWS account succeeds", func() {
+							var existingResolverRules = []resolver.ResolverRule{
+								{
+									Id:   "a1",
+									Arn:  "a1",
+									Name: "resolver-rule-a1",
+								},
+								{
+									Id:   "b2",
+									Arn:  "b2",
+									Name: "resolver-rule-b2",
+								},
+								{
+									Id:   "c3",
+									Arn:  "c3",
+									Name: "resolver-rule-c3",
+								},
+								{
+									Id:   "d4",
+									Arn:  "d4",
+									Name: "resolver-rule-d4",
+								},
+							}
+							BeforeEach(func() {
+								resolverClient.FindResolverRulesByAWSAccountIdReturns(existingResolverRules, nil)
+								resolverClient.DisassociateResolverRuleWithContextReturnsOnCall(1, errors.New("failed trying to disassociate resolver rule"))
+							})
+
+							It("disassociates resolver rules from given AWS Account from workload cluster VPC, even if some of them fail", func() {
+								Expect(resolverClient.DisassociateResolverRuleWithContextCallCount()).To(Equal(len(existingResolverRules)))
+								_, _, vpcId, resolverRuleId := resolverClient.DisassociateResolverRuleWithContextArgsForCall(0)
+								Expect(resolverRuleId).To(Equal(existingResolverRules[0].Id))
+								Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
 							})
 
 							It("deletes the finalizer", func() {
 								Expect(awsClusterClient.RemoveFinalizerCallCount()).To(Equal(1))
-							})
-
-							When("removing the resolver rule fails", func() {
-								BeforeEach(func() {
-									resolverClient.DeleteResolverRuleReturns(errors.New("failing removing resolver rule"))
-								})
-
-								It("does not delete the finalizer", func() {
-									Expect(awsClusterClient.RemoveFinalizerCallCount()).To(Equal(0))
-								})
 							})
 						})
 					})

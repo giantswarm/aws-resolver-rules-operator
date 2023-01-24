@@ -112,15 +112,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (controllers.NewResolverRulesDNSServerReconciler(k8sAwsClusterClient, awsResolver)).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller Resolver Rule reconciler for DNS Server")
+	if err = (controllers.NewResolverRulesReconciler(k8sAwsClusterClient, awsResolver)).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller")
 		os.Exit(1)
 	}
 
-	if err = (controllers.NewResolverRulesReconciler(k8sAwsClusterClient, awsResolver)).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller Resovler Rule reconciler for AWS account")
-		os.Exit(1)
-	}
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
