@@ -102,7 +102,7 @@ func (a *AWSResolver) createResolverRule(ctx context.Context, domainName, resolv
 func (a *AWSResolver) createResolverEndpointWithContext(ctx context.Context, logger logr.Logger, direction, name string, securityGroupIds, subnetIds []string) (string, error) {
 	resolverEndpoint, err := a.getResolverEndpoint(ctx, name)
 	if err != nil {
-		if !errors.Is(err, &resolver.ResolverEndpointNotFoundError{}) {
+		if !errors.Is(err, &ResolverEndpointNotFoundError{}) {
 			return "", errors.WithStack(err)
 		}
 	}
@@ -174,7 +174,7 @@ func (a *AWSResolver) getResolverEndpoint(ctx context.Context, resolverEndpointN
 		return listRulesResponse.ResolverEndpoints[0], nil
 	}
 
-	return nil, &resolver.ResolverEndpointNotFoundError{}
+	return nil, &ResolverEndpointNotFoundError{}
 }
 
 func (a *AWSResolver) DeleteResolverRule(ctx context.Context, logger logr.Logger, cluster resolver.Cluster, resolverRuleId string) error {
@@ -219,7 +219,7 @@ func (a *AWSResolver) deleteResolverRule(ctx context.Context, resolverRuleId str
 
 func (a *AWSResolver) deleteResolverEndpoint(ctx context.Context, resolverEndpointName string) error {
 	resolverEndpoint, err := a.getResolverEndpoint(ctx, resolverEndpointName)
-	if errors.Is(err, &resolver.ResolverEndpointNotFoundError{}) {
+	if errors.Is(err, &ResolverEndpointNotFoundError{}) {
 		return nil
 	}
 	if err != nil {

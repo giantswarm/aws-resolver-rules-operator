@@ -29,10 +29,10 @@ dnsServerRegion: ""
 dnsServerVpcId: ""
 
 # ARN for the IAM Role assumed to associate the Resolver Rule to the DNS server AWS account.
-dnsServerARN: ""
+dnsServerIAMRoleARN: ""
 
 # AWS external id used to be able to assume the IAM Role used by the DNS server.
-dnsServerExternalId: ""
+dnsServerIAMRoleExternalId: ""
 
 # Base domain used for the workload clusters created on the MC where this controller is deployed.
 # Normally we prepend the workload cluster name to this, i.e. my-cluster.${baseDomain}

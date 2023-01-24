@@ -37,8 +37,8 @@ spec:
           args:
             - --leader-elect
             - --dns-server-aws-account-id={{ .Values.dnsServerAWSAccountId }}
-            - --dns-server-arn={{ .Values.dnsServerARN }}
-            - --dns-server-external-id={{ .Values.dnsServerExternalId }}
+            - --dns-server-iam-role-arn={{ .Values.dnsServerIAMRoleARN }}
+            - --dns-server-iam-role-external-id={{ .Values.dnsServerIAMRoleExternalId }}
             - --dns-server-region={{ .Values.dnsServerRegion }}
             - --dns-server-vpc-id={{ .Values.dnsServerVpcId }}
             - --basedomain={{ .Values.baseDomain }}

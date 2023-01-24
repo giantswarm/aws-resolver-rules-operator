@@ -58,16 +58,16 @@ func main() {
 	var enableLeaderElection bool
 	var probeAddr string
 	var dnsServerAWSAccountId string
-	var dnsServerArn string
-	var dnsServerExternalId string
+	var dnsServerIAMRoleArn string
+	var dnsServerIAMRoleExternalId string
 	var dnsServerRegion string
 	var dnsServerVpcId string
 	var workloadClusterBaseDomain string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.StringVar(&dnsServerAWSAccountId, "dns-server-aws-account-id", "", "The AWS account id where the DNS server is.")
-	flag.StringVar(&dnsServerArn, "dns-server-arn", "", "Assumed AWS Role to associate the resolver rules.")
-	flag.StringVar(&dnsServerExternalId, "dns-server-external-id", "", "The external-id used when assuming the role passed in 'dns-server-arn'.")
+	flag.StringVar(&dnsServerIAMRoleArn, "dns-server-iam-role-arn", "", "Assumed AWS IAM Role to associate the resolver rules.")
+	flag.StringVar(&dnsServerIAMRoleExternalId, "dns-server-iam-role-external-id", "", "The IAM external id used when assuming the role passed in 'dns-server-iam-role-arn'.")
 	flag.StringVar(&dnsServerRegion, "dns-server-region", "", "The AWS Region where the DNS server is.")
 	flag.StringVar(&dnsServerVpcId, "dns-server-vpc-id", "", "The AWS VPC where the DNS server is.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -100,7 +100,7 @@ func main() {
 	k8sAwsClusterClient := k8sclient.NewAWSClusterClient(mgr.GetClient())
 	awsClients := aws.NewClients(os.Getenv("AWS_ENDPOINT"))
 
-	dnsserver, err := resolver.NewDNSServer(dnsServerAWSAccountId, dnsServerExternalId, dnsServerRegion, dnsServerArn, dnsServerVpcId)
+	dnsserver, err := resolver.NewDNSServer(dnsServerAWSAccountId, dnsServerIAMRoleExternalId, dnsServerRegion, dnsServerIAMRoleArn, dnsServerVpcId)
 	if err != nil {
 		setupLog.Error(err, "unable to create DNSServer object")
 		os.Exit(1)
