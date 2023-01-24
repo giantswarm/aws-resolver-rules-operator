@@ -28,6 +28,7 @@ func (a *AWSResolver) CreateResolverRule(ctx context.Context, logger logr.Logger
 
 	// If we find it, we just return it.
 	if err == nil {
+		logger.Info("Resolver rule was already there, no need to create it", "rule", resolverRule)
 		return resolverRule, nil
 	}
 
@@ -56,7 +57,7 @@ func (a *AWSResolver) CreateResolverRule(ctx context.Context, logger logr.Logger
 			Port: aws.Int64(53),
 		})
 	}
-	resolverRule, err = a.createResolverRule(ctx, domainName, resolverRuleName, outboundEndpointId, targetAddress)
+	resolverRule, err = a.createResolverRule(ctx, logger, domainName, resolverRuleName, outboundEndpointId, targetAddress)
 	if err != nil {
 		return resolver.ResolverRule{}, errors.WithStack(err)
 	}
@@ -66,7 +67,7 @@ func (a *AWSResolver) CreateResolverRule(ctx context.Context, logger logr.Logger
 
 // createResolverRule will create a new Resolver Rule.
 // If the Rule already exists, it will try to fetch it to return the Rule ARN and ID.
-func (a *AWSResolver) createResolverRule(ctx context.Context, domainName, resolverRuleName, endpointId string, targetIps []*route53resolver.TargetAddress) (resolver.ResolverRule, error) {
+func (a *AWSResolver) createResolverRule(ctx context.Context, logger logr.Logger, domainName, resolverRuleName, endpointId string, targetIps []*route53resolver.TargetAddress) (resolver.ResolverRule, error) {
 	now := time.Now()
 	response, err := a.client.CreateResolverRuleWithContext(ctx, &route53resolver.CreateResolverRuleInput{
 		CreatorRequestId:   aws.String(fmt.Sprintf("%d", now.UnixNano())),
@@ -93,7 +94,10 @@ func (a *AWSResolver) createResolverRule(ctx context.Context, domainName, resolv
 		return resolver.ResolverRule{}, errors.WithStack(err)
 	}
 
-	return resolver.ResolverRule{RuleArn: *response.ResolverRule.Arn, RuleId: *response.ResolverRule.Id}, nil
+	resolverRule := resolver.ResolverRule{RuleArn: *response.ResolverRule.Arn, RuleId: *response.ResolverRule.Id}
+	logger.Info("Created resolver rule", "rule", resolverRule)
+
+	return resolverRule, nil
 }
 
 // CreateResolverEndpointWithContext creates a Resolver endpoint.
@@ -109,6 +113,7 @@ func (a *AWSResolver) createResolverEndpointWithContext(ctx context.Context, log
 
 	// If we find it, we just return it.
 	if err == nil {
+		logger.Info("Resolver endpoint was already there, no need to create it", "resolverEndpointName", name, "resolverEndpointDirection", direction)
 		return *resolverEndpoint.Id, nil
 	}
 
