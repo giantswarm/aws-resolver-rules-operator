@@ -20,6 +20,7 @@ import (
 	"flag"
 	"os"
 
+	"go.uber.org/zap/zapcore"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -34,7 +35,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/aws-resolver-rules-operator/controllers"
-	//+kubebuilder:scaffold:imports
+	"github.com/aws-resolver-rules-operator/pkg/aws"
+	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
+	"github.com/aws-resolver-rules-operator/pkg/resolver"
+	// +kubebuilder:scaffold:imports
 )
 
 var (
@@ -46,20 +50,34 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(capi.AddToScheme(scheme))
 	utilruntime.Must(capa.AddToScheme(scheme))
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 }
 
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
+	var dnsServerAWSAccountId string
+	var dnsServerIAMRoleArn string
+	var dnsServerIAMRoleExternalId string
+	var dnsServerRegion string
+	var dnsServerVpcId string
+	var workloadClusterBaseDomain string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.StringVar(&dnsServerAWSAccountId, "dns-server-aws-account-id", "", "The AWS account id where the DNS server is.")
+	flag.StringVar(&dnsServerIAMRoleArn, "dns-server-iam-role-arn", "", "Assumed AWS IAM Role to associate the resolver rules.")
+	flag.StringVar(&dnsServerIAMRoleExternalId, "dns-server-iam-role-external-id", "", "The IAM external id used when assuming the role passed in 'dns-server-iam-role-arn'.")
+	flag.StringVar(&dnsServerRegion, "dns-server-region", "", "The AWS Region where the DNS server is.")
+	flag.StringVar(&dnsServerVpcId, "dns-server-vpc-id", "", "The AWS VPC where the DNS server is.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&workloadClusterBaseDomain, "basedomain", "", "Domain for workload cluster, e.g. installation.eu-west-1.aws.domain.tld")
+
 	opts := zap.Options{
 		Development: true,
+		TimeEncoder: zapcore.RFC3339TimeEncoder,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -73,31 +91,32 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "4bb498d1.cluster.x-k8s.io",
-		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
-		// when the Manager ends. This requires the binary to immediately end when the
-		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
-		// speeds up voluntary leader transitions as the new leader don't have to wait
-		// LeaseDuration time first.
-		//
-		// In the default scaffold provided, the program ends immediately after
-		// the manager stops, so would be fine to enable this option. However,
-		// if you are doing or is intended to do any operation such as perform cleanups
-		// after the manager stops then its usage might be unsafe.
-		// LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
-	if err = (&controllers.AwsClusterReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	k8sAwsClusterClient := k8sclient.NewAWSClusterClient(mgr.GetClient())
+	awsClients := aws.NewClients(os.Getenv("AWS_ENDPOINT"))
+
+	dnsserver, err := resolver.NewDNSServer(dnsServerAWSAccountId, dnsServerIAMRoleExternalId, dnsServerRegion, dnsServerIAMRoleArn, dnsServerVpcId)
+	if err != nil {
+		setupLog.Error(err, "unable to create DNSServer object")
+		os.Exit(1)
+	}
+
+	awsResolver, err := resolver.NewResolver(awsClients, dnsserver, workloadClusterBaseDomain)
+	if err != nil {
+		setupLog.Error(err, "unable to create Resolver")
+		os.Exit(1)
+	}
+
+	if err = (controllers.NewAwsClusterReconciler(k8sAwsClusterClient, awsResolver)).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AwsCluster")
 		os.Exit(1)
 	}
-	//+kubebuilder:scaffold:builder
+	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
