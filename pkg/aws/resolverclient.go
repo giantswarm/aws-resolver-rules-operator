@@ -364,7 +364,7 @@ func (a *AWSResolver) FindResolverRulesByAWSAccountId(ctx context.Context, logge
 
 	resolverRulesInAccount := []resolver.ResolverRule{}
 	for _, rule := range unfilteredResolverRules {
-		if *rule.OwnerId == awsAccountId {
+		if awsAccountId == "" || *rule.OwnerId == awsAccountId {
 			resolverRulesInAccount = append(resolverRulesInAccount, a.buildResolverRule(rule))
 		}
 	}

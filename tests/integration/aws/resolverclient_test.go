@@ -214,10 +214,24 @@ var _ = Describe("Route53 Resolver client", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("finds resolver rules in AWS account", func() {
-			rules, err := resolverClient.FindResolverRulesByAWSAccountId(ctx, logger, LocalstackAWSAccountId)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(len(rules)).To(Equal(totalNumberOfResolverRules))
+		It("finds resolver rules", func() {
+			By("filtering by AWS account", func() {
+				rules, err := resolverClient.FindResolverRulesByAWSAccountId(ctx, logger, LocalstackAWSAccountId)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(len(rules)).To(Equal(totalNumberOfResolverRules))
+			})
+
+			By("no filtering by aws account when AWS account id is empty", func() {
+				rules, err := resolverClient.FindResolverRulesByAWSAccountId(ctx, logger, "")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(len(rules)).To(Equal(totalNumberOfResolverRules))
+			})
+
+			By("passing a different AWS Account id it won't find any resolver rules", func() {
+				rules, err := resolverClient.FindResolverRulesByAWSAccountId(ctx, logger, "1234567890")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(len(rules)).To(BeZero())
+			})
 		})
 	})
 })

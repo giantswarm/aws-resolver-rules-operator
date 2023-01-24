@@ -20,7 +20,6 @@ import (
 	"context"
 
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
@@ -114,17 +113,16 @@ func (r *ResolverRulesReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, nil
 	}
 
-	awsAccountOwnerOfRulesToAssociate := awsCluster.Annotations[gsannotations.ResolverRulesOwnerAWSAccountId]
 	if !awsCluster.DeletionTimestamp.IsZero() {
-		return r.reconcileDelete(ctx, awsCluster, identity, awsAccountOwnerOfRulesToAssociate)
+		return r.reconcileDelete(ctx, awsCluster, identity)
 	}
 
-	return r.reconcileNormal(ctx, awsCluster, identity, awsAccountOwnerOfRulesToAssociate)
+	return r.reconcileNormal(ctx, awsCluster, identity)
 }
 
 // reconcileNormal associates the Resolver Rules in the specified AWS account with the AWSCluster VPC, and creates a
 // Resolver Rule for the workload cluster k8s API endpoint.
-func (r *ResolverRulesReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity, awsAccountOwnerOfRulesToAssociate string) (ctrl.Result, error) {
+func (r *ResolverRulesReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	err := r.awsClusterClient.AddFinalizer(ctx, awsCluster, Finalizer)
@@ -133,52 +131,46 @@ func (r *ResolverRulesReconciler) reconcileNormal(ctx context.Context, awsCluste
 	}
 
 	cluster := buildCluster(awsCluster, identity)
-	err = r.associateResolverRulesInAccountWithClusterVPC(ctx, logger, cluster, awsAccountOwnerOfRulesToAssociate)
+
+	awsAccountOwnerOfRulesToAssociate, ok := awsCluster.Annotations[gsannotations.ResolverRulesOwnerAWSAccountId]
+	if !ok {
+		logger.Info("Resolver rules won't be associated with workload cluster VPC because the annotation is missing", "annotation", gsannotations.ResolverRulesOwnerAWSAccountId)
+	} else {
+		err := r.resolver.AssociateResolverRulesInAccountWithClusterVPC(ctx, logger, cluster, awsAccountOwnerOfRulesToAssociate)
+		if err != nil {
+			return ctrl.Result{}, errors.WithStack(err)
+		}
+	}
+
+	_, err = r.resolver.CreateRule(ctx, logger, cluster)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
-
-	associatedResolverRule, err := r.resolver.CreateRule(ctx, logger, cluster)
-	if err != nil {
-		return ctrl.Result{}, errors.WithStack(err)
-	}
-
-	logger.Info("Created resolver rule", "ruleId", associatedResolverRule.Id, "ruleArn", associatedResolverRule.Arn)
 
 	return reconcile.Result{}, nil
 }
 
-func (r *ResolverRulesReconciler) associateResolverRulesInAccountWithClusterVPC(ctx context.Context, logger logr.Logger, cluster resolver.Cluster, awsAccountOwnerOfRulesToAssociate string) error {
-	if awsAccountOwnerOfRulesToAssociate == "" {
-		logger.Info("AWSCluster is missing the annotation to specify the AWS Account id that owns the resolver rules to associate with the workload cluster VPC, skipping")
-		return nil
-	}
-
-	err := r.resolver.AssociateResolverRulesInAccountWithClusterVPC(ctx, logger, cluster, awsAccountOwnerOfRulesToAssociate)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	return nil
-}
-
 // reconcileDelete disassociates the Resolver Rules in the specified AWS account from the AWSCluster VPC, and deletes
 // the Resolver Rule created for the workload cluster k8s API endpoint.
-func (r *ResolverRulesReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity, awsAccountOwnerOfRulesToAssociate string) (ctrl.Result, error) {
+func (r *ResolverRulesReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	cluster := buildCluster(awsCluster, identity)
-	err := r.disassociateResolverRulesInAccountFromClusterVPC(ctx, logger, cluster, awsAccountOwnerOfRulesToAssociate)
+
+	awsAccountOwnerOfRulesToAssociate, ok := awsCluster.Annotations[gsannotations.ResolverRulesOwnerAWSAccountId]
+	if !ok {
+		logger.Info("Resolver rules won't be disassociated with workload cluster VPC because the annotation is missing", "annotation", gsannotations.ResolverRulesOwnerAWSAccountId)
+	} else {
+		err := r.resolver.DisassociateResolverRulesInAccountWithClusterVPC(ctx, logger, cluster, awsAccountOwnerOfRulesToAssociate)
+		if err != nil {
+			return ctrl.Result{}, errors.WithStack(err)
+		}
+	}
+
+	err := r.resolver.DeleteRule(ctx, logger, cluster)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
-
-	err = r.resolver.DeleteRule(ctx, logger, cluster)
-	if err != nil {
-		return ctrl.Result{}, errors.WithStack(err)
-	}
-
-	logger.Info("Deleted resolver rule")
 
 	err = r.awsClusterClient.RemoveFinalizer(ctx, awsCluster, Finalizer)
 	if err != nil {
@@ -186,20 +178,6 @@ func (r *ResolverRulesReconciler) reconcileDelete(ctx context.Context, awsCluste
 	}
 
 	return reconcile.Result{}, nil
-}
-
-func (r *ResolverRulesReconciler) disassociateResolverRulesInAccountFromClusterVPC(ctx context.Context, logger logr.Logger, cluster resolver.Cluster, awsAccountOwnerOfRulesToAssociate string) error {
-	if awsAccountOwnerOfRulesToAssociate == "" {
-		logger.Info("AWSCluster is missing the annotation to specify the AWS Account id that owns the resolver rules to associate with the workload cluster VPC, skipping")
-		return nil
-	}
-
-	err := r.resolver.DisassociateResolverRulesInAccountWithClusterVPC(ctx, logger, cluster, awsAccountOwnerOfRulesToAssociate)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

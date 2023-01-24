@@ -95,18 +95,18 @@ func (r *Resolver) AssociateResolverRulesInAccountWithClusterVPC(ctx context.Con
 	}
 
 	logger.Info("Filtering out resolver rules with target IPs that belong to the workload cluster VPC cidr", "vpcCidr", cluster.VPCCidr)
-	resolverRulesInAccount := []ResolverRule{}
+	resolverRulesToAssociate := []ResolverRule{}
 	for _, rule := range resolverRules {
 		targetIPsBelongToVPC, err := rule.TargetIPsBelongToCidr(cluster.VPCCidr)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 		if !targetIPsBelongToVPC {
-			resolverRulesInAccount = append(resolverRulesInAccount, rule)
+			resolverRulesToAssociate = append(resolverRulesToAssociate, rule)
 		}
 	}
 
-	for _, rule := range resolverRulesInAccount {
+	for _, rule := range resolverRulesToAssociate {
 		logger.Info("associating rule to VPC", "resolverRule", rule, "cidr", cluster.VPCCidr)
 		err = resolverClient.AssociateResolverRuleWithContext(ctx, logger, rule.Name, cluster.VPCId, rule.Id)
 		if err != nil {
