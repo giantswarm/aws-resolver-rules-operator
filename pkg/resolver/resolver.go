@@ -46,6 +46,7 @@ type ResolverClient interface {
 	AssociateResolverRuleWithContext(ctx context.Context, logger logr.Logger, associationName, vpcID, resolverRuleId string) error
 	DisassociateResolverRuleWithContext(ctx context.Context, logger logr.Logger, vpcID, resolverRuleId string) error
 	FindResolverRulesByAWSAccountId(ctx context.Context, logger logr.Logger, awsAccountId string) ([]ResolverRule, error)
+	FindResolverRuleIdsAssociatedWithVPCId(ctx context.Context, logger logr.Logger, vpcId string) ([]string, error)
 }
 
 type Cluster struct {
@@ -94,20 +95,25 @@ func (r *Resolver) AssociateResolverRulesInAccountWithClusterVPC(ctx context.Con
 		return errors.WithStack(err)
 	}
 
-	logger.Info("Filtering out resolver rules with target IPs that belong to the workload cluster VPC cidr", "vpcCidr", cluster.VPCCidr)
-	resolverRulesToAssociate := []ResolverRule{}
+	associatedResolverRuleIds, err := resolverClient.FindResolverRuleIdsAssociatedWithVPCId(ctx, logger, cluster.VPCId)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
 	for _, rule := range resolverRules {
 		targetIPsBelongToVPC, err := rule.TargetIPsBelongToCidr(cluster.VPCCidr)
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		if !targetIPsBelongToVPC {
-			resolverRulesToAssociate = append(resolverRulesToAssociate, rule)
-		}
-	}
 
-	for _, rule := range resolverRulesToAssociate {
-		logger.Info("associating rule to VPC", "resolverRule", rule, "cidr", cluster.VPCCidr)
+		if targetIPsBelongToVPC {
+			continue
+		}
+
+		if resolverRuleIdIsAlreadyAssociatedWithVPC(associatedResolverRuleIds, rule.Id) {
+			continue
+		}
+
 		err = resolverClient.AssociateResolverRuleWithContext(ctx, logger, rule.Name, cluster.VPCId, rule.Id)
 		if err != nil {
 			logger.Error(err, "failed to associate resolver rule to VPC", "resolverRuleId", rule.Id, "resolverRuleArn", rule.Arn, "vpcId", cluster.VPCId)
@@ -116,6 +122,15 @@ func (r *Resolver) AssociateResolverRulesInAccountWithClusterVPC(ctx context.Con
 	}
 
 	return nil
+}
+
+func resolverRuleIdIsAlreadyAssociatedWithVPC(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *Resolver) DisassociateResolverRulesInAccountWithClusterVPC(ctx context.Context, logger logr.Logger, cluster Cluster, awsAccountId string) error {
@@ -238,7 +253,6 @@ func (r *Resolver) associateRule(ctx context.Context, logger logr.Logger, cluste
 		return errors.WithStack(err)
 	}
 
-	logger.Info("Associating resolver rule with VPC")
 	err = dnsServerResolverClient.AssociateResolverRuleWithContext(ctx, logger, getAssociationName(cluster.Name), r.dnsServer.VPCId, resolverRule.Id)
 	if err != nil {
 		return errors.WithStack(err)

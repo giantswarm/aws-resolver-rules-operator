@@ -71,6 +71,21 @@ type FakeResolverClient struct {
 	disassociateResolverRuleWithContextReturnsOnCall map[int]struct {
 		result1 error
 	}
+	FindResolverRuleIdsAssociatedWithVPCIdStub        func(context.Context, logr.Logger, string) ([]string, error)
+	findResolverRuleIdsAssociatedWithVPCIdMutex       sync.RWMutex
+	findResolverRuleIdsAssociatedWithVPCIdArgsForCall []struct {
+		arg1 context.Context
+		arg2 logr.Logger
+		arg3 string
+	}
+	findResolverRuleIdsAssociatedWithVPCIdReturns struct {
+		result1 []string
+		result2 error
+	}
+	findResolverRuleIdsAssociatedWithVPCIdReturnsOnCall map[int]struct {
+		result1 []string
+		result2 error
+	}
 	FindResolverRulesByAWSAccountIdStub        func(context.Context, logr.Logger, string) ([]resolver.ResolverRule, error)
 	findResolverRulesByAWSAccountIdMutex       sync.RWMutex
 	findResolverRulesByAWSAccountIdArgsForCall []struct {
@@ -367,6 +382,72 @@ func (fake *FakeResolverClient) DisassociateResolverRuleWithContextReturnsOnCall
 	}{result1}
 }
 
+func (fake *FakeResolverClient) FindResolverRuleIdsAssociatedWithVPCId(arg1 context.Context, arg2 logr.Logger, arg3 string) ([]string, error) {
+	fake.findResolverRuleIdsAssociatedWithVPCIdMutex.Lock()
+	ret, specificReturn := fake.findResolverRuleIdsAssociatedWithVPCIdReturnsOnCall[len(fake.findResolverRuleIdsAssociatedWithVPCIdArgsForCall)]
+	fake.findResolverRuleIdsAssociatedWithVPCIdArgsForCall = append(fake.findResolverRuleIdsAssociatedWithVPCIdArgsForCall, struct {
+		arg1 context.Context
+		arg2 logr.Logger
+		arg3 string
+	}{arg1, arg2, arg3})
+	stub := fake.FindResolverRuleIdsAssociatedWithVPCIdStub
+	fakeReturns := fake.findResolverRuleIdsAssociatedWithVPCIdReturns
+	fake.recordInvocation("FindResolverRuleIdsAssociatedWithVPCId", []interface{}{arg1, arg2, arg3})
+	fake.findResolverRuleIdsAssociatedWithVPCIdMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeResolverClient) FindResolverRuleIdsAssociatedWithVPCIdCallCount() int {
+	fake.findResolverRuleIdsAssociatedWithVPCIdMutex.RLock()
+	defer fake.findResolverRuleIdsAssociatedWithVPCIdMutex.RUnlock()
+	return len(fake.findResolverRuleIdsAssociatedWithVPCIdArgsForCall)
+}
+
+func (fake *FakeResolverClient) FindResolverRuleIdsAssociatedWithVPCIdCalls(stub func(context.Context, logr.Logger, string) ([]string, error)) {
+	fake.findResolverRuleIdsAssociatedWithVPCIdMutex.Lock()
+	defer fake.findResolverRuleIdsAssociatedWithVPCIdMutex.Unlock()
+	fake.FindResolverRuleIdsAssociatedWithVPCIdStub = stub
+}
+
+func (fake *FakeResolverClient) FindResolverRuleIdsAssociatedWithVPCIdArgsForCall(i int) (context.Context, logr.Logger, string) {
+	fake.findResolverRuleIdsAssociatedWithVPCIdMutex.RLock()
+	defer fake.findResolverRuleIdsAssociatedWithVPCIdMutex.RUnlock()
+	argsForCall := fake.findResolverRuleIdsAssociatedWithVPCIdArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeResolverClient) FindResolverRuleIdsAssociatedWithVPCIdReturns(result1 []string, result2 error) {
+	fake.findResolverRuleIdsAssociatedWithVPCIdMutex.Lock()
+	defer fake.findResolverRuleIdsAssociatedWithVPCIdMutex.Unlock()
+	fake.FindResolverRuleIdsAssociatedWithVPCIdStub = nil
+	fake.findResolverRuleIdsAssociatedWithVPCIdReturns = struct {
+		result1 []string
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeResolverClient) FindResolverRuleIdsAssociatedWithVPCIdReturnsOnCall(i int, result1 []string, result2 error) {
+	fake.findResolverRuleIdsAssociatedWithVPCIdMutex.Lock()
+	defer fake.findResolverRuleIdsAssociatedWithVPCIdMutex.Unlock()
+	fake.FindResolverRuleIdsAssociatedWithVPCIdStub = nil
+	if fake.findResolverRuleIdsAssociatedWithVPCIdReturnsOnCall == nil {
+		fake.findResolverRuleIdsAssociatedWithVPCIdReturnsOnCall = make(map[int]struct {
+			result1 []string
+			result2 error
+		})
+	}
+	fake.findResolverRuleIdsAssociatedWithVPCIdReturnsOnCall[i] = struct {
+		result1 []string
+		result2 error
+	}{result1, result2}
+}
+
 func (fake *FakeResolverClient) FindResolverRulesByAWSAccountId(arg1 context.Context, arg2 logr.Logger, arg3 string) ([]resolver.ResolverRule, error) {
 	fake.findResolverRulesByAWSAccountIdMutex.Lock()
 	ret, specificReturn := fake.findResolverRulesByAWSAccountIdReturnsOnCall[len(fake.findResolverRulesByAWSAccountIdArgsForCall)]
@@ -510,6 +591,8 @@ func (fake *FakeResolverClient) Invocations() map[string][][]interface{} {
 	defer fake.deleteResolverRuleMutex.RUnlock()
 	fake.disassociateResolverRuleWithContextMutex.RLock()
 	defer fake.disassociateResolverRuleWithContextMutex.RUnlock()
+	fake.findResolverRuleIdsAssociatedWithVPCIdMutex.RLock()
+	defer fake.findResolverRuleIdsAssociatedWithVPCIdMutex.RUnlock()
 	fake.findResolverRulesByAWSAccountIdMutex.RLock()
 	defer fake.findResolverRulesByAWSAccountIdMutex.RUnlock()
 	fake.getResolverRuleByNameMutex.RLock()
