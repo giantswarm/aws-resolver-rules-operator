@@ -135,8 +135,10 @@ var _ = Describe("Route53 Resolver client", func() {
 
 	When("there are resolver rules in AWS account", func() {
 		var (
-			totalNumberOfResolverRules = 110
-			resolverEndpointId         string
+			createdResolverRules             []*route53resolver.ResolverRule
+			createdResolverRulesAssociations []*route53resolver.ResolverRuleAssociation
+			totalNumberOfResolverRules       = 110
+			resolverEndpointId               string
 		)
 
 		BeforeEach(func() {
@@ -164,7 +166,7 @@ var _ = Describe("Route53 Resolver client", func() {
 			resolverEndpointId = *createResolverEndpointResponse.ResolverEndpoint.Id
 
 			for i := 1; i <= totalNumberOfResolverRules; i++ {
-				_, err := rawResolverClient.CreateResolverRuleWithContext(ctx, &route53resolver.CreateResolverRuleInput{
+				createResolverRuleResponse, err := rawResolverClient.CreateResolverRuleWithContext(ctx, &route53resolver.CreateResolverRuleInput{
 					CreatorRequestId:   awssdk.String(fmt.Sprintf("%d%d", i, now.UnixNano())),
 					DomainName:         awssdk.String(fmt.Sprintf("a%d.example.com", i)),
 					Name:               awssdk.String(fmt.Sprintf("resolver-rule-%d", i)),
@@ -173,34 +175,24 @@ var _ = Describe("Route53 Resolver client", func() {
 					TargetIps:          nil,
 				})
 				Expect(err).NotTo(HaveOccurred())
+
+				associateResolverRuleResponse, err := rawResolverClient.AssociateResolverRuleWithContext(ctx, &route53resolver.AssociateResolverRuleInput{
+					Name:           createResolverRuleResponse.ResolverRule.Name,
+					ResolverRuleId: createResolverRuleResponse.ResolverRule.Id,
+					VPCId:          awssdk.String(VPCId),
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				createdResolverRules = append(createdResolverRules, createResolverRuleResponse.ResolverRule)
+				createdResolverRulesAssociations = append(createdResolverRulesAssociations, associateResolverRuleResponse.ResolverRuleAssociation)
 			}
 		})
 		AfterEach(func() {
-			resolverRules := []*route53resolver.ResolverRule{}
-			listResolverRulesResponse, err := rawResolverClient.ListResolverRulesWithContext(ctx, &route53resolver.ListResolverRulesInput{
-				Filters: []*route53resolver.Filter{
-					{
-						Name:   awssdk.String("ResolverEndpointId"),
-						Values: awssdk.StringSlice([]string{resolverEndpointId}),
-					},
-				},
-				MaxResults: awssdk.Int64(100),
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			resolverRules = append(resolverRules, listResolverRulesResponse.ResolverRules...)
-
-			// If the response contains `NexToken` we need to keep sending requests including the token to get all rules.
-			for listResolverRulesResponse.NextToken != nil && *listResolverRulesResponse.NextToken != "" {
-				listResolverRulesResponse, err = rawResolverClient.ListResolverRulesWithContext(ctx, &route53resolver.ListResolverRulesInput{
-					MaxResults: awssdk.Int64(100),
-					NextToken:  listResolverRulesResponse.NextToken,
-				})
+			for _, ruleAssociation := range createdResolverRulesAssociations {
+				_, err = rawResolverClient.DisassociateResolverRuleWithContext(ctx, &route53resolver.DisassociateResolverRuleInput{ResolverRuleId: ruleAssociation.ResolverRuleId, VPCId: ruleAssociation.VPCId})
 				Expect(err).NotTo(HaveOccurred())
-				resolverRules = append(resolverRules, listResolverRulesResponse.ResolverRules...)
 			}
-
-			for _, rule := range resolverRules {
+			for _, rule := range createdResolverRules {
 				_, err = rawResolverClient.DeleteResolverRuleWithContext(ctx, &route53resolver.DeleteResolverRuleInput{ResolverRuleId: rule.Id})
 				Expect(err).NotTo(HaveOccurred())
 			}
@@ -231,6 +223,12 @@ var _ = Describe("Route53 Resolver client", func() {
 				rules, err := resolverClient.FindResolverRulesByAWSAccountId(ctx, logger, "1234567890")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(len(rules)).To(BeZero())
+			})
+
+			By("it finds resolver rule associations", func() {
+				associations, err := resolverClient.FindResolverRuleIdsAssociatedWithVPCId(ctx, logger, VPCId)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(len(associations)).To(Equal(totalNumberOfResolverRules))
 			})
 		})
 	})

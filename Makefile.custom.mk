@@ -19,7 +19,7 @@ test-unit: ginkgo generate fmt vet envtest ## Run unit tests
 test-integration: ginkgo generate fmt vet ## Run integration tests
 	docker-compose up -d
 	sleep 4
-	AWS_ACCESS_KEY_ID="dummy" AWS_SECRET_ACCESS_KEY="dummy" AWS_ENDPOINT="http://localhost:4566" $(GINKGO) -p --nodes 4 -r -randomize-all --randomize-suites --cover tests/integration
+	AWS_ACCESS_KEY_ID="dummy" AWS_SECRET_ACCESS_KEY="dummy" AWS_ENDPOINT="http://localhost:4566" $(GINKGO) -p --nodes 4 -r -randomize-all --randomize-suites --cover --coverpkg=github.com/aws-resolver-rules-operator/pkg/aws tests/integration
 	docker-compose down
 
 .PHONY: test-all

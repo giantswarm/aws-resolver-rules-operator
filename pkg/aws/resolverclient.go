@@ -311,27 +311,6 @@ func (a *AWSResolver) AssociateResolverRuleWithContext(ctx context.Context, logg
 	return nil
 }
 
-func (a *AWSResolver) FindResolverRuleIdsAssociatedWithVPCId(ctx context.Context, logger logr.Logger, vpcId string) ([]string, error) {
-	associatedResolverRuleIds := []string{}
-	listResolverRuleAssociationsResponse, err := a.client.ListResolverRuleAssociationsWithContext(ctx, &route53resolver.ListResolverRuleAssociationsInput{
-		Filters: []*route53resolver.Filter{
-			{
-				Name:   aws.String("VPCId"),
-				Values: aws.StringSlice([]string{vpcId}),
-			},
-		},
-	})
-	if err != nil {
-		return associatedResolverRuleIds, errors.WithStack(err)
-	}
-
-	for _, association := range listResolverRuleAssociationsResponse.ResolverRuleAssociations {
-		associatedResolverRuleIds = append(associatedResolverRuleIds, *association.ResolverRuleId)
-	}
-
-	return associatedResolverRuleIds, nil
-}
-
 func (a *AWSResolver) DisassociateResolverRuleWithContext(ctx context.Context, logger logr.Logger, vpcID, resolverRuleId string) error {
 	logger = logger.WithValues("resolverRuleId", resolverRuleId, "resolverRuleType", "FORWARD", "vpcId", vpcID)
 
@@ -357,7 +336,7 @@ func (a *AWSResolver) DisassociateResolverRuleWithContext(ctx context.Context, l
 }
 
 func (a *AWSResolver) FindResolverRulesByAWSAccountId(ctx context.Context, logger logr.Logger, awsAccountId string) ([]resolver.ResolverRule, error) {
-	// Fetch first page of resolver rules.
+	// Fetch first page of results.
 	unfilteredResolverRules := []*route53resolver.ResolverRule{}
 	listResolverRulesResponse, err := a.client.ListResolverRulesWithContext(ctx, &route53resolver.ListResolverRulesInput{
 		MaxResults: aws.Int64(100),
@@ -369,14 +348,14 @@ func (a *AWSResolver) FindResolverRulesByAWSAccountId(ctx context.Context, logge
 
 	unfilteredResolverRules = append(unfilteredResolverRules, listResolverRulesResponse.ResolverRules...)
 
-	// If the response contains `NexToken` we need to keep sending requests including the token to get all rules.
+	// If the response contains `NexToken` we need to keep sending requests including the token to get all results.
 	for listResolverRulesResponse.NextToken != nil && *listResolverRulesResponse.NextToken != "" {
 		listResolverRulesResponse, err = a.client.ListResolverRulesWithContext(ctx, &route53resolver.ListResolverRulesInput{
 			MaxResults: aws.Int64(100),
 			NextToken:  listResolverRulesResponse.NextToken,
 		})
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to list resolver rules")
+			return nil, errors.WithStack(err)
 		}
 		unfilteredResolverRules = append(unfilteredResolverRules, listResolverRulesResponse.ResolverRules...)
 	}
@@ -389,6 +368,51 @@ func (a *AWSResolver) FindResolverRulesByAWSAccountId(ctx context.Context, logge
 	}
 
 	return resolverRulesInAccount, nil
+}
+
+func (a *AWSResolver) FindResolverRuleIdsAssociatedWithVPCId(ctx context.Context, logger logr.Logger, vpcId string) ([]string, error) {
+	// Fetch first page of results.
+	associatedResolverRuleIds := []string{}
+	allResolverRuleAssociations := []*route53resolver.ResolverRuleAssociation{}
+	listResolverRuleAssociationsResponse, err := a.client.ListResolverRuleAssociationsWithContext(ctx, &route53resolver.ListResolverRuleAssociationsInput{
+		MaxResults: aws.Int64(100),
+		NextToken:  nil,
+		Filters: []*route53resolver.Filter{
+			{
+				Name:   aws.String("VPCId"),
+				Values: aws.StringSlice([]string{vpcId}),
+			},
+		},
+	})
+	if err != nil {
+		return associatedResolverRuleIds, errors.WithStack(err)
+	}
+
+	allResolverRuleAssociations = append(allResolverRuleAssociations, listResolverRuleAssociationsResponse.ResolverRuleAssociations...)
+
+	// If the response contains `NexToken` we need to keep sending requests including the token to get all results.
+	for listResolverRuleAssociationsResponse.NextToken != nil && *listResolverRuleAssociationsResponse.NextToken != "" {
+		listResolverRuleAssociationsResponse, err = a.client.ListResolverRuleAssociationsWithContext(ctx, &route53resolver.ListResolverRuleAssociationsInput{
+			MaxResults: aws.Int64(100),
+			NextToken:  listResolverRuleAssociationsResponse.NextToken,
+			Filters: []*route53resolver.Filter{
+				{
+					Name:   aws.String("VPCId"),
+					Values: aws.StringSlice([]string{vpcId}),
+				},
+			},
+		})
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		allResolverRuleAssociations = append(allResolverRuleAssociations, listResolverRuleAssociationsResponse.ResolverRuleAssociations...)
+	}
+
+	for _, association := range allResolverRuleAssociations {
+		associatedResolverRuleIds = append(associatedResolverRuleIds, *association.ResolverRuleId)
+	}
+
+	return associatedResolverRuleIds, nil
 }
 
 func (a *AWSResolver) buildResolverRule(rule *route53resolver.ResolverRule) resolver.ResolverRule {
