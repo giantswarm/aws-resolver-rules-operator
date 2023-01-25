@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Associate existing Resolver Rules with workload cluster VPC.
+
 ### Fixed
 
 - Don't create RAM resource share if it's already created.
