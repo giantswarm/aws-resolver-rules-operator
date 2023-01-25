@@ -230,6 +230,38 @@ var _ = Describe("Route53 Resolver client", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(len(associations)).To(Equal(totalNumberOfResolverRules))
 			})
+
+			By("associating a resolver rule that is already associated with the same vpc don't return error", func() {
+				now := time.Now()
+				createResolverRuleResponse, err := rawResolverClient.CreateResolverRuleWithContext(ctx, &route53resolver.CreateResolverRuleInput{
+					CreatorRequestId:   awssdk.String(fmt.Sprintf("%d", now.UnixNano())),
+					DomainName:         awssdk.String("test.example.com"),
+					Name:               awssdk.String("resolver-rule-associate-twice"),
+					ResolverEndpointId: awssdk.String(resolverEndpointId),
+					RuleType:           awssdk.String("FORWARD"),
+					TargetIps:          nil,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				// Associating once with the VPC should be fine
+				err = resolverClient.AssociateResolverRuleWithContext(ctx, logger, "associationName", VPCId, *createResolverRuleResponse.ResolverRule.Id)
+				Expect(err).NotTo(HaveOccurred())
+				// Associating again should yield no errors
+				err = resolverClient.AssociateResolverRuleWithContext(ctx, logger, "associationName", VPCId, *createResolverRuleResponse.ResolverRule.Id)
+				Expect(err).NotTo(HaveOccurred())
+				// Disassociating should return no errors
+				err = resolverClient.DisassociateResolverRuleWithContext(ctx, logger, VPCId, *createResolverRuleResponse.ResolverRule.Id)
+				Expect(err).NotTo(HaveOccurred())
+				// Disassociating again should return no errors
+				err = resolverClient.DisassociateResolverRuleWithContext(ctx, logger, VPCId, *createResolverRuleResponse.ResolverRule.Id)
+				Expect(err).NotTo(HaveOccurred())
+				// Deleting the resolver rule should work after disassociating it from the VPC
+				err = resolverClient.DeleteResolverRule(ctx, logger, cluster, *createResolverRuleResponse.ResolverRule.Id)
+				Expect(err).NotTo(HaveOccurred())
+				// Deleting the resolver rule again shouldn't return any errors
+				err = resolverClient.DeleteResolverRule(ctx, logger, cluster, *createResolverRuleResponse.ResolverRule.Id)
+				Expect(err).NotTo(HaveOccurred())
+			})
 		})
 	})
 })
