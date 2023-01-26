@@ -34,7 +34,7 @@ type EC2Client interface {
 
 //counterfeiter:generate . RAMClient
 type RAMClient interface {
-	CreateResourceShareWithContext(ctx context.Context, resourceShareName string, allowExternalPrincipals bool, resourceArns, principals []string) (string, error)
+	CreateResourceShareWithContext(ctx context.Context, logger logr.Logger, resourceShareName string, resourceArns, principals string) (string, error)
 	DeleteResourceShareWithContext(ctx context.Context, logger logr.Logger, resourceShareName string) error
 }
 
@@ -175,8 +175,7 @@ func (r *Resolver) associateRule(ctx context.Context, logger logr.Logger, cluste
 		return errors.WithStack(err)
 	}
 
-	logger.Info("Creating resource share item so we can share resolver rule with a different aws account")
-	_, err = ramClient.CreateResourceShareWithContext(ctx, getResourceShareName(cluster.Name), true, []string{resolverRule.RuleArn}, []string{r.dnsServer.AWSAccountId})
+	_, err = ramClient.CreateResourceShareWithContext(ctx, logger, getResourceShareName(cluster.Name), resolverRule.RuleArn, r.dnsServer.AWSAccountId)
 	if err != nil {
 		return errors.WithStack(err)
 	}
