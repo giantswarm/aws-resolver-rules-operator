@@ -19,6 +19,7 @@ type RAM struct {
 // a new RAM resource share.
 func (a *RAM) CreateResourceShareWithContext(ctx context.Context, logger logr.Logger, resourceShareName, resourceArn, principal string) (string, error) {
 	logger = logger.WithValues("resourceShareName", resourceShareName, "sharedWith", principal, "sharedResourceArn", resourceArn)
+	logger = logger.WithValues("resourceShareName", resourceShareName, "sharedWith", principal, "sharedResourceArn", resourceArn)
 
 	logger.Info("Trying to find RAM resource share by name")
 	getResourceSharesResponse, err := a.client.GetResourceSharesWithContext(ctx, &ram.GetResourceSharesInput{
@@ -45,7 +46,7 @@ func (a *RAM) CreateResourceShareWithContext(ctx context.Context, logger logr.Lo
 		return "", errors.WithStack(err)
 	}
 
-	logger.Info("Resource share created", "sharedArn", resourceArn, "sharedWith", principal)
+	logger.Info("Resource share created")
 
 	return *response.ResourceShare.ResourceShareArn, nil
 }
