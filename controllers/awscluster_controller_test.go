@@ -262,11 +262,10 @@ var _ = Describe("AWSCluster", func() {
 						})
 
 						It("creates ram share resource", func() {
-							_, resourceShareName, allowPrincipals, principals, resourceArns := ramClient.CreateResourceShareWithContextArgsForCall(0)
+							_, _, resourceShareName, principal, resourceArn := ramClient.CreateResourceShareWithContextArgsForCall(0)
 							Expect(resourceShareName).To(Equal(fmt.Sprintf("giantswarm-%s-rr", ClusterName)))
-							Expect(allowPrincipals).To(Equal(true))
-							Expect(principals).To(Equal([]string{"resolver-rule-principal-arn"}))
-							Expect(resourceArns).To(Equal([]string{DnsServerAWSAccountId}))
+							Expect(principal).To(Equal("resolver-rule-principal-arn"))
+							Expect(resourceArn).To(Equal(DnsServerAWSAccountId))
 						})
 
 						When("creating ram share resource fails", func() {

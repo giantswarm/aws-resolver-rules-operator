@@ -109,19 +109,19 @@ func (c *Clients) newEC2Client(region, arn, externalId string) (*ec2.EC2, error)
 func (c *Clients) NewRAMClient(region, arn string) (resolver.RAMClient, error) {
 	client, err := c.newRAMClient(region, arn, "")
 	if err != nil {
-		return &AWSRAM{}, errors.WithStack(err)
+		return &RAM{}, errors.WithStack(err)
 	}
 
-	return &AWSRAM{client: client}, nil
+	return &RAM{client: client}, nil
 }
 
 func (c *Clients) NewRAMClientWithExternalId(region, arn, externalId string) (resolver.RAMClient, error) {
 	client, err := c.newRAMClient(region, arn, externalId)
 	if err != nil {
-		return &AWSRAM{}, errors.WithStack(err)
+		return &RAM{}, errors.WithStack(err)
 	}
 
-	return &AWSRAM{client: client}, nil
+	return &RAM{client: client}, nil
 }
 
 func (c *Clients) newRAMClient(region, arn, externalId string) (*ram.RAM, error) {

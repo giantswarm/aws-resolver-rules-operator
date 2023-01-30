@@ -10,14 +10,14 @@ import (
 )
 
 type FakeRAMClient struct {
-	CreateResourceShareWithContextStub        func(context.Context, string, bool, []string, []string) (string, error)
+	CreateResourceShareWithContextStub        func(context.Context, logr.Logger, string, string, string) (string, error)
 	createResourceShareWithContextMutex       sync.RWMutex
 	createResourceShareWithContextArgsForCall []struct {
 		arg1 context.Context
-		arg2 string
-		arg3 bool
-		arg4 []string
-		arg5 []string
+		arg2 logr.Logger
+		arg3 string
+		arg4 string
+		arg5 string
 	}
 	createResourceShareWithContextReturns struct {
 		result1 string
@@ -44,29 +44,19 @@ type FakeRAMClient struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeRAMClient) CreateResourceShareWithContext(arg1 context.Context, arg2 string, arg3 bool, arg4 []string, arg5 []string) (string, error) {
-	var arg4Copy []string
-	if arg4 != nil {
-		arg4Copy = make([]string, len(arg4))
-		copy(arg4Copy, arg4)
-	}
-	var arg5Copy []string
-	if arg5 != nil {
-		arg5Copy = make([]string, len(arg5))
-		copy(arg5Copy, arg5)
-	}
+func (fake *FakeRAMClient) CreateResourceShareWithContext(arg1 context.Context, arg2 logr.Logger, arg3 string, arg4 string, arg5 string) (string, error) {
 	fake.createResourceShareWithContextMutex.Lock()
 	ret, specificReturn := fake.createResourceShareWithContextReturnsOnCall[len(fake.createResourceShareWithContextArgsForCall)]
 	fake.createResourceShareWithContextArgsForCall = append(fake.createResourceShareWithContextArgsForCall, struct {
 		arg1 context.Context
-		arg2 string
-		arg3 bool
-		arg4 []string
-		arg5 []string
-	}{arg1, arg2, arg3, arg4Copy, arg5Copy})
+		arg2 logr.Logger
+		arg3 string
+		arg4 string
+		arg5 string
+	}{arg1, arg2, arg3, arg4, arg5})
 	stub := fake.CreateResourceShareWithContextStub
 	fakeReturns := fake.createResourceShareWithContextReturns
-	fake.recordInvocation("CreateResourceShareWithContext", []interface{}{arg1, arg2, arg3, arg4Copy, arg5Copy})
+	fake.recordInvocation("CreateResourceShareWithContext", []interface{}{arg1, arg2, arg3, arg4, arg5})
 	fake.createResourceShareWithContextMutex.Unlock()
 	if stub != nil {
 		return stub(arg1, arg2, arg3, arg4, arg5)
@@ -83,13 +73,13 @@ func (fake *FakeRAMClient) CreateResourceShareWithContextCallCount() int {
 	return len(fake.createResourceShareWithContextArgsForCall)
 }
 
-func (fake *FakeRAMClient) CreateResourceShareWithContextCalls(stub func(context.Context, string, bool, []string, []string) (string, error)) {
+func (fake *FakeRAMClient) CreateResourceShareWithContextCalls(stub func(context.Context, logr.Logger, string, string, string) (string, error)) {
 	fake.createResourceShareWithContextMutex.Lock()
 	defer fake.createResourceShareWithContextMutex.Unlock()
 	fake.CreateResourceShareWithContextStub = stub
 }
 
-func (fake *FakeRAMClient) CreateResourceShareWithContextArgsForCall(i int) (context.Context, string, bool, []string, []string) {
+func (fake *FakeRAMClient) CreateResourceShareWithContextArgsForCall(i int) (context.Context, logr.Logger, string, string, string) {
 	fake.createResourceShareWithContextMutex.RLock()
 	defer fake.createResourceShareWithContextMutex.RUnlock()
 	argsForCall := fake.createResourceShareWithContextArgsForCall[i]
