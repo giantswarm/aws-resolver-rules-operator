@@ -157,6 +157,11 @@ func (r *ResolverRulesReconciler) reconcileDelete(ctx context.Context, awsCluste
 
 	cluster := buildCluster(awsCluster, identity)
 
+	err := r.resolver.DeleteRule(ctx, logger, cluster)
+	if err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
 	awsAccountOwnerOfRulesToAssociate, ok := awsCluster.Annotations[gsannotations.ResolverRulesOwnerAWSAccountId]
 	if !ok {
 		logger.Info("Resolver rules won't be disassociated with workload cluster VPC because the annotation is missing", "annotation", gsannotations.ResolverRulesOwnerAWSAccountId)
@@ -165,11 +170,6 @@ func (r *ResolverRulesReconciler) reconcileDelete(ctx context.Context, awsCluste
 		if err != nil {
 			return ctrl.Result{}, errors.WithStack(err)
 		}
-	}
-
-	err := r.resolver.DeleteRule(ctx, logger, cluster)
-	if err != nil {
-		return ctrl.Result{}, errors.WithStack(err)
 	}
 
 	err = r.awsClusterClient.RemoveFinalizer(ctx, awsCluster, Finalizer)
