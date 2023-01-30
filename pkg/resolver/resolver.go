@@ -133,26 +133,29 @@ func resolverRuleIdIsAlreadyAssociatedWithVPC(s []string, e string) bool {
 	return false
 }
 
-func (r *Resolver) DisassociateResolverRulesInAccountWithClusterVPC(ctx context.Context, logger logr.Logger, cluster Cluster, awsAccountId string) error {
+func (r *Resolver) DisassociateResolverRulesInAccountWithClusterVPC(ctx context.Context, logger logr.Logger, cluster Cluster) error {
+	logger = logger.WithValues("vpcId", cluster.VPCId)
 	resolverClient, err := r.awsClients.NewResolverClient(cluster.Region, cluster.IAMRoleARN)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	logger.Info("Finding resolver rules created/owned by AWS account specified in AWSCluster annotation", "awsAccountId", awsAccountId)
-	resolverRules, err := resolverClient.FindResolverRulesByAWSAccountId(ctx, logger, awsAccountId)
+	logger.Info("Finding Resolver Rule associations for workload cluster VPC")
+	resolverRuleAssociations, err := resolverClient.FindResolverRuleIdsAssociatedWithVPCId(ctx, logger, cluster.VPCId)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	for _, rule := range resolverRules {
-		logger.Info("disassociating rule from VPC", "resolverRule", rule, "cidr", cluster.VPCCidr)
-		err = resolverClient.DisassociateResolverRuleWithContext(ctx, logger, cluster.VPCId, rule.Id)
+	for _, resolverRuleId := range resolverRuleAssociations {
+		logger.Info("Disassociating Resolver Rule from VPC", "resolverRuleId", resolverRuleId)
+		err = resolverClient.DisassociateResolverRuleWithContext(ctx, logger, cluster.VPCId, resolverRuleId)
 		if err != nil {
-			logger.Error(err, "failed to disassociate resolver rule from VPC", "resolverRule", rule, "vpcId", cluster.VPCId)
+			logger.Error(err, "Failed to disassociate Resolver Rule from VPC", "resolverRuleId", resolverRuleId)
 			continue
 		}
 	}
+
+	logger.Info("Finished disassociating Resolver Rules from VPC")
 
 	return nil
 }

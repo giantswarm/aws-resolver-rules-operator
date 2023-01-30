@@ -565,52 +565,29 @@ var _ = Describe("Resolver rules reconciler", func() {
 							awsCluster.Annotations[gsannotations.ResolverRulesOwnerAWSAccountId] = "0000000000"
 						})
 
-						When("finding resolver rules on AWS account fails", func() {
+						When("finding resolver rule associations fails", func() {
 							BeforeEach(func() {
-								resolverClient.FindResolverRulesByAWSAccountIdReturns([]resolver.ResolverRule{}, errors.New("failed trying to find resolver rules on AWS account"))
-							})
-
-							It("does not try to disassociate AWS account resolver rules with workload cluster", func() {
+								resolverClient.FindResolverRuleIdsAssociatedWithVPCIdReturns([]string{}, errors.New("failed trying to get resolver rule associations"))
 								Expect(resolverClient.DisassociateResolverRuleWithContextCallCount()).To(BeZero())
 							})
 
 							It("does not delete the finalizer", func() {
+								Expect(reconcileErr).To(HaveOccurred())
 								Expect(awsClusterClient.RemoveFinalizerCallCount()).To(BeZero())
 							})
 						})
 
-						When("finding resolver rules on AWS account succeeds", func() {
-							var existingResolverRules = []resolver.ResolverRule{
-								{
-									Id:   "a1",
-									Arn:  "a1",
-									Name: "resolver-rule-a1",
-								},
-								{
-									Id:   "b2",
-									Arn:  "b2",
-									Name: "resolver-rule-b2",
-								},
-								{
-									Id:   "c3",
-									Arn:  "c3",
-									Name: "resolver-rule-c3",
-								},
-								{
-									Id:   "d4",
-									Arn:  "d4",
-									Name: "resolver-rule-d4",
-								},
-							}
+						When("finding resolver rule associations succeeds", func() {
+							var existingResolverRuleAssociations = []string{"a1", "b2"}
 							BeforeEach(func() {
-								resolverClient.FindResolverRulesByAWSAccountIdReturns(existingResolverRules, nil)
+								resolverClient.FindResolverRuleIdsAssociatedWithVPCIdReturns(existingResolverRuleAssociations, nil)
 								resolverClient.DisassociateResolverRuleWithContextReturnsOnCall(1, errors.New("failed trying to disassociate resolver rule"))
 							})
 
 							It("disassociates resolver rules from given AWS Account from workload cluster VPC, even if some of them fail", func() {
-								Expect(resolverClient.DisassociateResolverRuleWithContextCallCount()).To(Equal(len(existingResolverRules)))
+								Expect(resolverClient.DisassociateResolverRuleWithContextCallCount()).To(Equal(len(existingResolverRuleAssociations)))
 								_, _, vpcId, resolverRuleId := resolverClient.DisassociateResolverRuleWithContextArgsForCall(0)
-								Expect(resolverRuleId).To(Equal(existingResolverRules[0].Id))
+								Expect(resolverRuleId).To(Equal(existingResolverRuleAssociations[0]))
 								Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
 							})
 
