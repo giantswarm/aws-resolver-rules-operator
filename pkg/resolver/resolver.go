@@ -121,6 +121,8 @@ func (r *Resolver) AssociateResolverRulesInAccountWithClusterVPC(ctx context.Con
 		}
 	}
 
+	logger.Info("Finished associating resolver rules created/owned by AWS account specified in AWSCluster annotation", "awsAccountId", awsAccountId)
+
 	return nil
 }
 
