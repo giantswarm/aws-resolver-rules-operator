@@ -174,7 +174,7 @@ func (r *ResolverRulesReconciler) reconcileDelete(ctx context.Context, awsCluste
 
 	err = r.awsClusterClient.RemoveFinalizer(ctx, awsCluster, Finalizer)
 	if err != nil {
-		return ctrl.Result{}, errors.WithStack(err)
+		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
 	}
 
 	return reconcile.Result{}, nil
