@@ -1,5 +1,6 @@
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+	go generate ./...
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 .PHONY: fmt
@@ -11,15 +12,18 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test-unit
-test-unit: ginkgo generate fmt vet envtest ## Run tests.
+test-unit: ginkgo generate fmt vet envtest ## Run unit tests
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) -p --nodes 4 -r -randomize-all --randomize-suites --skip-package=tests --cover --coverpkg=`go list ./... | grep -v fakes | tr '\n' ','` ./...
 
 .PHONY: test-integration
-test-integration: ginkgo generate fmt vet ## Run tests.
+test-integration: ginkgo generate fmt vet ## Run integration tests
 	docker-compose up -d
 	sleep 4
-	AWS_ACCESS_KEY_ID="dummy" AWS_SECRET_ACCESS_KEY="dummy" AWS_ENDPOINT="http://localhost:4566" $(GINKGO) -p --nodes 4 -r -randomize-all --randomize-suites --cover tests/integration
+	AWS_ACCESS_KEY_ID="dummy" AWS_SECRET_ACCESS_KEY="dummy" AWS_ENDPOINT="http://localhost:4566" $(GINKGO) -p --nodes 4 -r -randomize-all --randomize-suites --cover --coverpkg=github.com/aws-resolver-rules-operator/pkg/aws tests/integration
 	docker-compose down
+
+.PHONY: test-all
+test-all: test-unit test-integration ## Run all tests
 
 .PHONY: coverage-html
 coverage-html: test-unit

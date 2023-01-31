@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -94,7 +95,7 @@ func (a *AWSResolver) createResolverRule(ctx context.Context, logger logr.Logger
 		return resolver.ResolverRule{}, errors.WithStack(err)
 	}
 
-	resolverRule := resolver.ResolverRule{RuleArn: *response.ResolverRule.Arn, RuleId: *response.ResolverRule.Id}
+	resolverRule := a.buildResolverRule(response.ResolverRule)
 	logger.Info("Created resolver rule", "rule", resolverRule)
 
 	return resolverRule, nil
@@ -266,52 +267,46 @@ func (a *AWSResolver) GetResolverRuleByName(ctx context.Context, resolverRuleNam
 	}
 
 	if len(listRulesResponse.ResolverRules) > 0 {
-		return resolver.ResolverRule{
-			RuleId:  *listRulesResponse.ResolverRules[0].Id,
-			RuleArn: *listRulesResponse.ResolverRules[0].Arn,
-		}, nil
+		return a.buildResolverRule(listRulesResponse.ResolverRules[0]), nil
 	}
 
 	return resolver.ResolverRule{}, &resolver.ResolverRuleNotFoundError{}
 }
 
 // AssociateResolverRuleWithContext creates an association between a resolver rule and a VPC.
-// It will try to find an existing association for that Resolver Rule and VPC, and only create a new association if it
-// does not find any.
+// You cannot associate rules with same domain name with same VPC on AWS, in which case
+// `AssociateResolverRuleWithContext` will log the error and ignore associating the rule with the VPC.
 func (a *AWSResolver) AssociateResolverRuleWithContext(ctx context.Context, logger logr.Logger, associationName, vpcId, resolverRuleId string) error {
-	logger = logger.WithValues("resolverRuleId", resolverRuleId, "vpcId", vpcId)
-	logger.Info("Checking if Resolver Rule is already associated to VPC")
-	listResolverRuleAssociationsResponse, err := a.client.ListResolverRuleAssociationsWithContext(ctx, &route53resolver.ListResolverRuleAssociationsInput{
-		Filters: []*route53resolver.Filter{
-			{
-				Name:   aws.String("ResolverRuleId"),
-				Values: aws.StringSlice([]string{resolverRuleId}),
-			},
-			{
-				Name:   aws.String("VPCId"),
-				Values: aws.StringSlice([]string{vpcId}),
-			},
-		},
-	})
-	if err != nil {
-		return errors.WithStack(err)
-	}
+	logger = logger.WithValues("resolverRuleId", resolverRuleId, "vpcId", vpcId, "associationName", associationName)
 
-	// If the rule is already associated we just return.
-	if len(listResolverRuleAssociationsResponse.ResolverRuleAssociations) > 0 {
-		logger.Info("The Resolver Rule was already associated with the VPC")
-		return nil
-	}
-
-	logger.Info("Associating Resolver Rule to VPC")
-	_, err = a.client.AssociateResolverRuleWithContext(ctx, &route53resolver.AssociateResolverRuleInput{
+	logger.Info("Associating Resolver Rule with the VPC")
+	_, err := a.client.AssociateResolverRuleWithContext(ctx, &route53resolver.AssociateResolverRuleInput{
 		Name:           aws.String(associationName),
 		ResolverRuleId: aws.String(resolverRuleId),
 		VPCId:          aws.String(vpcId),
 	})
 	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case route53resolver.ErrCodeInvalidRequestException:
+				// We get a generic `InvalidRequestException` when we try to associate a resolver rule but there is another rule
+				// with the same domain name and same VPC.
+				// This controller will try to associate rules on every reconciliation loop, so to ignore that specific error
+				// we need to check the contents of the error message. This is very brittle.
+				if strings.Contains(aerr.Message(), "Cannot associate rules with same domain name with same VPC") {
+					logger.Info("The Resolver Rule was already associated with the VPC (or there is another rule with same VPC and same domain name in rule), skipping associating the rule with the VPC again")
+					return nil
+				}
+				return errors.WithStack(err)
+			default:
+				return errors.WithStack(err)
+			}
+		}
+
 		return errors.WithStack(err)
 	}
+
+	logger.Info("The Resolver Rule has been associated with the VPC")
 
 	return nil
 }
@@ -338,6 +333,100 @@ func (a *AWSResolver) DisassociateResolverRuleWithContext(ctx context.Context, l
 	}
 
 	return nil
+}
+
+func (a *AWSResolver) FindResolverRulesByAWSAccountId(ctx context.Context, logger logr.Logger, awsAccountId string) ([]resolver.ResolverRule, error) {
+	// Fetch first page of results.
+	unfilteredResolverRules := []*route53resolver.ResolverRule{}
+	listResolverRulesResponse, err := a.client.ListResolverRulesWithContext(ctx, &route53resolver.ListResolverRulesInput{
+		MaxResults: aws.Int64(100),
+		NextToken:  nil,
+	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	unfilteredResolverRules = append(unfilteredResolverRules, listResolverRulesResponse.ResolverRules...)
+
+	// If the response contains `NexToken` we need to keep sending requests including the token to get all results.
+	for listResolverRulesResponse.NextToken != nil && *listResolverRulesResponse.NextToken != "" {
+		listResolverRulesResponse, err = a.client.ListResolverRulesWithContext(ctx, &route53resolver.ListResolverRulesInput{
+			MaxResults: aws.Int64(100),
+			NextToken:  listResolverRulesResponse.NextToken,
+		})
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		unfilteredResolverRules = append(unfilteredResolverRules, listResolverRulesResponse.ResolverRules...)
+	}
+
+	resolverRulesInAccount := []resolver.ResolverRule{}
+	for _, rule := range unfilteredResolverRules {
+		if awsAccountId == "" || *rule.OwnerId == awsAccountId {
+			resolverRulesInAccount = append(resolverRulesInAccount, a.buildResolverRule(rule))
+		}
+	}
+
+	return resolverRulesInAccount, nil
+}
+
+func (a *AWSResolver) FindResolverRuleIdsAssociatedWithVPCId(ctx context.Context, logger logr.Logger, vpcId string) ([]string, error) {
+	// Fetch first page of results.
+	associatedResolverRuleIds := []string{}
+	allResolverRuleAssociations := []*route53resolver.ResolverRuleAssociation{}
+	listResolverRuleAssociationsResponse, err := a.client.ListResolverRuleAssociationsWithContext(ctx, &route53resolver.ListResolverRuleAssociationsInput{
+		MaxResults: aws.Int64(100),
+		NextToken:  nil,
+		Filters: []*route53resolver.Filter{
+			{
+				Name:   aws.String("VPCId"),
+				Values: aws.StringSlice([]string{vpcId}),
+			},
+		},
+	})
+	if err != nil {
+		return associatedResolverRuleIds, errors.WithStack(err)
+	}
+
+	allResolverRuleAssociations = append(allResolverRuleAssociations, listResolverRuleAssociationsResponse.ResolverRuleAssociations...)
+
+	// If the response contains `NexToken` we need to keep sending requests including the token to get all results.
+	for listResolverRuleAssociationsResponse.NextToken != nil && *listResolverRuleAssociationsResponse.NextToken != "" {
+		listResolverRuleAssociationsResponse, err = a.client.ListResolverRuleAssociationsWithContext(ctx, &route53resolver.ListResolverRuleAssociationsInput{
+			MaxResults: aws.Int64(100),
+			NextToken:  listResolverRuleAssociationsResponse.NextToken,
+			Filters: []*route53resolver.Filter{
+				{
+					Name:   aws.String("VPCId"),
+					Values: aws.StringSlice([]string{vpcId}),
+				},
+			},
+		})
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		allResolverRuleAssociations = append(allResolverRuleAssociations, listResolverRuleAssociationsResponse.ResolverRuleAssociations...)
+	}
+
+	for _, association := range allResolverRuleAssociations {
+		associatedResolverRuleIds = append(associatedResolverRuleIds, *association.ResolverRuleId)
+	}
+
+	return associatedResolverRuleIds, nil
+}
+
+func (a *AWSResolver) buildResolverRule(rule *route53resolver.ResolverRule) resolver.ResolverRule {
+	ruleIPs := []string{}
+	for _, ip := range rule.TargetIps {
+		ruleIPs = append(ruleIPs, *ip.Ip)
+	}
+
+	return resolver.ResolverRule{
+		Arn:  *rule.Arn,
+		Id:   *rule.Id,
+		IPs:  ruleIPs,
+		Name: *rule.Name,
+	}
 }
 
 func getInboundEndpointName(clusterName string) string {
