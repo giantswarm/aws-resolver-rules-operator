@@ -39,6 +39,12 @@ spec:
             - /manager
           args:
             - --leader-elect
+            - --dns-server-aws-account-id={{ .Values.dnsServerAWSAccountId }}
+            - --dns-server-iam-role-arn={{ .Values.dnsServerIAMRoleARN }}
+            - --dns-server-iam-role-external-id={{ .Values.dnsServerIAMRoleExternalId }}
+            - --dns-server-region={{ .Values.dnsServerRegion }}
+            - --dns-server-vpc-id={{ .Values.dnsServerVpcId }}
+            - --basedomain={{ .Values.baseDomain }}
           securityContext:
             {{- with .Values.securityContext }}
               {{- . | toYaml | nindent 10 }}

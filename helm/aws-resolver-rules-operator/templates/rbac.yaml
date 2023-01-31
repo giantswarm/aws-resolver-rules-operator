@@ -17,6 +17,14 @@ rules:
       - patch
       - watch
   - apiGroups:
+      - infrastructure.cluster.x-k8s.io
+    resources:
+      - awsclusterroleidentities
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
       - coordination.k8s.io
     resources:
       - leases
@@ -24,6 +32,12 @@ rules:
       - get
       - create
       - update
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

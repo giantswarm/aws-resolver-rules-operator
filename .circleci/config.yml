@@ -2,14 +2,55 @@ version: 2.1
 orbs:
   architect: giantswarm/architect@4.27.0
 
+jobs:
+  unit-tests:
+    executor: architect/architect
+    steps:
+      - checkout
+      - run:
+          name: "Run unit tests"
+          command: CGO_ENABLED=0 make test-unit
+  integration-tests:
+    executor: architect/machine
+    machine:
+      image: 'ubuntu-2004:202010-01'
+    steps:
+      - checkout
+      - architect/machine-install-go
+      - run:
+          name: Install Docker Compose
+          environment:
+            COMPOSE_VERSION: '1.29.2'
+          command: |
+            curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o ~/docker-compose
+            chmod +x ~/docker-compose
+            sudo mv ~/docker-compose /usr/bin/docker-compose
+      - run:
+          name: "Run integration tests"
+          command: |
+            CGO_ENABLED=0 make test-integration
+
 workflows:
   package-and-push-chart-on-tag:
     jobs:
+      - unit-tests:
+          filters:
+            tags:
+              only: /^v.*/
+
+      - integration-tests:
+          filters:
+            tags:
+              only: /^v.*/
+
       - architect/go-build:
           context: architect
           name: go-build
           binary: aws-resolver-rules-operator
           resource_class: xlarge
+          requires:
+            - unit-tests
+            - integration-tests
           filters:
             tags:
               only: /^v.*/
@@ -37,22 +78,6 @@ workflows:
           - go-build
           # Needed to trigger job also on git tag.
           filters:
-            tags:
-              only: /^v.*/
-
-      # Ensure that for every commit to master, and for every new release tag,
-      # an image gets pushed to the Aliyun registry.
-      - architect/push-to-docker:
-          context: "architect"
-          name: push-aws-resolver-rules-operator-to-aliyun
-          image: "registry-intl.cn-shanghai.aliyuncs.com/giantswarm/aws-resolver-rules-operator"
-          username_envar: "ALIYUN_USERNAME"
-          password_envar: "ALIYUN_PASSWORD"
-          requires:
-          - go-build
-          filters:
-            branches:
-              only: master
             tags:
               only: /^v.*/
 
