@@ -68,7 +68,7 @@ func (a *RAM) DeleteResourceShareWithContext(ctx context.Context, logger logr.Lo
 		return nil
 	}
 
-	logger.Info("Deleting RAM resource share")
+	logger.Info("Deleting RAM resource share", "resourceShareArn", resourceShare.ResourceShares[0].ResourceShareArn)
 	_, err = a.client.DeleteResourceShareWithContext(ctx, &ram.DeleteResourceShareInput{
 		ResourceShareArn: resourceShare.ResourceShares[0].ResourceShareArn,
 	})

@@ -172,6 +172,7 @@ func (r *ResolverRulesReconciler) reconcileDelete(ctx context.Context, awsCluste
 		}
 	}
 
+	logger.Info("Removing finalizer from AWSCluster")
 	err = r.awsClusterClient.RemoveFinalizer(ctx, awsCluster, Finalizer)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
