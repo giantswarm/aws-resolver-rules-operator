@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Associate existing Resolver Rules with workload cluster VPC.
 - Add the use of runtime/default seccomp profile.
+- Improve logging.
 
 ### Fixed
 

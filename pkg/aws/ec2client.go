@@ -45,6 +45,7 @@ func (a *AWSEC2) DeleteSecurityGroupForResolverEndpoints(ctx context.Context, lo
 	logger.Info("Trying to find Resolver Rule security group", "securityGroupName", groupName, "vpcId", vpcId)
 	securityGroup, err := a.getSecurityGroupByName(ctx, vpcId, groupName)
 	if errors.Is(err, &SecurityGroupNotFoundError{}) {
+		logger.Info("Security Group was not found, skipping deletion")
 		return nil
 	}
 	if err != nil {

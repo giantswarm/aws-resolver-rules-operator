@@ -183,6 +183,7 @@ func (r *Resolver) DeleteRule(ctx context.Context, logger logr.Logger, cluster C
 		return errors.WithStack(err)
 	}
 
+	logger.Info("Trying to find Resolver Rule to delete", "resolverRuleName", getResolverRuleName(cluster.Name))
 	resolverRule, err := resolverClient.GetResolverRuleByName(ctx, getResolverRuleName(cluster.Name), "FORWARD")
 	if err != nil && !errors.Is(err, &ResolverRuleNotFoundError{}) {
 		return errors.WithStack(err)
@@ -190,6 +191,7 @@ func (r *Resolver) DeleteRule(ctx context.Context, logger logr.Logger, cluster C
 
 	// Only if we found the resolver rule, try to delete it
 	if err == nil {
+		logger.Info("Resolver Rule was found. Let's dissasociate it from workload cluster VPC before removing it")
 		err = dnsServerResolverClient.DisassociateResolverRuleWithContext(ctx, logger, r.dnsServer.VPCId, resolverRule.Id)
 		if err != nil {
 			return errors.WithStack(err)
