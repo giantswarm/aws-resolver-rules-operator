@@ -190,10 +190,14 @@ func (r *ResolverRulesReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+// getSubnetIds will fetch the subnet ids for the subnets in the spec that contain certain tag.
+// These are the subnets in your VPC that you forward DNS queries to.
 func getSubnetIds(awsCluster *capa.AWSCluster) []string {
 	var subnetIds []string
 	for _, subnet := range awsCluster.Spec.NetworkSpec.Subnets {
-		subnetIds = append(subnetIds, subnet.ID)
+		if _, ok := subnet.Tags["subnet.giantswarm.io/endpoints"]; ok {
+			subnetIds = append(subnetIds, subnet.ID)
+		}
 	}
 
 	return subnetIds
