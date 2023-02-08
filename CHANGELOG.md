@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Don't create RAM resource share if it's already created.
+- When creating the Resolver endpoints, only create it for the subnets with a specific tag on them.
 
 ## [0.1.1] - 2023-01-24
 
