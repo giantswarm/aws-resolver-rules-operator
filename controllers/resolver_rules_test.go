@@ -85,7 +85,8 @@ var _ = Describe("Resolver rules reconciler", func() {
 					},
 					Subnets: []capa.SubnetSpec{
 						{
-							ID: "subnet-1",
+							ID:   "subnet-1",
+							Tags: map[string]string{"subnet.giantswarm.io/endpoints": "true"},
 						},
 						{
 							ID: "subnet-2",
@@ -287,6 +288,8 @@ var _ = Describe("Resolver rules reconciler", func() {
 							Expect(resolverRuleName).To(Equal(fmt.Sprintf("giantswarm-%s", ClusterName)))
 							Expect(securityGroupId).To(Equal("my-security-group"))
 							Expect(cluster.Name).To(Equal("foo"))
+							Expect(cluster.Subnets).To(HaveLen(1))
+							Expect(cluster.Subnets).To(ContainElement("subnet-1"))
 						})
 
 						When("creating resolver rule fails", func() {

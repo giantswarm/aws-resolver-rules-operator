@@ -37,13 +37,3 @@ dnsServerIAMRoleExternalId: ""
 # Base domain used for the workload clusters created on the MC where this controller is deployed.
 # Normally we prepend the workload cluster name to this, i.e. my-cluster.${baseDomain}
 baseDomain: ""
-
-# Add seccomp to pod security context
-podSecurityContext:
-  seccompProfile:
-    type: RuntimeDefault
-
-# Add seccomp to container security context
-securityContext:
-  seccompProfile:
-    type: RuntimeDefault

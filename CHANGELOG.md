@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2023-02-08
+
+### Fix
+
+- Revert seccomp profile.
+
+## [0.2.0] - 2023-02-08
+
 ### Added
 
 - Associate existing Resolver Rules with workload cluster VPC.
@@ -16,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Don't create RAM resource share if it's already created.
+- When creating the Resolver endpoints, only create it for the subnets with a specific tag on them.
 
 ## [0.1.1] - 2023-01-24
 
@@ -33,7 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
 
-[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/giantswarm/aws-resolver-rules-operator/releases/tag/v0.0.1
