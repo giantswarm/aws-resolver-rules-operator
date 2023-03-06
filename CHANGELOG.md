@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add condition to `AWSCluster` signaling that resolver rules in AWS account have been associated with workload cluster VPC.
+
 ## [0.3.0] - 2023-02-22
 
 ### Changed

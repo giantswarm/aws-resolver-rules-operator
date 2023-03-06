@@ -254,7 +254,6 @@ var _ = Describe("Resolver rules reconciler", func() {
 				})
 
 				When("the cluster is not being deleted", func() {
-
 					It("adds the finalizer to the AWSCluster", func() {
 						Expect(awsClusterClient.AddFinalizerCallCount()).To(Equal(1))
 						Expect(reconcileErr).NotTo(HaveOccurred())
@@ -374,6 +373,11 @@ var _ = Describe("Resolver rules reconciler", func() {
 							It("it doesn't associate resolver rules and returns error", func() {
 								Expect(resolverClient.AssociateResolverRuleWithContextCallCount()).To(BeZero())
 							})
+
+							It("does not add Condition to AWSCluster to mark that rules got associated", func() {
+								Expect(awsClusterClient.MarkConditionTrueCallCount()).To(BeZero())
+							})
+
 						})
 
 						When("finding resolver rules on AWS account succeeds", func() {
@@ -423,8 +427,15 @@ var _ = Describe("Resolver rules reconciler", func() {
 									Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
 								})
 							})
+
+							It("adds Condition to AWSCluster to mark that rules got associated", func() {
+								Expect(awsClusterClient.MarkConditionTrueCallCount()).To(Equal(1))
+								_, _, condition := awsClusterClient.MarkConditionTrueArgsForCall(0)
+								Expect(condition).To(Equal(controllers.ResolverRulesAssociatedCondition))
+							})
 						})
 					})
+
 					When("the AWS Account id annotation is set to an empty string", func() {
 						BeforeEach(func() {
 							awsCluster.Annotations[gsannotations.ResolverRulesOwnerAWSAccountId] = ""
@@ -432,6 +443,12 @@ var _ = Describe("Resolver rules reconciler", func() {
 
 						It("it still associates resolver rules", func() {
 							Expect(resolverClient.FindResolverRulesByAWSAccountIdCallCount()).To(Equal(1))
+						})
+
+						It("adds Condition to AWSCluster to mark that rules got associated", func() {
+							Expect(awsClusterClient.MarkConditionTrueCallCount()).To(Equal(1))
+							_, _, condition := awsClusterClient.MarkConditionTrueArgsForCall(0)
+							Expect(condition).To(Equal(controllers.ResolverRulesAssociatedCondition))
 						})
 					})
 				})

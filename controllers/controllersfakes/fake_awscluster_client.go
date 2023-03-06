@@ -67,6 +67,19 @@ type FakeAWSClusterClient struct {
 		result1 *v1beta1a.Cluster
 		result2 error
 	}
+	MarkConditionTrueStub        func(context.Context, *v1beta1.AWSCluster, v1beta1a.ConditionType) error
+	markConditionTrueMutex       sync.RWMutex
+	markConditionTrueArgsForCall []struct {
+		arg1 context.Context
+		arg2 *v1beta1.AWSCluster
+		arg3 v1beta1a.ConditionType
+	}
+	markConditionTrueReturns struct {
+		result1 error
+	}
+	markConditionTrueReturnsOnCall map[int]struct {
+		result1 error
+	}
 	RemoveFinalizerStub        func(context.Context, *v1beta1.AWSCluster, string) error
 	removeFinalizerMutex       sync.RWMutex
 	removeFinalizerArgsForCall []struct {
@@ -342,6 +355,69 @@ func (fake *FakeAWSClusterClient) GetOwnerReturnsOnCall(i int, result1 *v1beta1a
 	}{result1, result2}
 }
 
+func (fake *FakeAWSClusterClient) MarkConditionTrue(arg1 context.Context, arg2 *v1beta1.AWSCluster, arg3 v1beta1a.ConditionType) error {
+	fake.markConditionTrueMutex.Lock()
+	ret, specificReturn := fake.markConditionTrueReturnsOnCall[len(fake.markConditionTrueArgsForCall)]
+	fake.markConditionTrueArgsForCall = append(fake.markConditionTrueArgsForCall, struct {
+		arg1 context.Context
+		arg2 *v1beta1.AWSCluster
+		arg3 v1beta1a.ConditionType
+	}{arg1, arg2, arg3})
+	stub := fake.MarkConditionTrueStub
+	fakeReturns := fake.markConditionTrueReturns
+	fake.recordInvocation("MarkConditionTrue", []interface{}{arg1, arg2, arg3})
+	fake.markConditionTrueMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeAWSClusterClient) MarkConditionTrueCallCount() int {
+	fake.markConditionTrueMutex.RLock()
+	defer fake.markConditionTrueMutex.RUnlock()
+	return len(fake.markConditionTrueArgsForCall)
+}
+
+func (fake *FakeAWSClusterClient) MarkConditionTrueCalls(stub func(context.Context, *v1beta1.AWSCluster, v1beta1a.ConditionType) error) {
+	fake.markConditionTrueMutex.Lock()
+	defer fake.markConditionTrueMutex.Unlock()
+	fake.MarkConditionTrueStub = stub
+}
+
+func (fake *FakeAWSClusterClient) MarkConditionTrueArgsForCall(i int) (context.Context, *v1beta1.AWSCluster, v1beta1a.ConditionType) {
+	fake.markConditionTrueMutex.RLock()
+	defer fake.markConditionTrueMutex.RUnlock()
+	argsForCall := fake.markConditionTrueArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeAWSClusterClient) MarkConditionTrueReturns(result1 error) {
+	fake.markConditionTrueMutex.Lock()
+	defer fake.markConditionTrueMutex.Unlock()
+	fake.MarkConditionTrueStub = nil
+	fake.markConditionTrueReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeAWSClusterClient) MarkConditionTrueReturnsOnCall(i int, result1 error) {
+	fake.markConditionTrueMutex.Lock()
+	defer fake.markConditionTrueMutex.Unlock()
+	fake.MarkConditionTrueStub = nil
+	if fake.markConditionTrueReturnsOnCall == nil {
+		fake.markConditionTrueReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.markConditionTrueReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakeAWSClusterClient) RemoveFinalizer(arg1 context.Context, arg2 *v1beta1.AWSCluster, arg3 string) error {
 	fake.removeFinalizerMutex.Lock()
 	ret, specificReturn := fake.removeFinalizerReturnsOnCall[len(fake.removeFinalizerArgsForCall)]
@@ -416,6 +492,8 @@ func (fake *FakeAWSClusterClient) Invocations() map[string][][]interface{} {
 	defer fake.getIdentityMutex.RUnlock()
 	fake.getOwnerMutex.RLock()
 	defer fake.getOwnerMutex.RUnlock()
+	fake.markConditionTrueMutex.RLock()
+	defer fake.markConditionTrueMutex.RUnlock()
 	fake.removeFinalizerMutex.RLock()
 	defer fake.removeFinalizerMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}

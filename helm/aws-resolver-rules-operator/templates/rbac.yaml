@@ -10,6 +10,7 @@ rules:
       - infrastructure.cluster.x-k8s.io
     resources:
       - awsclusters
+      - awsclusters/status
       - clusters
     verbs:
       - get
