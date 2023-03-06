@@ -44,6 +44,7 @@ type AWSClusterClient interface {
 	Get(context.Context, types.NamespacedName) (*capa.AWSCluster, error)
 	GetOwner(context.Context, *capa.AWSCluster) (*capi.Cluster, error)
 	AddFinalizer(context.Context, *capa.AWSCluster, string) error
+	Unpause(context.Context, *capa.AWSCluster, *capi.Cluster) error
 	RemoveFinalizer(context.Context, *capa.AWSCluster, string) error
 	GetIdentity(context.Context, *capa.AWSCluster) (*capa.AWSClusterRoleIdentity, error)
 	MarkConditionTrue(context.Context, *capa.AWSCluster, capi.ConditionType) error

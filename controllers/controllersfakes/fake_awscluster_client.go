@@ -93,6 +93,19 @@ type FakeAWSClusterClient struct {
 	removeFinalizerReturnsOnCall map[int]struct {
 		result1 error
 	}
+	UnpauseStub        func(context.Context, *v1beta1.AWSCluster, *v1beta1a.Cluster) error
+	unpauseMutex       sync.RWMutex
+	unpauseArgsForCall []struct {
+		arg1 context.Context
+		arg2 *v1beta1.AWSCluster
+		arg3 *v1beta1a.Cluster
+	}
+	unpauseReturns struct {
+		result1 error
+	}
+	unpauseReturnsOnCall map[int]struct {
+		result1 error
+	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
@@ -481,6 +494,69 @@ func (fake *FakeAWSClusterClient) RemoveFinalizerReturnsOnCall(i int, result1 er
 	}{result1}
 }
 
+func (fake *FakeAWSClusterClient) Unpause(arg1 context.Context, arg2 *v1beta1.AWSCluster, arg3 *v1beta1a.Cluster) error {
+	fake.unpauseMutex.Lock()
+	ret, specificReturn := fake.unpauseReturnsOnCall[len(fake.unpauseArgsForCall)]
+	fake.unpauseArgsForCall = append(fake.unpauseArgsForCall, struct {
+		arg1 context.Context
+		arg2 *v1beta1.AWSCluster
+		arg3 *v1beta1a.Cluster
+	}{arg1, arg2, arg3})
+	stub := fake.UnpauseStub
+	fakeReturns := fake.unpauseReturns
+	fake.recordInvocation("Unpause", []interface{}{arg1, arg2, arg3})
+	fake.unpauseMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeAWSClusterClient) UnpauseCallCount() int {
+	fake.unpauseMutex.RLock()
+	defer fake.unpauseMutex.RUnlock()
+	return len(fake.unpauseArgsForCall)
+}
+
+func (fake *FakeAWSClusterClient) UnpauseCalls(stub func(context.Context, *v1beta1.AWSCluster, *v1beta1a.Cluster) error) {
+	fake.unpauseMutex.Lock()
+	defer fake.unpauseMutex.Unlock()
+	fake.UnpauseStub = stub
+}
+
+func (fake *FakeAWSClusterClient) UnpauseArgsForCall(i int) (context.Context, *v1beta1.AWSCluster, *v1beta1a.Cluster) {
+	fake.unpauseMutex.RLock()
+	defer fake.unpauseMutex.RUnlock()
+	argsForCall := fake.unpauseArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeAWSClusterClient) UnpauseReturns(result1 error) {
+	fake.unpauseMutex.Lock()
+	defer fake.unpauseMutex.Unlock()
+	fake.UnpauseStub = nil
+	fake.unpauseReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeAWSClusterClient) UnpauseReturnsOnCall(i int, result1 error) {
+	fake.unpauseMutex.Lock()
+	defer fake.unpauseMutex.Unlock()
+	fake.UnpauseStub = nil
+	if fake.unpauseReturnsOnCall == nil {
+		fake.unpauseReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.unpauseReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakeAWSClusterClient) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
@@ -496,6 +572,8 @@ func (fake *FakeAWSClusterClient) Invocations() map[string][][]interface{} {
 	defer fake.markConditionTrueMutex.RUnlock()
 	fake.removeFinalizerMutex.RLock()
 	defer fake.removeFinalizerMutex.RUnlock()
+	fake.unpauseMutex.RLock()
+	defer fake.unpauseMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value
