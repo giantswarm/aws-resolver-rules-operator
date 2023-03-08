@@ -106,40 +106,42 @@ var _ = Describe("Unpause reconciler", func() {
 			awsClusterClient.GetOwnerReturns(cluster, nil)
 		})
 
-		When("is not using private DNS mode", func() {
+		When("is not using private VPC mode", func() {
 			BeforeEach(func() {
 				awsClusterClient.GetReturns(awsCluster, nil)
-				awsCluster.Annotations = map[string]string{
-					gsannotations.AWSDNSMode: "non-private",
+				if awsCluster.Annotations == nil {
+					awsCluster.Annotations = map[string]string{}
 				}
+				awsCluster.Annotations[gsannotations.AWSVPCMode] = "non-private"
 			})
 			It("doesn't really reconcile", func() {
 				Expect(reconcileErr).NotTo(HaveOccurred())
 			})
 		})
 
-		When("is using private DNS mode", func() {
+		When("the cluster is being deleted", func() {
 			BeforeEach(func() {
-				awsClusterClient.GetReturns(awsCluster, nil)
-				awsCluster.Annotations = map[string]string{
-					gsannotations.AWSDNSMode: gsannotations.DNSModePrivate,
-				}
+				deletionTime := metav1.Now()
+				awsCluster.DeletionTimestamp = &deletionTime
 			})
 
-			When("the cluster is being deleted", func() {
+			It("nothing really happens", func() {
+				Expect(awsClusterClient.UnpauseCallCount()).To(BeZero())
+				Expect(reconcileErr).NotTo(HaveOccurred())
+			})
+		})
+
+		When("the cluster is not being deleted", func() {
+			When("the cluster is using private VPC mode", func() {
 				BeforeEach(func() {
-					deletionTime := metav1.Now()
-					awsCluster.DeletionTimestamp = &deletionTime
+					awsClusterClient.GetReturns(awsCluster, nil)
+					if awsCluster.Annotations == nil {
+						awsCluster.Annotations = map[string]string{}
+					}
+					awsCluster.Annotations[gsannotations.AWSVPCMode] = gsannotations.AWSVPCModePrivate
 				})
 
-				It("nothing really happens", func() {
-					Expect(awsClusterClient.UnpauseCallCount()).To(BeZero())
-					Expect(reconcileErr).NotTo(HaveOccurred())
-				})
-			})
-
-			When("the cluster is not being deleted", func() {
-				When("VPC and Subnets conditions are Ready and ResolverRules Ready condition is Ready", func() {
+				When("VPC and Subnets conditions are Ready", func() {
 					BeforeEach(func() {
 						awsCluster.Status.Conditions = []capi.Condition{
 							{
@@ -148,10 +150,6 @@ var _ = Describe("Unpause reconciler", func() {
 							},
 							{
 								Type:   capa.SubnetsReadyCondition,
-								Status: v1.ConditionTrue,
-							},
-							{
-								Type:   controllers.ResolverRulesAssociatedCondition,
 								Status: v1.ConditionTrue,
 							},
 						}
@@ -176,10 +174,6 @@ var _ = Describe("Unpause reconciler", func() {
 					BeforeEach(func() {
 						awsCluster.Status.Conditions = []capi.Condition{
 							{
-								Type:   controllers.ResolverRulesAssociatedCondition,
-								Status: v1.ConditionTrue,
-							},
-							{
 								Type:   capa.SubnetsReadyCondition,
 								Status: v1.ConditionTrue,
 							},
@@ -198,10 +192,6 @@ var _ = Describe("Unpause reconciler", func() {
 								Type:   capa.VpcReadyCondition,
 								Status: v1.ConditionTrue,
 							},
-							{
-								Type:   controllers.ResolverRulesAssociatedCondition,
-								Status: v1.ConditionTrue,
-							},
 						}
 					})
 
@@ -210,25 +200,74 @@ var _ = Describe("Unpause reconciler", func() {
 					})
 				})
 
-				When("ResolverRules Ready condition is not Ready yet", func() {
+				When("the cluster is using private DNS mode", func() {
 					BeforeEach(func() {
-						awsCluster.Status.Conditions = []capi.Condition{
-							{
-								Type:   capa.VpcReadyCondition,
-								Status: v1.ConditionTrue,
-							},
-							{
-								Type:   capa.SubnetsReadyCondition,
-								Status: v1.ConditionTrue,
-							},
-						}
+						awsClusterClient.GetReturns(awsCluster, nil)
+						awsCluster.Annotations[gsannotations.AWSDNSMode] = gsannotations.DNSModePrivate
 					})
 
-					It("does not unpauses the cluster", func() {
-						Expect(awsClusterClient.UnpauseCallCount()).To(BeZero())
+					When("VPC, Subnets and ResolverRules conditions are Ready", func() {
+						BeforeEach(func() {
+							awsCluster.Status.Conditions = []capi.Condition{
+								{
+									Type:   capa.VpcReadyCondition,
+									Status: v1.ConditionTrue,
+								},
+								{
+									Type:   capa.SubnetsReadyCondition,
+									Status: v1.ConditionTrue,
+								},
+								{
+									Type:   controllers.ResolverRulesAssociatedCondition,
+									Status: v1.ConditionTrue,
+								},
+							}
+						})
+
+						It("unpauses the cluster", func() {
+							Expect(awsClusterClient.UnpauseCallCount()).To(Equal(1))
+						})
+					})
+
+					When("ResolverRules Ready condition is not Ready yet", func() {
+						BeforeEach(func() {
+							awsCluster.Status.Conditions = []capi.Condition{
+								{
+									Type:   capa.VpcReadyCondition,
+									Status: v1.ConditionTrue,
+								},
+								{
+									Type:   capa.SubnetsReadyCondition,
+									Status: v1.ConditionTrue,
+								},
+							}
+						})
+
+						It("does not unpauses the cluster", func() {
+							Expect(awsClusterClient.UnpauseCallCount()).To(BeZero())
+						})
 					})
 				})
 			})
+
+			// When("ResolverRules Ready condition is not Ready yet", func() {
+			// 	BeforeEach(func() {
+			// 		awsCluster.Status.Conditions = []capi.Condition{
+			// 			{
+			// 				Type:   capa.VpcReadyCondition,
+			// 				Status: v1.ConditionTrue,
+			// 			},
+			// 			{
+			// 				Type:   capa.SubnetsReadyCondition,
+			// 				Status: v1.ConditionTrue,
+			// 			},
+			// 		}
+			// 	})
+			//
+			// 	It("does not unpauses the cluster", func() {
+			// 		Expect(awsClusterClient.UnpauseCallCount()).To(BeZero())
+			// 	})
+			// })
 		})
 	})
 })

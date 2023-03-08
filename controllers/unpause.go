@@ -31,6 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+// UnpauseReconciler reconciles AWSClusters.
+// We use it to orchestrate our different controllers. Our AWSClusters start paused in some situations, and we use this
+// reconciler to unpause the clusters when certain conditions are met.
 type UnpauseReconciler struct {
 	awsClusterClient AWSClusterClient
 }
@@ -41,11 +44,9 @@ func NewUnpauseReconciler(awsClusterClient AWSClusterClient) *UnpauseReconciler 
 	}
 }
 
-// +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=awsclusters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=awsclusters/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=awsclusters/finalizers,verbs=update
-// +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters;clusters/status,verbs=get;list;watch
-
+// Reconcile will unpause the reconciled cluster when certain conditions are marked as true.
+// It will unpause the Cluster and AWSCluster when VPC and Subnet conditions are marked as ready.
+// It also requires the ResolverRules condition to be ready if using the private dns mode.
 func (r *UnpauseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	logger.Info("Reconciling")
@@ -66,9 +67,9 @@ func (r *UnpauseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
-	dnsModeAnnotation, ok := awsCluster.Annotations[gsannotations.AWSDNSMode]
-	if !ok || dnsModeAnnotation != gsannotations.DNSModePrivate {
-		logger.Info("AWSCluster is not using private DNS mode, skipping")
+	vpcModeAnnotation, ok := awsCluster.Annotations[gsannotations.AWSVPCMode]
+	if !ok || vpcModeAnnotation != gsannotations.AWSVPCModePrivate {
+		logger.Info("AWSCluster is not using private VPC mode so there is no need to unpause it, skipping")
 		return ctrl.Result{}, nil
 	}
 
@@ -80,10 +81,20 @@ func (r *UnpauseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 func (r *UnpauseReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AWSCluster, cluster *capi.Cluster) (ctrl.Result, error) {
-	if conditions.IsTrue(awsCluster, capa.VpcReadyCondition) && conditions.IsTrue(awsCluster, capa.SubnetsReadyCondition) && conditions.IsTrue(awsCluster, ResolverRulesAssociatedCondition) {
-		err := r.awsClusterClient.Unpause(ctx, awsCluster, cluster)
-		if err != nil {
-			return ctrl.Result{}, errors.WithStack(err)
+	if conditions.IsTrue(awsCluster, capa.VpcReadyCondition) && conditions.IsTrue(awsCluster, capa.SubnetsReadyCondition) {
+		dnsModeAnnotation := awsCluster.Annotations[gsannotations.AWSDNSMode]
+		if dnsModeAnnotation != gsannotations.DNSModePrivate {
+			err := r.awsClusterClient.Unpause(ctx, awsCluster, cluster)
+			if err != nil {
+				return ctrl.Result{}, errors.WithStack(err)
+			}
+		} else {
+			if dnsModeAnnotation == gsannotations.DNSModePrivate && conditions.IsTrue(awsCluster, ResolverRulesAssociatedCondition) {
+				err := r.awsClusterClient.Unpause(ctx, awsCluster, cluster)
+				if err != nil {
+					return ctrl.Result{}, errors.WithStack(err)
+				}
+			}
 		}
 	}
 
