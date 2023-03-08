@@ -34,4 +34,3 @@ application.giantswarm.io/team: {{ index .Chart.Annotations "application.giantsw
 giantswarm.io/managed-by: {{ .Release.Name | quote }}
 helm.sh/chart: {{ include "chart" . | quote }}
 {{- end -}}
-
