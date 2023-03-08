@@ -40,7 +40,8 @@ const (
 
 //counterfeiter:generate . AWSClusterClient
 type AWSClusterClient interface {
-	Get(context.Context, types.NamespacedName) (*capa.AWSCluster, error)
+	GetAWSCluster(context.Context, types.NamespacedName) (*capa.AWSCluster, error)
+	GetCluster(ctx context.Context, namespacedName types.NamespacedName) (*capi.Cluster, error)
 	GetOwner(context.Context, *capa.AWSCluster) (*capi.Cluster, error)
 	AddFinalizer(context.Context, *capa.AWSCluster, string) error
 	Unpause(context.Context, *capa.AWSCluster, *capi.Cluster) error
@@ -74,19 +75,9 @@ func (r *ResolverRulesReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	logger.Info("Reconciling")
 	defer logger.Info("Done reconciling")
 
-	awsCluster, err := r.awsClusterClient.Get(ctx, req.NamespacedName)
+	awsCluster, err := r.awsClusterClient.GetAWSCluster(ctx, req.NamespacedName)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
-	}
-
-	cluster, err := r.awsClusterClient.GetOwner(ctx, awsCluster)
-	if err != nil {
-		return ctrl.Result{}, errors.WithStack(err)
-	}
-
-	if cluster == nil {
-		logger.Info("Cluster controller has not yet set OwnerRef")
-		return ctrl.Result{}, nil
 	}
 
 	identity, err := r.awsClusterClient.GetIdentity(ctx, awsCluster)

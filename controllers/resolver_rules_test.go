@@ -26,7 +26,6 @@ var _ = Describe("Resolver rules reconciler", func() {
 		awsClusterClient        *controllersfakes.FakeAWSClusterClient
 		ctx                     context.Context
 		reconciler              *controllers.ResolverRulesReconciler
-		cluster                 *capi.Cluster
 		awsCluster              *capa.AWSCluster
 		awsClusterRoleIdentity  *capa.AWSClusterRoleIdentity
 		result                  ctrl.Result
@@ -101,12 +100,6 @@ var _ = Describe("Resolver rules reconciler", func() {
 				},
 			},
 		}
-		cluster = &capi.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      ClusterName,
-				Namespace: "bar",
-			},
-		}
 	})
 
 	JustBeforeEach(func() {
@@ -121,7 +114,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 
 	When("there is an error trying to get the AWSCluster being reconciled", func() {
 		BeforeEach(func() {
-			awsClusterClient.GetReturns(awsCluster, errors.New("failed fetching the AWSCluster"))
+			awsClusterClient.GetAWSClusterReturns(awsCluster, errors.New("failed fetching the AWSCluster"))
 		})
 
 		It("returns the error", func() {
@@ -130,36 +123,9 @@ var _ = Describe("Resolver rules reconciler", func() {
 		})
 	})
 
-	When("there is an error trying to get the owner Cluster", func() {
+	When("reconciling an existing cluster", func() {
 		BeforeEach(func() {
-			awsClusterClient.GetReturns(awsCluster, nil)
-			awsClusterClient.GetOwnerReturns(nil, errors.New("failed fetching the owner Cluster CR"))
-		})
-
-		It("returns the error", func() {
-			Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
-			Expect(reconcileErr).To(HaveOccurred())
-		})
-	})
-
-	When("the cluster does not have an owner yet", func() {
-		BeforeEach(func() {
-			awsClusterClient.GetReturns(awsCluster, nil)
-			awsClusterClient.GetOwnerReturns(nil, nil)
-		})
-
-		It("does not really reconcile", func() {
-			Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
-			Expect(result.Requeue).To(BeFalse())
-			Expect(result.RequeueAfter).To(BeZero())
-			Expect(reconcileErr).NotTo(HaveOccurred())
-		})
-	})
-
-	When("the cluster has an owner", func() {
-		BeforeEach(func() {
-			awsClusterClient.GetReturns(awsCluster, nil)
-			awsClusterClient.GetOwnerReturns(cluster, nil)
+			awsClusterClient.GetAWSClusterReturns(awsCluster, nil)
 		})
 
 		When("we get an error trying to get the cluster identity", func() {
@@ -178,15 +144,6 @@ var _ = Describe("Resolver rules reconciler", func() {
 				awsClusterClient.GetIdentityReturns(nil, nil)
 			})
 
-			It("gets the cluster and owner cluster", func() {
-				Expect(awsClusterClient.GetCallCount()).To(Equal(1))
-				Expect(awsClusterClient.GetOwnerCallCount()).To(Equal(1))
-
-				_, actualCluster := awsClusterClient.GetOwnerArgsForCall(0)
-				Expect(actualCluster).To(Equal(awsCluster))
-				Expect(reconcileErr).NotTo(HaveOccurred())
-			})
-
 			It("doesn't really reconcile", func() {
 				Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
 				Expect(result.Requeue).To(BeFalse())
@@ -202,7 +159,6 @@ var _ = Describe("Resolver rules reconciler", func() {
 
 			When("is not using private DNS mode", func() {
 				BeforeEach(func() {
-					awsClusterClient.GetReturns(awsCluster, nil)
 					awsCluster.Annotations = map[string]string{
 						gsannotations.AWSDNSMode: "non-private",
 					}
@@ -217,7 +173,6 @@ var _ = Describe("Resolver rules reconciler", func() {
 
 			When("is using private DNS mode", func() {
 				BeforeEach(func() {
-					awsClusterClient.GetReturns(awsCluster, nil)
 					awsCluster.Annotations = map[string]string{
 						gsannotations.AWSDNSMode: gsannotations.DNSModePrivate,
 					}

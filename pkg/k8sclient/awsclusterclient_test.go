@@ -30,7 +30,7 @@ var _ = Describe("AWSClusterClient", func() {
 		awsClusterClient = *k8sclient.NewAWSClusterClient(k8sClient)
 	})
 
-	Describe("Get", func() {
+	Describe("GetAWSCluster", func() {
 		BeforeEach(func() {
 			awsCluster := &capa.AWSCluster{
 				ObjectMeta: metav1.ObjectMeta{
@@ -42,7 +42,7 @@ var _ = Describe("AWSClusterClient", func() {
 		})
 
 		It("gets the desired cluster", func() {
-			actualCluster, err := awsClusterClient.Get(ctx, types.NamespacedName{
+			actualCluster, err := awsClusterClient.GetAWSCluster(ctx, types.NamespacedName{
 				Namespace: namespace,
 				Name:      "test-cluster",
 			})
@@ -54,7 +54,7 @@ var _ = Describe("AWSClusterClient", func() {
 
 		When("the cluster does not exist", func() {
 			It("returns an error", func() {
-				_, err := awsClusterClient.Get(ctx, types.NamespacedName{
+				_, err := awsClusterClient.GetAWSCluster(ctx, types.NamespacedName{
 					Namespace: namespace,
 					Name:      "does-not-exist",
 				})
@@ -70,7 +70,57 @@ var _ = Describe("AWSClusterClient", func() {
 			})
 
 			It("returns an error", func() {
-				actualCluster, err := awsClusterClient.Get(ctx, types.NamespacedName{
+				actualCluster, err := awsClusterClient.GetAWSCluster(ctx, types.NamespacedName{
+					Namespace: namespace,
+					Name:      "test-cluster",
+				})
+				Expect(err).To(MatchError(ContainSubstring("context canceled")))
+				Expect(actualCluster).To(BeNil())
+			})
+		})
+	})
+
+	Describe("GetCluster", func() {
+		BeforeEach(func() {
+			cluster := &capi.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: namespace,
+				},
+			}
+			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
+		})
+
+		It("gets the desired cluster", func() {
+			actualCluster, err := awsClusterClient.GetCluster(ctx, types.NamespacedName{
+				Namespace: namespace,
+				Name:      "test-cluster",
+			})
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(actualCluster.Name).To(Equal("test-cluster"))
+			Expect(actualCluster.Namespace).To(Equal(namespace))
+		})
+
+		When("the cluster does not exist", func() {
+			It("returns an error", func() {
+				_, err := awsClusterClient.GetCluster(ctx, types.NamespacedName{
+					Namespace: namespace,
+					Name:      "does-not-exist",
+				})
+				Expect(k8serrors.IsNotFound(err)).To(BeTrue())
+			})
+		})
+
+		When("the context is cancelled", func() {
+			BeforeEach(func() {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			})
+
+			It("returns an error", func() {
+				actualCluster, err := awsClusterClient.GetCluster(ctx, types.NamespacedName{
 					Namespace: namespace,
 					Name:      "test-cluster",
 				})

@@ -51,19 +51,14 @@ func (r *UnpauseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logger.Info("Reconciling")
 	defer logger.Info("Done reconciling")
 
-	awsCluster, err := r.awsClusterClient.Get(ctx, req.NamespacedName)
+	awsCluster, err := r.awsClusterClient.GetAWSCluster(ctx, req.NamespacedName)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
 	}
 
-	cluster, err := r.awsClusterClient.GetOwner(ctx, awsCluster)
+	cluster, err := r.awsClusterClient.GetCluster(ctx, req.NamespacedName)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
-	}
-
-	if cluster == nil {
-		logger.Info("Cluster controller has not yet set OwnerRef")
-		return ctrl.Result{}, nil
 	}
 
 	vpcModeAnnotation, ok := awsCluster.Annotations[gsannotations.AWSVPCMode]

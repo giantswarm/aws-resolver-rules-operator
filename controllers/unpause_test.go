@@ -23,9 +23,7 @@ var _ = Describe("Unpause reconciler", func() {
 		awsClusterClient *controllersfakes.FakeAWSClusterClient
 		ctx              context.Context
 		reconciler       *controllers.UnpauseReconciler
-		cluster          *capi.Cluster
 		awsCluster       *capa.AWSCluster
-		result           ctrl.Result
 		reconcileErr     error
 	)
 
@@ -45,12 +43,6 @@ var _ = Describe("Unpause reconciler", func() {
 			},
 			Spec: capa.AWSClusterSpec{},
 		}
-		cluster = &capi.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      ClusterName,
-				Namespace: "bar",
-			},
-		}
 	})
 
 	JustBeforeEach(func() {
@@ -65,7 +57,7 @@ var _ = Describe("Unpause reconciler", func() {
 
 	When("there is an error trying to get the AWSCluster being reconciled", func() {
 		BeforeEach(func() {
-			awsClusterClient.GetReturns(awsCluster, errors.New("failed fetching the AWSCluster"))
+			awsClusterClient.GetAWSClusterReturns(awsCluster, errors.New("failed fetching the AWSCluster"))
 		})
 
 		It("returns the error", func() {
@@ -74,41 +66,13 @@ var _ = Describe("Unpause reconciler", func() {
 		})
 	})
 
-	When("there is an error trying to get the owner Cluster", func() {
+	When("reconciling an existing cluster", func() {
 		BeforeEach(func() {
-			awsClusterClient.GetReturns(awsCluster, nil)
-			awsClusterClient.GetOwnerReturns(nil, errors.New("failed fetching the owner Cluster CR"))
-		})
-
-		It("returns the error", func() {
-			Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
-			Expect(reconcileErr).To(HaveOccurred())
-		})
-	})
-
-	When("the cluster does not have an owner yet", func() {
-		BeforeEach(func() {
-			awsClusterClient.GetReturns(awsCluster, nil)
-			awsClusterClient.GetOwnerReturns(nil, nil)
-		})
-
-		It("does not really reconcile", func() {
-			Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
-			Expect(result.Requeue).To(BeFalse())
-			Expect(result.RequeueAfter).To(BeZero())
-			Expect(reconcileErr).NotTo(HaveOccurred())
-		})
-	})
-
-	When("the cluster has an owner", func() {
-		BeforeEach(func() {
-			awsClusterClient.GetReturns(awsCluster, nil)
-			awsClusterClient.GetOwnerReturns(cluster, nil)
+			awsClusterClient.GetAWSClusterReturns(awsCluster, nil)
 		})
 
 		When("is not using private VPC mode", func() {
 			BeforeEach(func() {
-				awsClusterClient.GetReturns(awsCluster, nil)
 				if awsCluster.Annotations == nil {
 					awsCluster.Annotations = map[string]string{}
 				}

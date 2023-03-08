@@ -23,7 +23,7 @@ func NewAWSClusterClient(client client.Client) *AWSClusterClient {
 	}
 }
 
-func (a *AWSClusterClient) Get(ctx context.Context, namespacedName types.NamespacedName) (*capa.AWSCluster, error) {
+func (a *AWSClusterClient) GetAWSCluster(ctx context.Context, namespacedName types.NamespacedName) (*capa.AWSCluster, error) {
 	awsCluster := &capa.AWSCluster{}
 	err := a.client.Get(ctx, namespacedName, awsCluster)
 	if err != nil {
@@ -31,6 +31,16 @@ func (a *AWSClusterClient) Get(ctx context.Context, namespacedName types.Namespa
 	}
 
 	return awsCluster, errors.WithStack(err)
+}
+
+func (a *AWSClusterClient) GetCluster(ctx context.Context, namespacedName types.NamespacedName) (*capi.Cluster, error) {
+	cluster := &capi.Cluster{}
+	err := a.client.Get(ctx, namespacedName, cluster)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return cluster, errors.WithStack(err)
 }
 
 func (a *AWSClusterClient) GetOwner(ctx context.Context, awsCluster *capa.AWSCluster) (*capi.Cluster, error) {
