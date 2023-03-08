@@ -134,7 +134,6 @@ var _ = Describe("Unpause reconciler", func() {
 		When("the cluster is not being deleted", func() {
 			When("the cluster is using private VPC mode", func() {
 				BeforeEach(func() {
-					awsClusterClient.GetReturns(awsCluster, nil)
 					if awsCluster.Annotations == nil {
 						awsCluster.Annotations = map[string]string{}
 					}
@@ -202,7 +201,6 @@ var _ = Describe("Unpause reconciler", func() {
 
 				When("the cluster is using private DNS mode", func() {
 					BeforeEach(func() {
-						awsClusterClient.GetReturns(awsCluster, nil)
 						awsCluster.Annotations[gsannotations.AWSDNSMode] = gsannotations.DNSModePrivate
 					})
 
@@ -249,25 +247,6 @@ var _ = Describe("Unpause reconciler", func() {
 					})
 				})
 			})
-
-			// When("ResolverRules Ready condition is not Ready yet", func() {
-			// 	BeforeEach(func() {
-			// 		awsCluster.Status.Conditions = []capi.Condition{
-			// 			{
-			// 				Type:   capa.VpcReadyCondition,
-			// 				Status: v1.ConditionTrue,
-			// 			},
-			// 			{
-			// 				Type:   capa.SubnetsReadyCondition,
-			// 				Status: v1.ConditionTrue,
-			// 			},
-			// 		}
-			// 	})
-			//
-			// 	It("does not unpauses the cluster", func() {
-			// 		Expect(awsClusterClient.UnpauseCallCount()).To(BeZero())
-			// 	})
-			// })
 		})
 	})
 })

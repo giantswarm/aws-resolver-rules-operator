@@ -8,6 +8,7 @@ import (
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
@@ -115,7 +116,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 				Namespace: "bar",
 			},
 		}
-		_, reconcileErr = reconciler.Reconcile(ctx, request)
+		result, reconcileErr = reconciler.Reconcile(ctx, request)
 	})
 
 	When("there is an error trying to get the AWSCluster being reconciled", func() {
@@ -155,38 +156,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 		})
 	})
 
-	When("the cluster is paused", func() {
-		BeforeEach(func() {
-			awsClusterClient.GetReturns(awsCluster, nil)
-			cluster.Spec.Paused = true
-			awsClusterClient.GetOwnerReturns(cluster, nil)
-		})
-
-		It("does not really reconcile", func() {
-			Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
-			Expect(result.Requeue).To(BeFalse())
-			Expect(result.RequeueAfter).To(BeZero())
-			Expect(reconcileErr).NotTo(HaveOccurred())
-		})
-	})
-
-	When("the infrastructure cluster is paused", func() {
-		BeforeEach(func() {
-			awsClusterClient.GetReturns(awsCluster, nil)
-			awsCluster.Annotations = map[string]string{
-				capi.PausedAnnotation: "true",
-			}
-		})
-
-		It("does not really reconcile", func() {
-			Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
-			Expect(result.Requeue).To(BeFalse())
-			Expect(result.RequeueAfter).To(BeZero())
-			Expect(reconcileErr).NotTo(HaveOccurred())
-		})
-	})
-
-	When("the cluster has an owner and it's not paused", func() {
+	When("the cluster has an owner", func() {
 		BeforeEach(func() {
 			awsClusterClient.GetReturns(awsCluster, nil)
 			awsClusterClient.GetOwnerReturns(cluster, nil)
@@ -254,178 +224,234 @@ var _ = Describe("Resolver rules reconciler", func() {
 				})
 
 				When("the cluster is not being deleted", func() {
-					It("adds the finalizer to the AWSCluster", func() {
-						Expect(awsClusterClient.AddFinalizerCallCount()).To(Equal(1))
-						Expect(reconcileErr).NotTo(HaveOccurred())
+					When("the VPC condition is not marked as ready", func() {
+						It("does not really reconcile", func() {
+							Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
+							Expect(result.Requeue).To(BeFalse())
+							Expect(reconcileErr).NotTo(HaveOccurred())
+						})
 					})
 
-					It("creates security group", func() {
-						Expect(ec2Client.CreateSecurityGroupForResolverEndpointsCallCount()).To(Equal(1))
-						_, vpcId, groupName := ec2Client.CreateSecurityGroupForResolverEndpointsArgsForCall(0)
-						Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
-						Expect(groupName).To(Equal(fmt.Sprintf("%s-resolverrules-endpoints", ClusterName)))
-						Expect(reconcileErr).NotTo(HaveOccurred())
-					})
-
-					When("creating security group fails", func() {
+					When("the Subnet condition is not marked as ready", func() {
 						BeforeEach(func() {
-							ec2Client.CreateSecurityGroupForResolverEndpointsReturns("", errors.New("error creating security group"))
+							awsCluster.Status.Conditions = []capi.Condition{
+								{
+									Type:   capa.VpcReadyCondition,
+									Status: v1.ConditionTrue,
+								},
+							}
 						})
-						It("returns the error", func() {
-							Expect(reconcileErr).To(HaveOccurred())
+
+						It("does not really reconcile", func() {
+							Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
+							Expect(result.Requeue).To(BeFalse())
+							Expect(reconcileErr).NotTo(HaveOccurred())
 						})
 					})
 
-					When("creating security group succeeds", func() {
+					When("VpcReady and SubnetReady conditions are marked as true", func() {
 						BeforeEach(func() {
-							ec2Client.CreateSecurityGroupForResolverEndpointsReturns("my-security-group", nil)
+							awsCluster.Status.Conditions = []capi.Condition{
+								{
+									Type:   capa.VpcReadyCondition,
+									Status: v1.ConditionTrue,
+								},
+								{
+									Type:   capa.SubnetsReadyCondition,
+									Status: v1.ConditionTrue,
+								},
+							}
 						})
 
-						It("creates resolver rule", func() {
-							_, _, cluster, securityGroupId, domainName, resolverRuleName := resolverClient.CreateResolverRuleArgsForCall(0)
-							Expect(domainName).To(Equal(fmt.Sprintf("%s.%s", ClusterName, WorkloadClusterBaseDomain)))
-							Expect(resolverRuleName).To(Equal(fmt.Sprintf("giantswarm-%s", ClusterName)))
-							Expect(securityGroupId).To(Equal("my-security-group"))
-							Expect(cluster.Name).To(Equal("foo"))
-							Expect(cluster.Subnets).To(HaveLen(1))
-							Expect(cluster.Subnets).To(ContainElement("subnet-1"))
+						It("adds the finalizer to the AWSCluster", func() {
+							Expect(awsClusterClient.AddFinalizerCallCount()).To(Equal(1))
+							Expect(reconcileErr).NotTo(HaveOccurred())
 						})
 
-						When("creating resolver rule fails", func() {
+						It("creates security group", func() {
+							Expect(ec2Client.CreateSecurityGroupForResolverEndpointsCallCount()).To(Equal(1))
+							_, vpcId, groupName := ec2Client.CreateSecurityGroupForResolverEndpointsArgsForCall(0)
+							Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
+							Expect(groupName).To(Equal(fmt.Sprintf("%s-resolverrules-endpoints", ClusterName)))
+							Expect(reconcileErr).NotTo(HaveOccurred())
+						})
+
+						When("creating security group fails", func() {
 							BeforeEach(func() {
-								resolverClient.CreateResolverRuleReturns(resolver.ResolverRule{}, errors.New("error creating resolver rule"))
+								ec2Client.CreateSecurityGroupForResolverEndpointsReturns("", errors.New("error creating security group"))
 							})
-
 							It("returns the error", func() {
-								Expect(ramClient.CreateResourceShareWithContextCallCount()).To(BeZero())
 								Expect(reconcileErr).To(HaveOccurred())
 							})
 						})
 
-						When("creating resolver rule succeeds", func() {
+						When("creating security group succeeds", func() {
 							BeforeEach(func() {
-								resolverClient.CreateResolverRuleReturns(resolver.ResolverRule{Id: "resolver-rule-id", Arn: "resolver-rule-principal-arn"}, nil)
+								ec2Client.CreateSecurityGroupForResolverEndpointsReturns("my-security-group", nil)
 							})
 
-							It("creates ram share resource", func() {
-								_, _, resourceShareName, principal, resourceArn := ramClient.CreateResourceShareWithContextArgsForCall(0)
-								Expect(resourceShareName).To(Equal(fmt.Sprintf("giantswarm-%s-rr", ClusterName)))
-								Expect(principal).To(Equal("resolver-rule-principal-arn"))
-								Expect(resourceArn).To(Equal(DnsServerAWSAccountId))
+							It("creates resolver rule", func() {
+								_, _, cluster, securityGroupId, domainName, resolverRuleName := resolverClient.CreateResolverRuleArgsForCall(0)
+								Expect(domainName).To(Equal(fmt.Sprintf("%s.%s", ClusterName, WorkloadClusterBaseDomain)))
+								Expect(resolverRuleName).To(Equal(fmt.Sprintf("giantswarm-%s", ClusterName)))
+								Expect(securityGroupId).To(Equal("my-security-group"))
+								Expect(cluster.Name).To(Equal("foo"))
+								Expect(cluster.Subnets).To(HaveLen(1))
+								Expect(cluster.Subnets).To(ContainElement("subnet-1"))
 							})
 
-							When("creating ram share resource fails", func() {
+							When("creating resolver rule fails", func() {
 								BeforeEach(func() {
-									ramClient.CreateResourceShareWithContextReturns("", errors.New("error creating ram"))
+									resolverClient.CreateResolverRuleReturns(resolver.ResolverRule{}, errors.New("error creating resolver rule"))
 								})
 
 								It("returns the error", func() {
+									Expect(ramClient.CreateResourceShareWithContextCallCount()).To(BeZero())
 									Expect(reconcileErr).To(HaveOccurred())
 								})
 							})
 
-							When("creating ram share resource succeeds", func() {
+							When("creating resolver rule succeeds", func() {
 								BeforeEach(func() {
-									ramClient.CreateResourceShareWithContextReturns("resource-share-arn", nil)
+									resolverClient.CreateResolverRuleReturns(resolver.ResolverRule{Id: "resolver-rule-id", Arn: "resolver-rule-principal-arn"}, nil)
 								})
 
-								It("associates resolver rule with VPC account", func() {
-									_, _, associationName, vpcId, resolverRuleId := dnsServerResolverClient.AssociateResolverRuleWithContextArgsForCall(0)
-									Expect(associationName).To(Equal(fmt.Sprintf("giantswarm-%s-rr-association", ClusterName)))
-									Expect(vpcId).To(Equal(DnsServerVPCId))
-									Expect(resolverRuleId).To(Equal("resolver-rule-id"))
+								It("creates ram share resource", func() {
+									_, _, resourceShareName, principal, resourceArn := ramClient.CreateResourceShareWithContextArgsForCall(0)
+									Expect(resourceShareName).To(Equal(fmt.Sprintf("giantswarm-%s-rr", ClusterName)))
+									Expect(principal).To(Equal("resolver-rule-principal-arn"))
+									Expect(resourceArn).To(Equal(DnsServerAWSAccountId))
 								})
 
-								When("associating resolver rule with the DNS server VPC fails", func() {
+								When("creating ram share resource fails", func() {
 									BeforeEach(func() {
-										dnsServerResolverClient.AssociateResolverRuleWithContextReturns(errors.New("error associating resolver rule with vpc"))
+										ramClient.CreateResourceShareWithContextReturns("", errors.New("error creating ram"))
 									})
 
 									It("returns the error", func() {
 										Expect(reconcileErr).To(HaveOccurred())
 									})
 								})
+
+								When("creating ram share resource succeeds", func() {
+									BeforeEach(func() {
+										ramClient.CreateResourceShareWithContextReturns("resource-share-arn", nil)
+									})
+
+									It("associates resolver rule with VPC account", func() {
+										_, _, associationName, vpcId, resolverRuleId := dnsServerResolverClient.AssociateResolverRuleWithContextArgsForCall(0)
+										Expect(associationName).To(Equal(fmt.Sprintf("giantswarm-%s-rr-association", ClusterName)))
+										Expect(vpcId).To(Equal(DnsServerVPCId))
+										Expect(resolverRuleId).To(Equal("resolver-rule-id"))
+									})
+
+									When("associating resolver rule with the DNS server VPC fails", func() {
+										BeforeEach(func() {
+											dnsServerResolverClient.AssociateResolverRuleWithContextReturns(errors.New("error associating resolver rule with vpc"))
+										})
+
+										It("returns the error", func() {
+											Expect(reconcileErr).To(HaveOccurred())
+										})
+									})
+								})
 							})
 						})
-					})
 
-					When("the AWS Account id annotation is missing", func() {
-						BeforeEach(func() {
-							delete(awsCluster.Annotations, gsannotations.ResolverRulesOwnerAWSAccountId)
-						})
-
-						It("doesn't really reconcile", func() {
-							Expect(resolverClient.FindResolverRulesByAWSAccountIdCallCount()).To(BeZero())
-							Expect(reconcileErr).NotTo(HaveOccurred())
-						})
-					})
-
-					When("the AWS Account id annotation is set", func() {
-						BeforeEach(func() {
-							awsCluster.Annotations[gsannotations.ResolverRulesOwnerAWSAccountId] = "0000000000"
-						})
-
-						When("finding resolver rules on AWS account fails", func() {
+						When("the AWS Account id annotation is missing", func() {
 							BeforeEach(func() {
-								resolverClient.FindResolverRulesByAWSAccountIdReturns([]resolver.ResolverRule{}, errors.New("failed trying to find resolver rules on AWS account"))
+								delete(awsCluster.Annotations, gsannotations.ResolverRulesOwnerAWSAccountId)
 							})
 
-							It("it doesn't associate resolver rules and returns error", func() {
-								Expect(resolverClient.AssociateResolverRuleWithContextCallCount()).To(BeZero())
+							It("doesn't really reconcile", func() {
+								Expect(resolverClient.FindResolverRulesByAWSAccountIdCallCount()).To(BeZero())
+								Expect(reconcileErr).NotTo(HaveOccurred())
 							})
-
-							It("does not add Condition to AWSCluster to mark that rules got associated", func() {
-								Expect(awsClusterClient.MarkConditionTrueCallCount()).To(BeZero())
-							})
-
 						})
 
-						When("finding resolver rules on AWS account succeeds", func() {
-							var existingResolverRules = []resolver.ResolverRule{
-								{Id: "a1", Arn: "a1", Name: "resolver-rule-a1"},
-								{Id: "b2", Arn: "b2", Name: "resolver-rule-b2"},
-								{Id: "c3", Arn: "c3", Name: "resolver-rule-c3"},
-								{Id: "d4", Arn: "d4", Name: "resolver-rule-d4"},
-							}
+						When("the AWS Account id annotation is set", func() {
 							BeforeEach(func() {
-								resolverClient.FindResolverRulesByAWSAccountIdReturns(existingResolverRules, nil)
+								awsCluster.Annotations[gsannotations.ResolverRulesOwnerAWSAccountId] = "0000000000"
 							})
 
-							It("does not associate the rules that belong to the WC VPC cidr", func() {
-								Expect(resolverClient.AssociateResolverRuleWithContextCallCount()).To(Equal(4))
-								_, _, associationName, vpcId, resolverRuleId := resolverClient.AssociateResolverRuleWithContextArgsForCall(0)
-								Expect(associationName).To(Equal(existingResolverRules[0].Name))
-								Expect(resolverRuleId).To(Equal(existingResolverRules[0].Id))
-								Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
-							})
-
-							When("there are errors trying to associate resolver rules", func() {
+							When("finding resolver rules on AWS account fails", func() {
 								BeforeEach(func() {
-									resolverClient.AssociateResolverRuleWithContextReturnsOnCall(1, errors.New("failed trying to associate resolver rule"))
-									resolverClient.AssociateResolverRuleWithContextReturnsOnCall(2, errors.New("failed trying to associate resolver rule"))
+									resolverClient.FindResolverRulesByAWSAccountIdReturns([]resolver.ResolverRule{}, errors.New("failed trying to find resolver rules on AWS account"))
 								})
 
-								It("associates resolver rules even when it fails associating some of them ", func() {
-									Expect(resolverClient.AssociateResolverRuleWithContextCallCount()).To(Equal(len(existingResolverRules)))
+								It("it doesn't associate resolver rules and returns error", func() {
+									Expect(resolverClient.AssociateResolverRuleWithContextCallCount()).To(BeZero())
+								})
+
+								It("does not add Condition to AWSCluster to mark that rules got associated", func() {
+									Expect(awsClusterClient.MarkConditionTrueCallCount()).To(BeZero())
+								})
+
+							})
+
+							When("finding resolver rules on AWS account succeeds", func() {
+								var existingResolverRules = []resolver.ResolverRule{
+									{Id: "a1", Arn: "a1", Name: "resolver-rule-a1"},
+									{Id: "b2", Arn: "b2", Name: "resolver-rule-b2"},
+									{Id: "c3", Arn: "c3", Name: "resolver-rule-c3"},
+									{Id: "d4", Arn: "d4", Name: "resolver-rule-d4"},
+								}
+								BeforeEach(func() {
+									resolverClient.FindResolverRulesByAWSAccountIdReturns(existingResolverRules, nil)
+								})
+
+								It("does not associate the rules that belong to the WC VPC cidr", func() {
+									Expect(resolverClient.AssociateResolverRuleWithContextCallCount()).To(Equal(4))
 									_, _, associationName, vpcId, resolverRuleId := resolverClient.AssociateResolverRuleWithContextArgsForCall(0)
 									Expect(associationName).To(Equal(existingResolverRules[0].Name))
 									Expect(resolverRuleId).To(Equal(existingResolverRules[0].Id))
 									Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
 								})
+
+								When("there are errors trying to associate resolver rules", func() {
+									BeforeEach(func() {
+										resolverClient.AssociateResolverRuleWithContextReturnsOnCall(1, errors.New("failed trying to associate resolver rule"))
+										resolverClient.AssociateResolverRuleWithContextReturnsOnCall(2, errors.New("failed trying to associate resolver rule"))
+									})
+
+									It("associates resolver rules even when it fails associating some of them ", func() {
+										Expect(resolverClient.AssociateResolverRuleWithContextCallCount()).To(Equal(len(existingResolverRules)))
+										_, _, associationName, vpcId, resolverRuleId := resolverClient.AssociateResolverRuleWithContextArgsForCall(0)
+										Expect(associationName).To(Equal(existingResolverRules[0].Name))
+										Expect(resolverRuleId).To(Equal(existingResolverRules[0].Id))
+										Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
+									})
+								})
+
+								When("some rules are already associated with the VPC", func() {
+									BeforeEach(func() {
+										resolverClient.FindResolverRuleIdsAssociatedWithVPCIdReturns([]string{"a1", "c3"}, nil)
+									})
+
+									It("does not associate the rules that are already associated with the workload cluster VPC", func() {
+										Expect(resolverClient.AssociateResolverRuleWithContextCallCount()).To(Equal(2))
+										_, _, associationName, vpcId, resolverRuleId := resolverClient.AssociateResolverRuleWithContextArgsForCall(0)
+										Expect(associationName).To(Equal(existingResolverRules[1].Name))
+										Expect(resolverRuleId).To(Equal(existingResolverRules[1].Id))
+										Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
+									})
+								})
+
+								It("adds Condition to AWSCluster to mark that rules got associated", func() {
+									Expect(awsClusterClient.MarkConditionTrueCallCount()).To(Equal(1))
+									_, _, condition := awsClusterClient.MarkConditionTrueArgsForCall(0)
+									Expect(condition).To(Equal(controllers.ResolverRulesAssociatedCondition))
+								})
+							})
+						})
+
+						When("the AWS Account id annotation is set to an empty string", func() {
+							BeforeEach(func() {
+								awsCluster.Annotations[gsannotations.ResolverRulesOwnerAWSAccountId] = ""
 							})
 
-							When("some rules are already associated with the VPC", func() {
-								BeforeEach(func() {
-									resolverClient.FindResolverRuleIdsAssociatedWithVPCIdReturns([]string{"a1", "c3"}, nil)
-								})
-
-								It("does not associate the rules that are already associated with the workload cluster VPC", func() {
-									Expect(resolverClient.AssociateResolverRuleWithContextCallCount()).To(Equal(2))
-									_, _, associationName, vpcId, resolverRuleId := resolverClient.AssociateResolverRuleWithContextArgsForCall(0)
-									Expect(associationName).To(Equal(existingResolverRules[1].Name))
-									Expect(resolverRuleId).To(Equal(existingResolverRules[1].Id))
-									Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
-								})
+							It("it still associates resolver rules", func() {
+								Expect(resolverClient.FindResolverRulesByAWSAccountIdCallCount()).To(Equal(1))
 							})
 
 							It("adds Condition to AWSCluster to mark that rules got associated", func() {
@@ -433,22 +459,6 @@ var _ = Describe("Resolver rules reconciler", func() {
 								_, _, condition := awsClusterClient.MarkConditionTrueArgsForCall(0)
 								Expect(condition).To(Equal(controllers.ResolverRulesAssociatedCondition))
 							})
-						})
-					})
-
-					When("the AWS Account id annotation is set to an empty string", func() {
-						BeforeEach(func() {
-							awsCluster.Annotations[gsannotations.ResolverRulesOwnerAWSAccountId] = ""
-						})
-
-						It("it still associates resolver rules", func() {
-							Expect(resolverClient.FindResolverRulesByAWSAccountIdCallCount()).To(Equal(1))
-						})
-
-						It("adds Condition to AWSCluster to mark that rules got associated", func() {
-							Expect(awsClusterClient.MarkConditionTrueCallCount()).To(Equal(1))
-							_, _, condition := awsClusterClient.MarkConditionTrueArgsForCall(0)
-							Expect(condition).To(Equal(controllers.ResolverRulesAssociatedCondition))
 						})
 					})
 				})
