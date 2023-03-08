@@ -35,7 +35,8 @@ import (
 )
 
 const (
-	Finalizer = "aws-resolver-rules-operator.finalizers.giantswarm.io"
+	Finalizer                                           = "aws-resolver-rules-operator.finalizers.giantswarm.io"
+	ResolverRulesAssociatedCondition capi.ConditionType = "ResolverRulesAssociated"
 )
 
 //counterfeiter:generate . AWSClusterClient
@@ -45,6 +46,7 @@ type AWSClusterClient interface {
 	AddFinalizer(context.Context, *capa.AWSCluster, string) error
 	RemoveFinalizer(context.Context, *capa.AWSCluster, string) error
 	GetIdentity(context.Context, *capa.AWSCluster) (*capa.AWSClusterRoleIdentity, error)
+	MarkConditionTrue(context.Context, *capa.AWSCluster, capi.ConditionType) error
 }
 
 // ResolverRulesReconciler reconciles AWSClusters.
@@ -140,6 +142,12 @@ func (r *ResolverRulesReconciler) reconcileNormal(ctx context.Context, awsCluste
 		if err != nil {
 			return ctrl.Result{}, errors.WithStack(err)
 		}
+	}
+
+	// After associating resolver rules in the account we signal that resolver rules are ready.
+	err = r.awsClusterClient.MarkConditionTrue(ctx, awsCluster, ResolverRulesAssociatedCondition)
+	if err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
 	}
 
 	_, err = r.resolver.CreateRule(ctx, logger, cluster)
