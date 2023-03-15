@@ -25,18 +25,32 @@ type FakeAWSClusterClient struct {
 	addFinalizerReturnsOnCall map[int]struct {
 		result1 error
 	}
-	GetStub        func(context.Context, types.NamespacedName) (*v1beta1.AWSCluster, error)
-	getMutex       sync.RWMutex
-	getArgsForCall []struct {
+	GetAWSClusterStub        func(context.Context, types.NamespacedName) (*v1beta1.AWSCluster, error)
+	getAWSClusterMutex       sync.RWMutex
+	getAWSClusterArgsForCall []struct {
 		arg1 context.Context
 		arg2 types.NamespacedName
 	}
-	getReturns struct {
+	getAWSClusterReturns struct {
 		result1 *v1beta1.AWSCluster
 		result2 error
 	}
-	getReturnsOnCall map[int]struct {
+	getAWSClusterReturnsOnCall map[int]struct {
 		result1 *v1beta1.AWSCluster
+		result2 error
+	}
+	GetClusterStub        func(context.Context, types.NamespacedName) (*v1beta1a.Cluster, error)
+	getClusterMutex       sync.RWMutex
+	getClusterArgsForCall []struct {
+		arg1 context.Context
+		arg2 types.NamespacedName
+	}
+	getClusterReturns struct {
+		result1 *v1beta1a.Cluster
+		result2 error
+	}
+	getClusterReturnsOnCall map[int]struct {
+		result1 *v1beta1a.Cluster
 		result2 error
 	}
 	GetIdentityStub        func(context.Context, *v1beta1.AWSCluster) (*v1beta1.AWSClusterRoleIdentity, error)
@@ -91,6 +105,19 @@ type FakeAWSClusterClient struct {
 		result1 error
 	}
 	removeFinalizerReturnsOnCall map[int]struct {
+		result1 error
+	}
+	UnpauseStub        func(context.Context, *v1beta1.AWSCluster, *v1beta1a.Cluster) error
+	unpauseMutex       sync.RWMutex
+	unpauseArgsForCall []struct {
+		arg1 context.Context
+		arg2 *v1beta1.AWSCluster
+		arg3 *v1beta1a.Cluster
+	}
+	unpauseReturns struct {
+		result1 error
+	}
+	unpauseReturnsOnCall map[int]struct {
 		result1 error
 	}
 	invocations      map[string][][]interface{}
@@ -160,17 +187,17 @@ func (fake *FakeAWSClusterClient) AddFinalizerReturnsOnCall(i int, result1 error
 	}{result1}
 }
 
-func (fake *FakeAWSClusterClient) Get(arg1 context.Context, arg2 types.NamespacedName) (*v1beta1.AWSCluster, error) {
-	fake.getMutex.Lock()
-	ret, specificReturn := fake.getReturnsOnCall[len(fake.getArgsForCall)]
-	fake.getArgsForCall = append(fake.getArgsForCall, struct {
+func (fake *FakeAWSClusterClient) GetAWSCluster(arg1 context.Context, arg2 types.NamespacedName) (*v1beta1.AWSCluster, error) {
+	fake.getAWSClusterMutex.Lock()
+	ret, specificReturn := fake.getAWSClusterReturnsOnCall[len(fake.getAWSClusterArgsForCall)]
+	fake.getAWSClusterArgsForCall = append(fake.getAWSClusterArgsForCall, struct {
 		arg1 context.Context
 		arg2 types.NamespacedName
 	}{arg1, arg2})
-	stub := fake.GetStub
-	fakeReturns := fake.getReturns
-	fake.recordInvocation("Get", []interface{}{arg1, arg2})
-	fake.getMutex.Unlock()
+	stub := fake.GetAWSClusterStub
+	fakeReturns := fake.getAWSClusterReturns
+	fake.recordInvocation("GetAWSCluster", []interface{}{arg1, arg2})
+	fake.getAWSClusterMutex.Unlock()
 	if stub != nil {
 		return stub(arg1, arg2)
 	}
@@ -180,47 +207,112 @@ func (fake *FakeAWSClusterClient) Get(arg1 context.Context, arg2 types.Namespace
 	return fakeReturns.result1, fakeReturns.result2
 }
 
-func (fake *FakeAWSClusterClient) GetCallCount() int {
-	fake.getMutex.RLock()
-	defer fake.getMutex.RUnlock()
-	return len(fake.getArgsForCall)
+func (fake *FakeAWSClusterClient) GetAWSClusterCallCount() int {
+	fake.getAWSClusterMutex.RLock()
+	defer fake.getAWSClusterMutex.RUnlock()
+	return len(fake.getAWSClusterArgsForCall)
 }
 
-func (fake *FakeAWSClusterClient) GetCalls(stub func(context.Context, types.NamespacedName) (*v1beta1.AWSCluster, error)) {
-	fake.getMutex.Lock()
-	defer fake.getMutex.Unlock()
-	fake.GetStub = stub
+func (fake *FakeAWSClusterClient) GetAWSClusterCalls(stub func(context.Context, types.NamespacedName) (*v1beta1.AWSCluster, error)) {
+	fake.getAWSClusterMutex.Lock()
+	defer fake.getAWSClusterMutex.Unlock()
+	fake.GetAWSClusterStub = stub
 }
 
-func (fake *FakeAWSClusterClient) GetArgsForCall(i int) (context.Context, types.NamespacedName) {
-	fake.getMutex.RLock()
-	defer fake.getMutex.RUnlock()
-	argsForCall := fake.getArgsForCall[i]
+func (fake *FakeAWSClusterClient) GetAWSClusterArgsForCall(i int) (context.Context, types.NamespacedName) {
+	fake.getAWSClusterMutex.RLock()
+	defer fake.getAWSClusterMutex.RUnlock()
+	argsForCall := fake.getAWSClusterArgsForCall[i]
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeAWSClusterClient) GetReturns(result1 *v1beta1.AWSCluster, result2 error) {
-	fake.getMutex.Lock()
-	defer fake.getMutex.Unlock()
-	fake.GetStub = nil
-	fake.getReturns = struct {
+func (fake *FakeAWSClusterClient) GetAWSClusterReturns(result1 *v1beta1.AWSCluster, result2 error) {
+	fake.getAWSClusterMutex.Lock()
+	defer fake.getAWSClusterMutex.Unlock()
+	fake.GetAWSClusterStub = nil
+	fake.getAWSClusterReturns = struct {
 		result1 *v1beta1.AWSCluster
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeAWSClusterClient) GetReturnsOnCall(i int, result1 *v1beta1.AWSCluster, result2 error) {
-	fake.getMutex.Lock()
-	defer fake.getMutex.Unlock()
-	fake.GetStub = nil
-	if fake.getReturnsOnCall == nil {
-		fake.getReturnsOnCall = make(map[int]struct {
+func (fake *FakeAWSClusterClient) GetAWSClusterReturnsOnCall(i int, result1 *v1beta1.AWSCluster, result2 error) {
+	fake.getAWSClusterMutex.Lock()
+	defer fake.getAWSClusterMutex.Unlock()
+	fake.GetAWSClusterStub = nil
+	if fake.getAWSClusterReturnsOnCall == nil {
+		fake.getAWSClusterReturnsOnCall = make(map[int]struct {
 			result1 *v1beta1.AWSCluster
 			result2 error
 		})
 	}
-	fake.getReturnsOnCall[i] = struct {
+	fake.getAWSClusterReturnsOnCall[i] = struct {
 		result1 *v1beta1.AWSCluster
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeAWSClusterClient) GetCluster(arg1 context.Context, arg2 types.NamespacedName) (*v1beta1a.Cluster, error) {
+	fake.getClusterMutex.Lock()
+	ret, specificReturn := fake.getClusterReturnsOnCall[len(fake.getClusterArgsForCall)]
+	fake.getClusterArgsForCall = append(fake.getClusterArgsForCall, struct {
+		arg1 context.Context
+		arg2 types.NamespacedName
+	}{arg1, arg2})
+	stub := fake.GetClusterStub
+	fakeReturns := fake.getClusterReturns
+	fake.recordInvocation("GetCluster", []interface{}{arg1, arg2})
+	fake.getClusterMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeAWSClusterClient) GetClusterCallCount() int {
+	fake.getClusterMutex.RLock()
+	defer fake.getClusterMutex.RUnlock()
+	return len(fake.getClusterArgsForCall)
+}
+
+func (fake *FakeAWSClusterClient) GetClusterCalls(stub func(context.Context, types.NamespacedName) (*v1beta1a.Cluster, error)) {
+	fake.getClusterMutex.Lock()
+	defer fake.getClusterMutex.Unlock()
+	fake.GetClusterStub = stub
+}
+
+func (fake *FakeAWSClusterClient) GetClusterArgsForCall(i int) (context.Context, types.NamespacedName) {
+	fake.getClusterMutex.RLock()
+	defer fake.getClusterMutex.RUnlock()
+	argsForCall := fake.getClusterArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeAWSClusterClient) GetClusterReturns(result1 *v1beta1a.Cluster, result2 error) {
+	fake.getClusterMutex.Lock()
+	defer fake.getClusterMutex.Unlock()
+	fake.GetClusterStub = nil
+	fake.getClusterReturns = struct {
+		result1 *v1beta1a.Cluster
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeAWSClusterClient) GetClusterReturnsOnCall(i int, result1 *v1beta1a.Cluster, result2 error) {
+	fake.getClusterMutex.Lock()
+	defer fake.getClusterMutex.Unlock()
+	fake.GetClusterStub = nil
+	if fake.getClusterReturnsOnCall == nil {
+		fake.getClusterReturnsOnCall = make(map[int]struct {
+			result1 *v1beta1a.Cluster
+			result2 error
+		})
+	}
+	fake.getClusterReturnsOnCall[i] = struct {
+		result1 *v1beta1a.Cluster
 		result2 error
 	}{result1, result2}
 }
@@ -481,13 +573,78 @@ func (fake *FakeAWSClusterClient) RemoveFinalizerReturnsOnCall(i int, result1 er
 	}{result1}
 }
 
+func (fake *FakeAWSClusterClient) Unpause(arg1 context.Context, arg2 *v1beta1.AWSCluster, arg3 *v1beta1a.Cluster) error {
+	fake.unpauseMutex.Lock()
+	ret, specificReturn := fake.unpauseReturnsOnCall[len(fake.unpauseArgsForCall)]
+	fake.unpauseArgsForCall = append(fake.unpauseArgsForCall, struct {
+		arg1 context.Context
+		arg2 *v1beta1.AWSCluster
+		arg3 *v1beta1a.Cluster
+	}{arg1, arg2, arg3})
+	stub := fake.UnpauseStub
+	fakeReturns := fake.unpauseReturns
+	fake.recordInvocation("Unpause", []interface{}{arg1, arg2, arg3})
+	fake.unpauseMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeAWSClusterClient) UnpauseCallCount() int {
+	fake.unpauseMutex.RLock()
+	defer fake.unpauseMutex.RUnlock()
+	return len(fake.unpauseArgsForCall)
+}
+
+func (fake *FakeAWSClusterClient) UnpauseCalls(stub func(context.Context, *v1beta1.AWSCluster, *v1beta1a.Cluster) error) {
+	fake.unpauseMutex.Lock()
+	defer fake.unpauseMutex.Unlock()
+	fake.UnpauseStub = stub
+}
+
+func (fake *FakeAWSClusterClient) UnpauseArgsForCall(i int) (context.Context, *v1beta1.AWSCluster, *v1beta1a.Cluster) {
+	fake.unpauseMutex.RLock()
+	defer fake.unpauseMutex.RUnlock()
+	argsForCall := fake.unpauseArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeAWSClusterClient) UnpauseReturns(result1 error) {
+	fake.unpauseMutex.Lock()
+	defer fake.unpauseMutex.Unlock()
+	fake.UnpauseStub = nil
+	fake.unpauseReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeAWSClusterClient) UnpauseReturnsOnCall(i int, result1 error) {
+	fake.unpauseMutex.Lock()
+	defer fake.unpauseMutex.Unlock()
+	fake.UnpauseStub = nil
+	if fake.unpauseReturnsOnCall == nil {
+		fake.unpauseReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.unpauseReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakeAWSClusterClient) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
 	fake.addFinalizerMutex.RLock()
 	defer fake.addFinalizerMutex.RUnlock()
-	fake.getMutex.RLock()
-	defer fake.getMutex.RUnlock()
+	fake.getAWSClusterMutex.RLock()
+	defer fake.getAWSClusterMutex.RUnlock()
+	fake.getClusterMutex.RLock()
+	defer fake.getClusterMutex.RUnlock()
 	fake.getIdentityMutex.RLock()
 	defer fake.getIdentityMutex.RUnlock()
 	fake.getOwnerMutex.RLock()
@@ -496,6 +653,8 @@ func (fake *FakeAWSClusterClient) Invocations() map[string][][]interface{} {
 	defer fake.markConditionTrueMutex.RUnlock()
 	fake.removeFinalizerMutex.RLock()
 	defer fake.removeFinalizerMutex.RUnlock()
+	fake.unpauseMutex.RLock()
+	defer fake.unpauseMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

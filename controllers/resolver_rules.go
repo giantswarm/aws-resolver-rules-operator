@@ -24,8 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
-	"sigs.k8s.io/cluster-api/util/annotations"
-	"sigs.k8s.io/cluster-api/util/predicates"
+	"sigs.k8s.io/cluster-api/util/conditions"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -41,9 +40,11 @@ const (
 
 //counterfeiter:generate . AWSClusterClient
 type AWSClusterClient interface {
-	Get(context.Context, types.NamespacedName) (*capa.AWSCluster, error)
+	GetAWSCluster(context.Context, types.NamespacedName) (*capa.AWSCluster, error)
+	GetCluster(ctx context.Context, namespacedName types.NamespacedName) (*capi.Cluster, error)
 	GetOwner(context.Context, *capa.AWSCluster) (*capi.Cluster, error)
 	AddFinalizer(context.Context, *capa.AWSCluster, string) error
+	Unpause(context.Context, *capa.AWSCluster, *capi.Cluster) error
 	RemoveFinalizer(context.Context, *capa.AWSCluster, string) error
 	GetIdentity(context.Context, *capa.AWSCluster) (*capa.AWSClusterRoleIdentity, error)
 	MarkConditionTrue(context.Context, *capa.AWSCluster, capi.ConditionType) error
@@ -69,34 +70,14 @@ func NewResolverRulesReconciler(awsClusterClient AWSClusterClient, resolver reso
 	}
 }
 
-// +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=awsclusters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=awsclusters/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=awsclusters/finalizers,verbs=update
-// +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters;clusters/status,verbs=get;list;watch
-
 func (r *ResolverRulesReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	logger.Info("Reconciling")
 	defer logger.Info("Done reconciling")
 
-	awsCluster, err := r.awsClusterClient.Get(ctx, req.NamespacedName)
+	awsCluster, err := r.awsClusterClient.GetAWSCluster(ctx, req.NamespacedName)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
-	}
-
-	cluster, err := r.awsClusterClient.GetOwner(ctx, awsCluster)
-	if err != nil {
-		return ctrl.Result{}, errors.WithStack(err)
-	}
-
-	if cluster == nil {
-		logger.Info("Cluster controller has not yet set OwnerRef")
-		return ctrl.Result{}, nil
-	}
-
-	if annotations.IsPaused(cluster, awsCluster) {
-		logger.Info("Reconciliation is paused for this object")
-		return ctrl.Result{}, nil
 	}
 
 	identity, err := r.awsClusterClient.GetIdentity(ctx, awsCluster)
@@ -117,6 +98,11 @@ func (r *ResolverRulesReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	if !awsCluster.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, awsCluster, identity)
+	}
+
+	if !conditions.IsTrue(awsCluster, capa.VpcReadyCondition) || !conditions.IsTrue(awsCluster, capa.SubnetsReadyCondition) {
+		logger.Info("The VpcReady or SubnetReady conditions are not ready yet, skipping")
+		return ctrl.Result{}, nil
 	}
 
 	return r.reconcileNormal(ctx, awsCluster, identity)
@@ -194,7 +180,6 @@ func (r *ResolverRulesReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("resolverrules").
 		For(&capa.AWSCluster{}).
-		WithEventFilter(predicates.ResourceNotPaused(mgr.GetLogger())).
 		Complete(r)
 }
 
