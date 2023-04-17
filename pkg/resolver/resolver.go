@@ -260,16 +260,15 @@ func (r *Resolver) associateRule(ctx context.Context, logger logr.Logger, cluste
 		return errors.WithStack(err)
 	}
 
-	_, err = dnsServerResolverClient.GetResolverRuleByName(ctx, resolverRule.Name, "FORWARD")
-	if err != nil {
-		if errors.Is(err, &ResolverRuleNotFoundError{}) {
-			err = errors.Wrap(err, "Shared resolver rule cannot be found, please recreate the underlying resolver rule")
-		}
-		return errors.WithStack(err)
-	}
-
 	err = dnsServerResolverClient.AssociateResolverRuleWithContext(ctx, logger, getAssociationName(cluster.Name), r.dnsServer.VPCId, resolverRule.Id)
 	if err != nil {
+		if errors.Is(err, &ResolverRuleNotFoundError{}) {
+			logger.Info("Shared resolver cannot be found, deleting the underlying resolver rule", "shareName", getResourceShareName(cluster.Name))
+			err = ramClient.DeleteResourceShareWithContext(ctx, logger, getResourceShareName(cluster.Name))
+			if err != nil {
+				return nil
+			}
+		}
 		return errors.WithStack(err)
 	}
 
