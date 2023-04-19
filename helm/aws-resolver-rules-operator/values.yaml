@@ -8,7 +8,7 @@ project:
   commit: "[[ .SHA ]]"
 
 image:
-  registry: quay.io
+  registry: docker.io
   name: giantswarm/aws-resolver-rules-operator
   tag: "[[ .Version ]]"
   pullPolicy: IfNotPresent
