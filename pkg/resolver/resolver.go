@@ -263,7 +263,7 @@ func (r *Resolver) associateRule(ctx context.Context, logger logr.Logger, cluste
 	err = dnsServerResolverClient.AssociateResolverRuleWithContext(ctx, logger, getAssociationName(cluster.Name), r.dnsServer.VPCId, resolverRule.Id)
 	if err != nil {
 		if errors.Is(err, &ResolverRuleNotFoundError{}) {
-			logger.Info("Shared resolver cannot be found, deleting the underlying resolver rule", "shareName", getResourceShareName(cluster.Name))
+			logger.Info("Shared resolver cannot be found, deleting the resource share", "resolverRule", resolverRule.Id, "resourceShare", getResourceShareName(cluster.Name))
 			err = ramClient.DeleteResourceShareWithContext(ctx, logger, getResourceShareName(cluster.Name))
 			if err != nil {
 				return nil
