@@ -309,6 +309,15 @@ var _ = Describe("Resolver rules reconciler", func() {
 											Expect(reconcileErr).To(HaveOccurred())
 										})
 									})
+
+									When("associating resolver rule with the DNS server VPC fails with resolver rule no found", func() {
+										BeforeEach(func() {
+											dnsServerResolverClient.AssociateResolverRuleWithContextReturns(&resolver.ResolverRuleNotFoundError{})
+										})
+										It("deletes the resource share", func() {
+											Expect(ramClient.DeleteResourceShareWithContextCallCount()).To(Equal(1))
+										})
+									})
 								})
 							})
 						})
