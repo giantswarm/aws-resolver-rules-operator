@@ -298,8 +298,6 @@ func (a *AWSResolver) AssociateResolverRuleWithContext(ctx context.Context, logg
 					return nil
 				}
 				return errors.WithStack(err)
-			case route53resolver.ErrCodeResourceNotFoundException:
-				return &resolver.ResolverRuleNotFoundError{}
 			default:
 				return errors.WithStack(err)
 			}
