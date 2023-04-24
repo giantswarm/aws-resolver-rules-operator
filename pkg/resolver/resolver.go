@@ -266,8 +266,9 @@ func (r *Resolver) associateRule(ctx context.Context, logger logr.Logger, cluste
 			logger.Info("Shared resolver cannot be found, deleting the resource share", "resolverRule", resolverRule.Id, "resourceShare", getResourceShareName(cluster.Name))
 			err = ramClient.DeleteResourceShareWithContext(ctx, logger, getResourceShareName(cluster.Name))
 			if err != nil {
-				return nil
+				return errors.WithStack(err)
 			}
+			return errors.WithStack(&ResolverRuleNotFoundError{})
 		}
 		return errors.WithStack(err)
 	}
