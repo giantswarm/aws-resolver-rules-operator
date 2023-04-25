@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Change reconcilation logic to process existing RAM resource shares.
+
 ## [0.5.0] - 2023-04-19
 
 ### Changed

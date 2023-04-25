@@ -273,7 +273,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 
 								It("creates ram share resource", func() {
 									_, _, resourceShareName, principal, resourceArn := ramClient.CreateResourceShareWithContextArgsForCall(0)
-									Expect(resourceShareName).To(Equal(fmt.Sprintf("giantswarm-%s-rr", ClusterName)))
+									Expect(resourceShareName).To(Equal(fmt.Sprintf("giantswarm-%s-%s-rr", ClusterName, "resolver-rule-id")))
 									Expect(principal).To(Equal("resolver-rule-principal-arn"))
 									Expect(resourceArn).To(Equal(DnsServerAWSAccountId))
 								})
@@ -422,11 +422,12 @@ var _ = Describe("Resolver rules reconciler", func() {
 					BeforeEach(func() {
 						deletionTime := metav1.Now()
 						awsCluster.DeletionTimestamp = &deletionTime
+						resolverClient.GetResolverRuleByNameReturns(resolver.ResolverRule{Id: "resolver-rule-id", Arn: "resolver-rule-principal-arn"}, nil)
 					})
 
 					It("deletes the ram share resource", func() {
 						_, _, resourceShareName := ramClient.DeleteResourceShareWithContextArgsForCall(0)
-						Expect(resourceShareName).To(Equal("giantswarm-foo-rr"))
+						Expect(resourceShareName).To(Equal("giantswarm-foo-resolver-rule-id-rr"))
 					})
 
 					When("removing the ram share resource fails", func() {
