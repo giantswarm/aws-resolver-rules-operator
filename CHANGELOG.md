@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Delete all RAM resource shares instead of just the first one.
+- Use resource share status as filter when listing RAM resource shares.
+- Change reconcilation logic to process existing RAM resource shares.
 
 ## [0.5.0] - 2023-04-19
 

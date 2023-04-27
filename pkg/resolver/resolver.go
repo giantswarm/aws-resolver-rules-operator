@@ -203,7 +203,7 @@ func (r *Resolver) DeleteRule(ctx context.Context, logger logr.Logger, cluster C
 		}
 	}
 
-	err = ramClient.DeleteResourceShareWithContext(ctx, logger, getResourceShareName(cluster.Name))
+	err = ramClient.DeleteResourceShareWithContext(ctx, logger, getResourceShareName(cluster.Name, resolverRule.Id))
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -255,7 +255,7 @@ func (r *Resolver) associateRule(ctx context.Context, logger logr.Logger, cluste
 	}
 
 	logger.Info("Creating resource share item so we can share resolver rule with a different aws account")
-	_, err = ramClient.CreateResourceShareWithContext(ctx, logger, getResourceShareName(cluster.Name), resolverRule.Arn, r.dnsServer.AWSAccountId)
+	_, err = ramClient.CreateResourceShareWithContext(ctx, logger, getResourceShareName(cluster.Name, resolverRule.Id), resolverRule.Arn, r.dnsServer.AWSAccountId)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -276,8 +276,8 @@ func getResolverRuleName(clusterName string) string {
 	return fmt.Sprintf("giantswarm-%s", clusterName)
 }
 
-func getResourceShareName(clusterName string) string {
-	return fmt.Sprintf("giantswarm-%s-rr", clusterName)
+func getResourceShareName(clusterName, resolverRuleID string) string {
+	return fmt.Sprintf("giantswarm-%s-%s-rr", clusterName, resolverRuleID)
 }
 
 func getAssociationName(clusterName string) string {
