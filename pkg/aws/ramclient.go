@@ -56,8 +56,9 @@ func (a *RAM) DeleteResourceShareWithContext(ctx context.Context, logger logr.Lo
 
 	logger.Info("Trying to find RAM resource share to delete")
 	resourceShare, err := a.client.GetResourceSharesWithContext(ctx, &ram.GetResourceSharesInput{
-		Name:          aws.String(resourceShareName),
-		ResourceOwner: aws.String("SELF"),
+		Name:                aws.String(resourceShareName),
+		ResourceOwner:       aws.String("SELF"),
+		ResourceShareStatus: aws.String(ram.ResourceShareStatusActive),
 	})
 	if err != nil {
 		return errors.WithStack(err)
@@ -68,14 +69,12 @@ func (a *RAM) DeleteResourceShareWithContext(ctx context.Context, logger logr.Lo
 		return nil
 	}
 
-	for i := range resourceShare.ResourceShares {
-		logger.Info("Deleting RAM resource share", "resourceShareArn", resourceShare.ResourceShares[i].ResourceShareArn)
-		_, err = a.client.DeleteResourceShareWithContext(ctx, &ram.DeleteResourceShareInput{
-			ResourceShareArn: resourceShare.ResourceShares[i].ResourceShareArn,
-		})
-		if err != nil {
-			return errors.WithStack(err)
-		}
+	logger.Info("Deleting RAM resource share", "resourceShareArn", resourceShare.ResourceShares[0].ResourceShareArn)
+	_, err = a.client.DeleteResourceShareWithContext(ctx, &ram.DeleteResourceShareInput{
+		ResourceShareArn: resourceShare.ResourceShares[0].ResourceShareArn,
+	})
+	if err != nil {
+		return errors.WithStack(err)
 	}
 
 	logger.Info("Deleted RAM resource shares")
