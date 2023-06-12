@@ -27,3 +27,15 @@ func (e *ResolverEndpointNotFoundError) Error() string {
 func (e *ResolverEndpointNotFoundError) Is(target error) bool {
 	return reflect.TypeOf(target) == reflect.TypeOf(e)
 }
+
+type HostedZoneNotFoundError struct {
+	error
+}
+
+func (e *HostedZoneNotFoundError) Error() string {
+	return "hosted zone was not found"
+}
+
+func (e *HostedZoneNotFoundError) Is(target error) bool {
+	return reflect.TypeOf(target) == reflect.TypeOf(e)
+}
