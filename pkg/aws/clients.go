@@ -10,6 +10,7 @@ import (
 	awssession "github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ram"
+	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/aws/aws-sdk-go/service/route53resolver"
 	"github.com/pkg/errors"
 
@@ -135,6 +136,28 @@ func (c *Clients) newRAMClient(region, arn, externalId string) (*ram.RAM, error)
 	ramClient.Handlers.CompleteAttempt.PushFront(captureRequestMetrics(controllerName))
 
 	return ramClient, nil
+}
+
+func (c *Clients) NewRoute53Client(region, arn string) (resolver.Route53Client, error) {
+	client, err := c.newRoute53Client(region, arn, "")
+	if err != nil {
+		return &Route53{}, errors.WithStack(err)
+	}
+
+	return &Route53{client: client}, nil
+}
+
+func (c *Clients) newRoute53Client(region, arn, externalId string) (*route53.Route53, error) {
+	session, err := c.sessionFromRegion(region)
+	if err != nil {
+		return &route53.Route53{}, errors.WithStack(err)
+	}
+
+	route53Client := route53.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn, configureExternalId(arn, externalId))})
+	route53Client.Handlers.Build.PushFront(request.MakeAddToUserAgentHandler(controllerName, currentCommit))
+	route53Client.Handlers.CompleteAttempt.PushFront(captureRequestMetrics(controllerName))
+
+	return route53Client, nil
 }
 
 func configureExternalId(roleArn, externalId string) func(provider *stscreds.AssumeRoleProvider) {

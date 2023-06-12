@@ -17,38 +17,6 @@ type Resolver struct {
 	workloadClusterBaseDomain string
 }
 
-type AWSClients interface {
-	NewResolverClient(region, arn string) (ResolverClient, error)
-	NewResolverClientWithExternalId(region, roleToAssume, externalRoleToAssume, externalId string) (ResolverClient, error)
-	NewEC2Client(region, arn string) (EC2Client, error)
-	NewEC2ClientWithExternalId(region, arn, externalId string) (EC2Client, error)
-	NewRAMClient(region, arn string) (RAMClient, error)
-	NewRAMClientWithExternalId(region, arn, externalId string) (RAMClient, error)
-}
-
-//counterfeiter:generate . EC2Client
-type EC2Client interface {
-	CreateSecurityGroupForResolverEndpoints(ctx context.Context, vpcId, groupName string) (string, error)
-	DeleteSecurityGroupForResolverEndpoints(ctx context.Context, logger logr.Logger, vpcId, groupName string) error
-}
-
-//counterfeiter:generate . RAMClient
-type RAMClient interface {
-	CreateResourceShareWithContext(ctx context.Context, logger logr.Logger, resourceShareName string, resourceArns, principals string) (string, error)
-	DeleteResourceShareWithContext(ctx context.Context, logger logr.Logger, resourceShareName string) error
-}
-
-//counterfeiter:generate . ResolverClient
-type ResolverClient interface {
-	GetResolverRuleByName(ctx context.Context, resolverRuleName, resolverRuleType string) (ResolverRule, error)
-	CreateResolverRule(ctx context.Context, logger logr.Logger, cluster Cluster, securityGroupId, domainName, resolverRuleName string) (ResolverRule, error)
-	DeleteResolverRule(ctx context.Context, logger logr.Logger, cluster Cluster, resolverRuleId string) error
-	AssociateResolverRuleWithContext(ctx context.Context, logger logr.Logger, associationName, vpcID, resolverRuleId string) error
-	DisassociateResolverRuleWithContext(ctx context.Context, logger logr.Logger, vpcID, resolverRuleId string) error
-	FindResolverRulesByAWSAccountId(ctx context.Context, logger logr.Logger, awsAccountId string) ([]ResolverRule, error)
-	FindResolverRuleIdsAssociatedWithVPCId(ctx context.Context, logger logr.Logger, vpcId string) ([]string, error)
-}
-
 type Cluster struct {
 	Name       string
 	Region     string

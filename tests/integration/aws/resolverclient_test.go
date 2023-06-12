@@ -25,14 +25,14 @@ var _ = Describe("Route53 Resolver client", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 
-		resolverClient, err = awsClients.NewResolverClient(Region, AWS_IAM_ARN)
+		resolverClient, err = awsClients.NewResolverClient(Region, AwsIamArn)
 		Expect(err).NotTo(HaveOccurred())
 
 		cluster = resolver.Cluster{
 			Name:       "my-cluster",
 			Region:     Region,
 			VPCId:      VPCId,
-			IAMRoleARN: AWS_IAM_ARN,
+			IAMRoleARN: AwsIamArn,
 			Subnets:    subnets,
 		}
 	})

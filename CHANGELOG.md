@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add necessary values for PSS policy warnings.
+- Add new reconciler that creates hosted zones for reconciled clusters.
 
 ## [0.6.0] - 2023-05-05
 
