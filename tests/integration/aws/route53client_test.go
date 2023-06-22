@@ -320,6 +320,7 @@ var _ = Describe("Route53 Resolver client", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 
+			// We add the delegation so we can delete it later.
 			err = route53Client.AddDelegationToParentZone(ctx, logger, *parentHostedZoneToFind.HostedZone.Id, *hostedZoneToFind.HostedZone.Id)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -347,6 +348,134 @@ var _ = Describe("Route53 Resolver client", func() {
 				}
 			}
 			Expect(found).To(BeFalse())
+		})
+	})
+
+	When("deleting a hosted zone", func() {
+		var hostedZoneToFind *route53.CreateHostedZoneOutput
+
+		BeforeEach(func() {
+			now := time.Now()
+
+			hostedZoneToFind, err = rawRoute53Client.CreateHostedZone(&route53.CreateHostedZoneInput{
+				CallerReference: awssdk.String(fmt.Sprintf("1%d", now.UnixNano())),
+				Name:            awssdk.String("deleting.test.example.com"),
+			})
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			// We don't check error here because we actually expect an error since we just removed the hosted zone.
+			_, err = rawRoute53Client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: hostedZoneToFind.HostedZone.Id})
+		})
+
+		It("deletes the zone", func() {
+			err = route53Client.DeleteHostedZone(ctx, logger, *hostedZoneToFind.HostedZone.Id)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func() (int, error) {
+				listHostedZoneResponse, err := rawRoute53Client.ListHostedZonesByName(&route53.ListHostedZonesByNameInput{
+					DNSName:  awssdk.String("deleting.test.example.com"),
+					MaxItems: awssdk.String("1"),
+				})
+				return len(listHostedZoneResponse.HostedZones), err
+			}, "3s", "100ms").Should(BeZero())
+		})
+	})
+
+	When("creating dns records", func() {
+		var hostedZoneToFind *route53.CreateHostedZoneOutput
+
+		BeforeEach(func() {
+			now := time.Now()
+
+			hostedZoneToFind, err = rawRoute53Client.CreateHostedZone(&route53.CreateHostedZoneInput{
+				CallerReference: awssdk.String(fmt.Sprintf("1%d", now.UnixNano())),
+				Name:            awssdk.String("dnsrecords.example.com"),
+			})
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			foundDnsRecordsResponse, err := rawRoute53Client.ListResourceRecordSetsWithContext(ctx, &route53.ListResourceRecordSetsInput{
+				HostedZoneId: hostedZoneToFind.HostedZone.Id,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			for _, recordSet := range foundDnsRecordsResponse.ResourceRecordSets {
+				// We don't need to remove NS or SOA records.
+				if *recordSet.Type == "CNAME" || *recordSet.Type == "A" {
+					_, err = rawRoute53Client.ChangeResourceRecordSetsWithContext(ctx, &route53.ChangeResourceRecordSetsInput{
+						ChangeBatch: &route53.ChangeBatch{
+							Changes: []*route53.Change{
+								{
+									Action:            awssdk.String("DELETE"),
+									ResourceRecordSet: recordSet,
+								},
+							},
+						},
+						HostedZoneId: hostedZoneToFind.HostedZone.Id,
+					})
+					Expect(err).NotTo(HaveOccurred())
+				}
+			}
+
+			_, err = rawRoute53Client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: hostedZoneToFind.HostedZone.Id})
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("creates the records", func() {
+			dnsRecordsToCreate := []resolver.DNSRecord{
+				{
+					Kind:  "CNAME",
+					Name:  "a.dnsrecords.example.com",
+					Value: "something",
+				},
+				{
+					Kind:   "ALIAS",
+					Name:   "z.dnsrecords.example.com",
+					Value:  "alias-value",
+					Region: "eu-central-1",
+				},
+			}
+			err = route53Client.AddDnsRecordsToHostedZone(ctx, logger, *hostedZoneToFind.HostedZone.Id, dnsRecordsToCreate)
+			Expect(err).NotTo(HaveOccurred())
+
+			foundDnsRecordsResponse, err := rawRoute53Client.ListResourceRecordSetsWithContext(ctx, &route53.ListResourceRecordSetsInput{
+				HostedZoneId: hostedZoneToFind.HostedZone.Id,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			cnameFound := false
+			aliasFound := false
+			for _, recordSet := range foundDnsRecordsResponse.ResourceRecordSets {
+				if *recordSet.Name == "a.dnsrecords.example.com." && *recordSet.ResourceRecords[0].Value == "something" {
+					cnameFound = true
+				}
+				if *recordSet.Name == "z.dnsrecords.example.com." && *recordSet.AliasTarget.DNSName == "alias-value" {
+					aliasFound = true
+				}
+			}
+			Expect(cnameFound).To(BeTrue())
+			Expect(aliasFound).To(BeTrue())
+
+			By("creating the exact same records again, it doesn't fail", func() {
+				dnsRecordsToCreate := []resolver.DNSRecord{
+					{
+						Kind:  "CNAME",
+						Name:  "a.dnsrecords.example.com",
+						Value: "something",
+					},
+					{
+						Kind:   "ALIAS",
+						Name:   "z.dnsrecords.example.com",
+						Value:  "alias-value",
+						Region: "eu-central-1",
+					},
+				}
+				err = route53Client.AddDnsRecordsToHostedZone(ctx, logger, *hostedZoneToFind.HostedZone.Id, dnsRecordsToCreate)
+				Expect(err).NotTo(HaveOccurred())
+			})
 		})
 	})
 })

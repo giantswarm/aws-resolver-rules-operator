@@ -118,3 +118,31 @@ func (d *Zoner) getTagsForHostedZone(cluster Cluster) map[string]string {
 		"sigs.k8s.io/cluster-api-provider-aws/role":                                  "common",
 	}
 }
+
+func (d *Zoner) getWorkloadClusterDnsRecords(workloadClusterBaseDomain string, cluster Cluster) []DNSRecord {
+	dnsRecords := []DNSRecord{
+		{
+			Kind:  "CNAME",
+			Name:  fmt.Sprintf("*.%s", workloadClusterBaseDomain),
+			Value: fmt.Sprintf("ingress.%s", workloadClusterBaseDomain),
+		},
+	}
+
+	if cluster.ControlPlaneEndpoint != "" {
+		dnsRecords = append(dnsRecords, DNSRecord{
+			Kind:  "ALIAS",
+			Name:  fmt.Sprintf("api.%s", workloadClusterBaseDomain),
+			Value: cluster.ControlPlaneEndpoint,
+		})
+	}
+
+	if cluster.BastionIp != "" {
+		dnsRecords = append(dnsRecords, DNSRecord{
+			Kind:  "A",
+			Name:  fmt.Sprintf("bastion1.%s", workloadClusterBaseDomain),
+			Value: cluster.BastionIp,
+		})
+	}
+
+	return dnsRecords
+}

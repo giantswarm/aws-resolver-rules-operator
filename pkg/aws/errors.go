@@ -39,3 +39,15 @@ func (e *HostedZoneNotFoundError) Error() string {
 func (e *HostedZoneNotFoundError) Is(target error) bool {
 	return reflect.TypeOf(target) == reflect.TypeOf(e)
 }
+
+type DnsRecordNotSupportedError struct {
+	error
+}
+
+func (e *DnsRecordNotSupportedError) Error() string {
+	return "dns record type is not supported"
+}
+
+func (e *DnsRecordNotSupportedError) Is(target error) bool {
+	return reflect.TypeOf(target) == reflect.TypeOf(e)
+}

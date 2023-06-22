@@ -7,6 +7,7 @@ import (
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
 	"github.com/pkg/errors"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -59,21 +60,26 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
+	cluster, err := r.awsClusterClient.GetCluster(ctx, req.NamespacedName)
+	if err != nil {
+		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
+	}
+
 	if identity == nil {
 		logger.Info("AWSCluster has no identityRef set, skipping")
 		return ctrl.Result{}, nil
 	}
 
 	if !awsCluster.DeletionTimestamp.IsZero() {
-		return r.reconcileDelete(ctx, awsCluster, identity)
+		return r.reconcileDelete(ctx, awsCluster, cluster, identity)
 	}
 
-	return r.reconcileNormal(ctx, awsCluster, identity)
+	return r.reconcileNormal(ctx, awsCluster, cluster, identity)
 }
 
 // reconcileNormal creates the hosted zone and the DNS records for the workload cluster.
 // It will take care of dns delegation in the parent hosted zone when using public dns mode.
-func (r *DnsReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
+func (r *DnsReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AWSCluster, capiCluster *capi.Cluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	err := r.awsClusterClient.AddFinalizer(ctx, awsCluster, DnsFinalizer)
@@ -81,7 +87,18 @@ func (r *DnsReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AW
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	cluster := buildCluster(awsCluster, identity)
+	addrType := capi.MachineExternalIP
+	if awsCluster.Annotations[gsannotations.AWSVPCMode] == gsannotations.AWSVPCModePrivate {
+		addrType = capi.MachineInternalIP
+	}
+
+	bastionIp, err := r.awsClusterClient.GetBastionIp(ctx, awsCluster, addrType)
+	if err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
+	cluster := buildCluster(awsCluster, capiCluster, identity)
+	cluster.BastionIp = bastionIp
 
 	annotation, ok := awsCluster.Annotations[gsannotations.AWSDNSMode]
 	if ok && annotation == gsannotations.DNSModePrivate {
@@ -104,10 +121,10 @@ func (r *DnsReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AW
 
 // reconcileDelete deletes the hosted zone and the DNS records for the workload cluster.
 // It will delete the delegation records in the parent hosted zone when using public dns mode.
-func (r *DnsReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
+func (r *DnsReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AWSCluster, capiCluster *capi.Cluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	cluster := buildCluster(awsCluster, identity)
+	cluster := buildCluster(awsCluster, capiCluster, identity)
 	err := r.dnsZone.DeleteHostedZone(ctx, logger, cluster)
 	if err != nil {
 		return ctrl.Result{}, err

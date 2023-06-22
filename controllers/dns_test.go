@@ -8,9 +8,12 @@ import (
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gstruct"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/aws-resolver-rules-operator/controllers"
@@ -25,6 +28,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 		ctx                     context.Context
 		reconciler              *controllers.DnsReconciler
 		awsCluster              *capa.AWSCluster
+		cluster                 *capi.Cluster
 		awsClusterRoleIdentity  *capa.AWSClusterRoleIdentity
 		result                  ctrl.Result
 		reconcileErr            error
@@ -36,7 +40,9 @@ var _ = Describe("Dns Zone reconciler", func() {
 	)
 
 	const (
-		ClusterName = "foo"
+		ClusterName               = "foo"
+		ClusterNamespace          = "bar"
+		WorkloadClusterBaseDomain = "test.gigantic.io"
 	)
 
 	BeforeEach(func() {
@@ -54,14 +60,14 @@ var _ = Describe("Dns Zone reconciler", func() {
 			Route53Client:          route53Client,
 		}
 
-		dns, err := resolver.NewDnsZone(fakeAWSClients, "test.gigantic.io")
+		dns, err := resolver.NewDnsZone(fakeAWSClients, WorkloadClusterBaseDomain)
 		Expect(err).NotTo(HaveOccurred())
 
 		reconciler = controllers.NewDnsReconciler(awsClusterClient, dns)
 
 		awsClusterRoleIdentity = &capa.AWSClusterRoleIdentity{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "bar",
+				Namespace: ClusterNamespace,
 				Name:      "default",
 			},
 			Spec: capa.AWSClusterRoleIdentitySpec{},
@@ -69,7 +75,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 		awsCluster = &capa.AWSCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ClusterName,
-				Namespace: "bar",
+				Namespace: ClusterNamespace,
 			},
 			Spec: capa.AWSClusterSpec{
 				IdentityRef: &capa.AWSIdentityReference{
@@ -84,13 +90,25 @@ var _ = Describe("Dns Zone reconciler", func() {
 				},
 			},
 		}
+		cluster = &capi.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ClusterName,
+				Namespace: ClusterNamespace,
+			},
+			Spec: capi.ClusterSpec{
+				InfrastructureRef: &corev1.ObjectReference{
+					Namespace: ClusterNamespace,
+					Name:      ClusterName,
+				},
+			},
+		}
 	})
 
 	JustBeforeEach(func() {
 		request := ctrl.Request{
 			NamespacedName: types.NamespacedName{
 				Name:      ClusterName,
-				Namespace: "bar",
+				Namespace: ClusterNamespace,
 			},
 		}
 		_, reconcileErr = reconciler.Reconcile(ctx, request)
@@ -113,6 +131,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 	When("reconciling an existing cluster", func() {
 		BeforeEach(func() {
 			awsClusterClient.GetAWSClusterReturns(awsCluster, nil)
+			awsClusterClient.GetClusterReturns(cluster, nil)
 		})
 
 		When("we get an error trying to get the cluster identity", func() {
@@ -156,6 +175,11 @@ var _ = Describe("Dns Zone reconciler", func() {
 				})
 
 				When("the hosted zone hasn't been deleted yet", func() {
+					It("deletes the workload cluster dns records", func() {
+						_, _, hostedZoneId, _ := route53Client.DeleteDnsRecordsFromHostedZoneArgsForCall(0)
+						Expect(hostedZoneId).To(Equal("hosted-zone-id"))
+					})
+
 					It("deletes the workload cluster hosted zone", func() {
 						_, _, hostedZoneId := route53Client.DeleteHostedZoneArgsForCall(0)
 						Expect(hostedZoneId).To(Equal("hosted-zone-id"))
@@ -227,6 +251,72 @@ var _ = Describe("Dns Zone reconciler", func() {
 						Expect(hostedZoneId).To(Equal("hosted-zone-id"))
 					})
 
+					It("creates DNS records for workload cluster", func() {
+						Expect(route53Client.AddDnsRecordsToHostedZoneCallCount()).To(Equal(1))
+						_, _, hostedZoneId, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+						Expect(hostedZoneId).To(Equal("hosted-zone-id"))
+						Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
+							Kind:  "CNAME",
+							Name:  fmt.Sprintf("*.%s", WorkloadClusterBaseDomain),
+							Value: fmt.Sprintf("ingress.%s", WorkloadClusterBaseDomain),
+						}))
+					})
+
+					When("the k8s API endpoint of the workload cluster is set", func() {
+						BeforeEach(func() {
+							cluster.Spec.ControlPlaneEndpoint.Host = "control-plane-load-balancer-hostname"
+							cluster.Spec.ControlPlaneEndpoint.Port = 6443
+						})
+
+						It("creates DNS records for workload cluster", func() {
+							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+							Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
+								Kind:  "ALIAS",
+								Name:  fmt.Sprintf("api.%s", WorkloadClusterBaseDomain),
+								Value: "control-plane-load-balancer-hostname:6443",
+							}))
+						})
+					})
+
+					When("the k8s API endpoint of the workload cluster is not set", func() {
+						It("it does not create DNS record for the API yet", func() {
+							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+							Expect(dnsRecords).ToNot(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+								"Kind": Equal("ALIAS"),
+								"Name": Equal(fmt.Sprintf("api.%s", WorkloadClusterBaseDomain)),
+							})))
+						})
+					})
+
+					When("there is a bastion server deployed", func() {
+						BeforeEach(func() {
+							awsClusterClient.GetBastionIpReturns("192.168.0.1", nil)
+						})
+
+						It("it creates DNS record for the bastion", func() {
+							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+							Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
+								Kind:  "A",
+								Name:  fmt.Sprintf("bastion1.%s", WorkloadClusterBaseDomain),
+								Value: "192.168.0.1",
+							}))
+						})
+					})
+
+					When("there is no bastion server deployed or it's deployed but it has no IP set yet", func() {
+						BeforeEach(func() {
+							awsClusterClient.GetBastionIpReturns("", nil)
+						})
+
+						It("it creates DNS record for the bastion", func() {
+							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+							Expect(dnsRecords).ToNot(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+								"Kind": Equal("A"),
+								"Name": Equal(fmt.Sprintf("bastion1.%s", WorkloadClusterBaseDomain)),
+							})))
+						})
+					})
+
 					When("creating hosted zone fails", func() {
 						expectedError := errors.New("failed to find parent hosted zone")
 						BeforeEach(func() {
@@ -283,6 +373,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 							gsannotations.AWSDNSMode:          "private",
 							gsannotations.AWSDNSAdditionalVPC: "vpc-0011223344,vpc-0987654321",
 						}
+						route53Client.CreatePrivateHostedZoneReturns("hosted-zone-id", nil)
 					})
 
 					It("creates hosted zone", func() {
@@ -300,6 +391,72 @@ var _ = Describe("Dns Zone reconciler", func() {
 						expectedVPCIdsToAttach := []string{"vpc-0011223344", "vpc-0987654321"}
 						Expect(dnsZone.VPCsToAssociate).To(Equal(expectedVPCIdsToAttach))
 						Expect(reconcileErr).NotTo(HaveOccurred())
+					})
+
+					It("creates DNS records for workload cluster", func() {
+						Expect(route53Client.AddDnsRecordsToHostedZoneCallCount()).To(Equal(1))
+						_, _, hostedZoneId, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+						Expect(hostedZoneId).To(Equal("hosted-zone-id"))
+						Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
+							Kind:  "CNAME",
+							Name:  fmt.Sprintf("*.%s", WorkloadClusterBaseDomain),
+							Value: fmt.Sprintf("ingress.%s", WorkloadClusterBaseDomain),
+						}))
+					})
+
+					When("the k8s API endpoint of the workload cluster is set", func() {
+						BeforeEach(func() {
+							cluster.Spec.ControlPlaneEndpoint.Host = "control-plane-load-balancer-hostname"
+							cluster.Spec.ControlPlaneEndpoint.Port = 6443
+						})
+
+						It("creates DNS records for workload cluster", func() {
+							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+							Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
+								Kind:  "ALIAS",
+								Name:  fmt.Sprintf("api.%s", WorkloadClusterBaseDomain),
+								Value: "control-plane-load-balancer-hostname:6443",
+							}))
+						})
+					})
+
+					When("the k8s API endpoint of the workload cluster is not set", func() {
+						It("it does not create DNS record for the API yet", func() {
+							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+							Expect(dnsRecords).ToNot(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+								"Kind": Equal("ALIAS"),
+								"Name": Equal(fmt.Sprintf("api.%s", WorkloadClusterBaseDomain)),
+							})))
+						})
+					})
+
+					When("there is a bastion server deployed", func() {
+						BeforeEach(func() {
+							awsClusterClient.GetBastionIpReturns("192.168.0.1", nil)
+						})
+
+						It("it creates DNS record for the bastion", func() {
+							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+							Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
+								Kind:  "A",
+								Name:  fmt.Sprintf("bastion1.%s", WorkloadClusterBaseDomain),
+								Value: "192.168.0.1",
+							}))
+						})
+					})
+
+					When("there is no bastion server deployed or it's deployed but it has no IP set yet", func() {
+						BeforeEach(func() {
+							awsClusterClient.GetBastionIpReturns("", nil)
+						})
+
+						It("it creates DNS record for the bastion", func() {
+							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+							Expect(dnsRecords).ToNot(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+								"Kind": Equal("A"),
+								"Name": Equal(fmt.Sprintf("bastion1.%s", WorkloadClusterBaseDomain)),
+							})))
+						})
 					})
 
 					When("creating hosted zone fails", func() {
