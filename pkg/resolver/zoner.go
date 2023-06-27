@@ -47,6 +47,11 @@ func (d *Zoner) CreatePublicHostedZone(ctx context.Context, logger logr.Logger, 
 	}
 	logger.Info("Added delegation to parent hosted zone")
 
+	err = d.createDnsRecords(ctx, logger, cluster, hostedZoneId)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
 	return nil
 }
 
@@ -93,12 +98,35 @@ func (d *Zoner) DeleteHostedZone(ctx context.Context, logger logr.Logger, cluste
 		return errors.WithStack(err)
 	}
 
+	logger.Info("Deleting dns records from hosted zone")
+	err = route53Client.DeleteDnsRecordsFromHostedZone(ctx, logger, hostedZoneId, d.getWorkloadClusterDnsRecords(d.workloadClusterBaseDomain, cluster))
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
 	logger.Info("Deleting hosted zone")
 	err = route53Client.DeleteHostedZone(ctx, logger, hostedZoneId)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 	logger.Info("Hosted zone deleted", "hostedZoneId", hostedZoneId)
+
+	return nil
+}
+
+func (d *Zoner) createDnsRecords(ctx context.Context, logger logr.Logger, cluster Cluster, hostedZoneId string) error {
+	route53Client, err := d.awsClients.NewRoute53Client(cluster.Region, cluster.IAMRoleARN)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	dnsRecordsToCreate := d.getWorkloadClusterDnsRecords(d.workloadClusterBaseDomain, cluster)
+	logger.Info("Creating DNS records", "dnsRecords", dnsRecordsToCreate, "hostedZoneId", hostedZoneId)
+	err = route53Client.AddDnsRecordsToHostedZone(ctx, logger, hostedZoneId, d.getWorkloadClusterDnsRecords(d.workloadClusterBaseDomain, cluster))
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	logger.Info("DNS records created", "dnsRecords", dnsRecordsToCreate, "hostedZoneId", hostedZoneId)
 
 	return nil
 }
