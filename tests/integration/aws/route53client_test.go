@@ -20,7 +20,7 @@ var _ = Describe("Route53 Resolver client", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	When("creating hosting zones", func() {
+	When("creating hosted zones", func() {
 		When("there is no hosted zone", func() {
 			When("we want a public hosted zone", func() {
 				var publicHostedZoneId string
