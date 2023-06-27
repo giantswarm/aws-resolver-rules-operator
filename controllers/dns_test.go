@@ -82,7 +82,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 					Name: "default",
 					Kind: capa.ClusterRoleIdentityKind,
 				},
-				Region: "gs-south-1",
+				Region: "eu-central-1",
 				NetworkSpec: capa.NetworkSpec{
 					VPC: capa.VPCSpec{
 						ID: "vpc-12345678",
@@ -271,9 +271,10 @@ var _ = Describe("Dns Zone reconciler", func() {
 						It("creates DNS records for workload cluster", func() {
 							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
 							Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
-								Kind:  "ALIAS",
-								Name:  fmt.Sprintf("api.%s", WorkloadClusterBaseDomain),
-								Value: "control-plane-load-balancer-hostname:6443",
+								Kind:   "ALIAS",
+								Name:   fmt.Sprintf("api.%s", WorkloadClusterBaseDomain),
+								Value:  "control-plane-load-balancer-hostname:6443",
+								Region: awsCluster.Spec.Region,
 							}))
 						})
 					})
@@ -413,9 +414,10 @@ var _ = Describe("Dns Zone reconciler", func() {
 						It("creates DNS records for workload cluster", func() {
 							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
 							Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
-								Kind:  "ALIAS",
-								Name:  fmt.Sprintf("api.%s", WorkloadClusterBaseDomain),
-								Value: "control-plane-load-balancer-hostname:6443",
+								Kind:   "ALIAS",
+								Name:   fmt.Sprintf("api.%s", WorkloadClusterBaseDomain),
+								Value:  "control-plane-load-balancer-hostname:6443",
+								Region: awsCluster.Spec.Region,
 							}))
 						})
 					})

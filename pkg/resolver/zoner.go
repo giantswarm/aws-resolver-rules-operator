@@ -158,9 +158,10 @@ func (d *Zoner) getWorkloadClusterDnsRecords(workloadClusterBaseDomain string, c
 
 	if cluster.ControlPlaneEndpoint != "" {
 		dnsRecords = append(dnsRecords, DNSRecord{
-			Kind:  "ALIAS",
-			Name:  fmt.Sprintf("api.%s", workloadClusterBaseDomain),
-			Value: cluster.ControlPlaneEndpoint,
+			Kind:   "ALIAS",
+			Name:   fmt.Sprintf("api.%s", workloadClusterBaseDomain),
+			Value:  cluster.ControlPlaneEndpoint,
+			Region: cluster.Region,
 		})
 	}
 
