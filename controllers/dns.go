@@ -97,8 +97,9 @@ func (r *DnsReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AW
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	cluster := buildCluster(awsCluster, capiCluster, identity)
+	cluster := buildCluster(awsCluster, identity)
 	cluster.BastionIp = bastionIp
+	cluster.ControlPlaneEndpoint = capiCluster.Spec.ControlPlaneEndpoint.Host
 
 	annotation, ok := awsCluster.Annotations[gsannotations.AWSDNSMode]
 	if ok && annotation == gsannotations.DNSModePrivate {
@@ -124,7 +125,8 @@ func (r *DnsReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AW
 func (r *DnsReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AWSCluster, capiCluster *capi.Cluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	cluster := buildCluster(awsCluster, capiCluster, identity)
+	cluster := buildCluster(awsCluster, identity)
+
 	err := r.dnsZone.DeleteHostedZone(ctx, logger, cluster)
 	if err != nil {
 		return ctrl.Result{}, err

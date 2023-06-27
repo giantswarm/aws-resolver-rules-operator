@@ -265,7 +265,6 @@ var _ = Describe("Dns Zone reconciler", func() {
 					When("the k8s API endpoint of the workload cluster is set", func() {
 						BeforeEach(func() {
 							cluster.Spec.ControlPlaneEndpoint.Host = "control-plane-load-balancer-hostname"
-							cluster.Spec.ControlPlaneEndpoint.Port = 6443
 						})
 
 						It("creates DNS records for workload cluster", func() {
@@ -273,7 +272,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 							Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
 								Kind:   "ALIAS",
 								Name:   fmt.Sprintf("api.%s.%s", ClusterName, WorkloadClusterBaseDomain),
-								Value:  "control-plane-load-balancer-hostname:6443",
+								Value:  "control-plane-load-balancer-hostname",
 								Region: awsCluster.Spec.Region,
 							}))
 						})
@@ -408,7 +407,6 @@ var _ = Describe("Dns Zone reconciler", func() {
 					When("the k8s API endpoint of the workload cluster is set", func() {
 						BeforeEach(func() {
 							cluster.Spec.ControlPlaneEndpoint.Host = "control-plane-load-balancer-hostname"
-							cluster.Spec.ControlPlaneEndpoint.Port = 6443
 						})
 
 						It("creates DNS records for workload cluster", func() {
@@ -416,7 +414,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 							Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
 								Kind:   "ALIAS",
 								Name:   fmt.Sprintf("api.%s.%s", ClusterName, WorkloadClusterBaseDomain),
-								Value:  "control-plane-load-balancer-hostname:6443",
+								Value:  "control-plane-load-balancer-hostname",
 								Region: awsCluster.Spec.Region,
 							}))
 						})

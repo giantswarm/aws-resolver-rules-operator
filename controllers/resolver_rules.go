@@ -98,7 +98,7 @@ func (r *ResolverRulesReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	if !awsCluster.DeletionTimestamp.IsZero() {
-		return r.reconcileDelete(ctx, awsCluster, nil, identity)
+		return r.reconcileDelete(ctx, awsCluster, identity)
 	}
 
 	if !conditions.IsTrue(awsCluster, capa.VpcReadyCondition) || !conditions.IsTrue(awsCluster, capa.SubnetsReadyCondition) {
@@ -106,12 +106,12 @@ func (r *ResolverRulesReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, nil
 	}
 
-	return r.reconcileNormal(ctx, awsCluster, nil, identity)
+	return r.reconcileNormal(ctx, awsCluster, identity)
 }
 
 // reconcileNormal associates the Resolver Rules in the specified AWS account with the AWSCluster VPC, and creates a
 // Resolver Rule for the workload cluster k8s API endpoint.
-func (r *ResolverRulesReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AWSCluster, capiCluster *capi.Cluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
+func (r *ResolverRulesReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	err := r.awsClusterClient.AddFinalizer(ctx, awsCluster, ResolverRulesFinalizer)
@@ -119,7 +119,7 @@ func (r *ResolverRulesReconciler) reconcileNormal(ctx context.Context, awsCluste
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	cluster := buildCluster(awsCluster, capiCluster, identity)
+	cluster := buildCluster(awsCluster, identity)
 
 	awsAccountOwnerOfRulesToAssociate, ok := awsCluster.Annotations[gsannotations.ResolverRulesOwnerAWSAccountId]
 	if !ok {
@@ -147,10 +147,10 @@ func (r *ResolverRulesReconciler) reconcileNormal(ctx context.Context, awsCluste
 
 // reconcileDelete disassociates the Resolver Rules in the specified AWS account from the AWSCluster VPC, and deletes
 // the Resolver Rule created for the workload cluster k8s API endpoint.
-func (r *ResolverRulesReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AWSCluster, capiCluster *capi.Cluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
+func (r *ResolverRulesReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	cluster := buildCluster(awsCluster, capiCluster, identity)
+	cluster := buildCluster(awsCluster, identity)
 
 	err := r.resolver.DeleteRule(ctx, logger, cluster)
 	if err != nil {
