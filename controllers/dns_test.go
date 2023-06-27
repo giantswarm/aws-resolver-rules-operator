@@ -257,8 +257,8 @@ var _ = Describe("Dns Zone reconciler", func() {
 						Expect(hostedZoneId).To(Equal("hosted-zone-id"))
 						Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
 							Kind:  "CNAME",
-							Name:  fmt.Sprintf("*.%s", WorkloadClusterBaseDomain),
-							Value: fmt.Sprintf("ingress.%s", WorkloadClusterBaseDomain),
+							Name:  fmt.Sprintf("*.%s.%s", ClusterName, WorkloadClusterBaseDomain),
+							Value: fmt.Sprintf("ingress.%s.%s", ClusterName, WorkloadClusterBaseDomain),
 						}))
 					})
 
@@ -272,7 +272,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
 							Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
 								Kind:   "ALIAS",
-								Name:   fmt.Sprintf("api.%s", WorkloadClusterBaseDomain),
+								Name:   fmt.Sprintf("api.%s.%s", ClusterName, WorkloadClusterBaseDomain),
 								Value:  "control-plane-load-balancer-hostname:6443",
 								Region: awsCluster.Spec.Region,
 							}))
@@ -284,7 +284,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
 							Expect(dnsRecords).ToNot(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 								"Kind": Equal("ALIAS"),
-								"Name": Equal(fmt.Sprintf("api.%s", WorkloadClusterBaseDomain)),
+								"Name": Equal(fmt.Sprintf("api.%s.%s", ClusterName, WorkloadClusterBaseDomain)),
 							})))
 						})
 					})
@@ -298,7 +298,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
 							Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
 								Kind:  "A",
-								Name:  fmt.Sprintf("bastion1.%s", WorkloadClusterBaseDomain),
+								Name:  fmt.Sprintf("bastion1.%s.%s", ClusterName, WorkloadClusterBaseDomain),
 								Value: "192.168.0.1",
 							}))
 						})
@@ -313,7 +313,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
 							Expect(dnsRecords).ToNot(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 								"Kind": Equal("A"),
-								"Name": Equal(fmt.Sprintf("bastion1.%s", WorkloadClusterBaseDomain)),
+								"Name": Equal(fmt.Sprintf("bastion1.%s.%s", ClusterName, WorkloadClusterBaseDomain)),
 							})))
 						})
 					})
@@ -400,8 +400,8 @@ var _ = Describe("Dns Zone reconciler", func() {
 						Expect(hostedZoneId).To(Equal("hosted-zone-id"))
 						Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
 							Kind:  "CNAME",
-							Name:  fmt.Sprintf("*.%s", WorkloadClusterBaseDomain),
-							Value: fmt.Sprintf("ingress.%s", WorkloadClusterBaseDomain),
+							Name:  fmt.Sprintf("*.%s.%s", ClusterName, WorkloadClusterBaseDomain),
+							Value: fmt.Sprintf("ingress.%s.%s", ClusterName, WorkloadClusterBaseDomain),
 						}))
 					})
 
@@ -415,7 +415,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
 							Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
 								Kind:   "ALIAS",
-								Name:   fmt.Sprintf("api.%s", WorkloadClusterBaseDomain),
+								Name:   fmt.Sprintf("api.%s.%s", ClusterName, WorkloadClusterBaseDomain),
 								Value:  "control-plane-load-balancer-hostname:6443",
 								Region: awsCluster.Spec.Region,
 							}))
@@ -427,7 +427,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
 							Expect(dnsRecords).ToNot(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 								"Kind": Equal("ALIAS"),
-								"Name": Equal(fmt.Sprintf("api.%s", WorkloadClusterBaseDomain)),
+								"Name": Equal(fmt.Sprintf("api.%s.%s", ClusterName, WorkloadClusterBaseDomain)),
 							})))
 						})
 					})
@@ -441,7 +441,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
 							Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
 								Kind:  "A",
-								Name:  fmt.Sprintf("bastion1.%s", WorkloadClusterBaseDomain),
+								Name:  fmt.Sprintf("bastion1.%s.%s", ClusterName, WorkloadClusterBaseDomain),
 								Value: "192.168.0.1",
 							}))
 						})
@@ -456,7 +456,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
 							Expect(dnsRecords).ToNot(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 								"Kind": Equal("A"),
-								"Name": Equal(fmt.Sprintf("bastion1.%s", WorkloadClusterBaseDomain)),
+								"Name": Equal(fmt.Sprintf("bastion1.%s.%s", ClusterName, WorkloadClusterBaseDomain)),
 							})))
 						})
 					})

@@ -98,8 +98,8 @@ func (d *Zoner) DeleteHostedZone(ctx context.Context, logger logr.Logger, cluste
 		return errors.WithStack(err)
 	}
 
-	logger.Info("Deleting dns records from hosted zone")
-	err = route53Client.DeleteDnsRecordsFromHostedZone(ctx, logger, hostedZoneId, d.getWorkloadClusterDnsRecords(d.workloadClusterBaseDomain, cluster))
+	logger.Info("Deleting cluster dns records from hosted zone")
+	err = route53Client.DeleteDnsRecordsFromHostedZone(ctx, logger, hostedZoneId, d.getWorkloadClusterDnsRecords(d.getHostedZoneName(cluster), cluster))
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -120,9 +120,9 @@ func (d *Zoner) createDnsRecords(ctx context.Context, logger logr.Logger, cluste
 		return errors.WithStack(err)
 	}
 
-	dnsRecordsToCreate := d.getWorkloadClusterDnsRecords(d.workloadClusterBaseDomain, cluster)
+	dnsRecordsToCreate := d.getWorkloadClusterDnsRecords(d.getHostedZoneName(cluster), cluster)
 	logger.Info("Creating DNS records", "dnsRecords", dnsRecordsToCreate, "hostedZoneId", hostedZoneId)
-	err = route53Client.AddDnsRecordsToHostedZone(ctx, logger, hostedZoneId, d.getWorkloadClusterDnsRecords(d.workloadClusterBaseDomain, cluster))
+	err = route53Client.AddDnsRecordsToHostedZone(ctx, logger, hostedZoneId, dnsRecordsToCreate)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -147,19 +147,19 @@ func (d *Zoner) getTagsForHostedZone(cluster Cluster) map[string]string {
 	}
 }
 
-func (d *Zoner) getWorkloadClusterDnsRecords(workloadClusterBaseDomain string, cluster Cluster) []DNSRecord {
+func (d *Zoner) getWorkloadClusterDnsRecords(workloadClusterHostedZoneName string, cluster Cluster) []DNSRecord {
 	dnsRecords := []DNSRecord{
 		{
 			Kind:  "CNAME",
-			Name:  fmt.Sprintf("*.%s", workloadClusterBaseDomain),
-			Value: fmt.Sprintf("ingress.%s", workloadClusterBaseDomain),
+			Name:  fmt.Sprintf("*.%s", workloadClusterHostedZoneName),
+			Value: fmt.Sprintf("ingress.%s", workloadClusterHostedZoneName),
 		},
 	}
 
 	if cluster.ControlPlaneEndpoint != "" {
 		dnsRecords = append(dnsRecords, DNSRecord{
 			Kind:   "ALIAS",
-			Name:   fmt.Sprintf("api.%s", workloadClusterBaseDomain),
+			Name:   fmt.Sprintf("api.%s", workloadClusterHostedZoneName),
 			Value:  cluster.ControlPlaneEndpoint,
 			Region: cluster.Region,
 		})
@@ -168,7 +168,7 @@ func (d *Zoner) getWorkloadClusterDnsRecords(workloadClusterBaseDomain string, c
 	if cluster.BastionIp != "" {
 		dnsRecords = append(dnsRecords, DNSRecord{
 			Kind:  "A",
-			Name:  fmt.Sprintf("bastion1.%s", workloadClusterBaseDomain),
+			Name:  fmt.Sprintf("bastion1.%s", workloadClusterHostedZoneName),
 			Value: cluster.BastionIp,
 		})
 	}

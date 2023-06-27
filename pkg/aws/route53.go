@@ -218,7 +218,7 @@ func (r *Route53) AddDelegationToParentZone(ctx context.Context, logger logr.Log
 func (r *Route53) AddDnsRecordsToHostedZone(ctx context.Context, logger logr.Logger, hostedZoneId string, dnsRecords []resolver.DNSRecord) error {
 	_, err := r.client.ChangeResourceRecordSetsWithContext(ctx, &route53.ChangeResourceRecordSetsInput{
 		ChangeBatch: &route53.ChangeBatch{
-			Changes: getChanges(logger, dnsRecords),
+			Changes: getAWSSdkChangesFromDnsRecords(logger, dnsRecords),
 		},
 		HostedZoneId: awssdk.String(hostedZoneId),
 	})
@@ -233,7 +233,7 @@ func (r *Route53) DeleteDnsRecordsFromHostedZone(ctx context.Context, logger log
 	return nil
 }
 
-func getChanges(logger logr.Logger, dnsRecords []resolver.DNSRecord) []*route53.Change {
+func getAWSSdkChangesFromDnsRecords(logger logr.Logger, dnsRecords []resolver.DNSRecord) []*route53.Change {
 	var changes []*route53.Change
 	for _, record := range dnsRecords {
 		switch record.Kind {
