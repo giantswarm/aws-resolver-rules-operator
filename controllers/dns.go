@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	DnsFinalizer = "dns-operator.finalizers.giantswarm.io"
+	DnsFinalizer = "capa-operator.finalizers.giantswarm.io/dns-controller"
 )
 
 // DnsReconciler reconciles AWSClusters.

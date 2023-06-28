@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	Finalizer                                           = "aws-resolver-rules-operator.finalizers.giantswarm.io"
+	ResolverRulesFinalizer                              = "capa-operator.finalizers.giantswarm.io/resolver-rules-controller"
 	ResolverRulesAssociatedCondition capi.ConditionType = "ResolverRulesAssociated"
 )
 
@@ -113,7 +113,7 @@ func (r *ResolverRulesReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 func (r *ResolverRulesReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	err := r.awsClusterClient.AddFinalizer(ctx, awsCluster, Finalizer)
+	err := r.awsClusterClient.AddFinalizer(ctx, awsCluster, ResolverRulesFinalizer)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
@@ -167,7 +167,7 @@ func (r *ResolverRulesReconciler) reconcileDelete(ctx context.Context, awsCluste
 	}
 
 	logger.Info("Removing finalizer from AWSCluster")
-	err = r.awsClusterClient.RemoveFinalizer(ctx, awsCluster, Finalizer)
+	err = r.awsClusterClient.RemoveFinalizer(ctx, awsCluster, ResolverRulesFinalizer)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
 	}
