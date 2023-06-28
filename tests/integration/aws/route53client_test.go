@@ -27,99 +27,48 @@ var _ = Describe("Route53 Resolver client", func() {
 			"something": "else",
 		}
 
-		When("there is no hosted zone", func() {
-			AfterEach(func() {
-				_, err = rawRoute53Client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: awssdk.String(hostedZoneId)})
-				Expect(err).NotTo(HaveOccurred())
-			})
-
-			When("we want a public hosted zone", func() {
-				It("creates a public hosted zone successfully", func() {
-					hostedZoneId, err = route53Client.CreatePublicHostedZone(ctx, logger, "josepublic.test.example.com", tags)
-					Expect(err).NotTo(HaveOccurred())
-
-					var publicListHostedZoneResponse *route53.ListHostedZonesByNameOutput
-					Eventually(func() (int, error) {
-						publicListHostedZoneResponse, err = rawRoute53Client.ListHostedZonesByNameWithContext(ctx, &route53.ListHostedZonesByNameInput{
-							DNSName:  awssdk.String("josepublic.test.example.com"),
-							MaxItems: awssdk.String("1"),
-						})
-						return len(publicListHostedZoneResponse.HostedZones), err
-					}, "2s", "100ms").Should(Equal(1))
-
-					actualTags, err := rawRoute53Client.ListTagsForResourceWithContext(ctx, &route53.ListTagsForResourceInput{
-						ResourceId:   publicListHostedZoneResponse.HostedZones[0].Id,
-						ResourceType: awssdk.String("hostedzone"),
-					})
-					Expect(err).NotTo(HaveOccurred())
-
-					Expect(actualTags.ResourceTagSet.Tags).To(ContainElement(&route53.Tag{
-						Key:   awssdk.String("Name"),
-						Value: awssdk.String("jose"),
-					}))
-					Expect(actualTags.ResourceTagSet.Tags).To(ContainElement(&route53.Tag{
-						Key:   awssdk.String("something"),
-						Value: awssdk.String("else"),
-					}))
-				})
-			})
-
-			When("we want a private hosted zone", func() {
-				It("creates a private hosted zone successfully", func() {
-					hostedZoneId, err = route53Client.CreatePrivateHostedZone(ctx, logger, "joseprivate.test.example.com", VPCId, Region, tags, []string{MCVPCId})
-					Expect(err).NotTo(HaveOccurred())
-
-					var privateHostedZoneResponse *route53.ListHostedZonesByNameOutput
-					Eventually(func() (int, error) {
-						privateHostedZoneResponse, err = rawRoute53Client.ListHostedZonesByNameWithContext(ctx, &route53.ListHostedZonesByNameInput{
-							DNSName:  awssdk.String("joseprivate.test.example.com"),
-							MaxItems: awssdk.String("1"),
-						})
-						return len(privateHostedZoneResponse.HostedZones), err
-					}, "2s", "100ms").Should(Equal(1))
-
-					actualTags, err := rawRoute53Client.ListTagsForResourceWithContext(ctx, &route53.ListTagsForResourceInput{
-						ResourceId:   privateHostedZoneResponse.HostedZones[0].Id,
-						ResourceType: awssdk.String("hostedzone"),
-					})
-					Expect(err).NotTo(HaveOccurred())
-
-					Expect(actualTags.ResourceTagSet.Tags).To(ContainElement(&route53.Tag{
-						Key:   awssdk.String("Name"),
-						Value: awssdk.String("jose"),
-					}))
-
-					associatedHostedZones, err := rawRoute53Client.ListHostedZonesByVPCWithContext(ctx, &route53.ListHostedZonesByVPCInput{
-						VPCId:     awssdk.String(MCVPCId),
-						VPCRegion: awssdk.String(Region),
-					})
-					Expect(err).NotTo(HaveOccurred())
-					Expect(associatedHostedZones.HostedZoneSummaries).To(ContainElement(&route53.HostedZoneSummary{
-						HostedZoneId: awssdk.String(strings.TrimPrefix(*privateHostedZoneResponse.HostedZones[0].Id, "/hostedzone/")),
-						Name:         awssdk.String("joseprivate.test.example.com."),
-						Owner: &route53.HostedZoneOwner{
-							OwningAccount: awssdk.String("000000000000"),
-						},
-					}))
-				})
-			})
+		AfterEach(func() {
+			_, err = rawRoute53Client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: awssdk.String(hostedZoneId)})
+			Expect(err).NotTo(HaveOccurred())
 		})
 
-		When("the hosted zone already exists", func() {
-			When("we want a public hosted zone", func() {
-				var alreadyExistingHostedZone *route53.CreateHostedZoneOutput
+		When("we want a public hosted zone", func() {
+			It("creates a public hosted zone successfully", func() {
+				hostedZoneId, err = route53Client.CreatePublicHostedZone(ctx, logger, "josepublic.test.example.com", tags)
+				Expect(err).NotTo(HaveOccurred())
 
+				var publicListHostedZoneResponse *route53.ListHostedZonesByNameOutput
+				Eventually(func() (int, error) {
+					publicListHostedZoneResponse, err = rawRoute53Client.ListHostedZonesByNameWithContext(ctx, &route53.ListHostedZonesByNameInput{
+						DNSName:  awssdk.String("josepublic.test.example.com"),
+						MaxItems: awssdk.String("1"),
+					})
+					return len(publicListHostedZoneResponse.HostedZones), err
+				}, "2s", "100ms").Should(Equal(1))
+
+				actualTags, err := rawRoute53Client.ListTagsForResourceWithContext(ctx, &route53.ListTagsForResourceInput{
+					ResourceId:   publicListHostedZoneResponse.HostedZones[0].Id,
+					ResourceType: awssdk.String("hostedzone"),
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(actualTags.ResourceTagSet.Tags).To(ContainElement(&route53.Tag{
+					Key:   awssdk.String("Name"),
+					Value: awssdk.String("jose"),
+				}))
+				Expect(actualTags.ResourceTagSet.Tags).To(ContainElement(&route53.Tag{
+					Key:   awssdk.String("something"),
+					Value: awssdk.String("else"),
+				}))
+			})
+
+			When("the hosted zone already exists", func() {
 				BeforeEach(func() {
 					now := time.Now()
-					alreadyExistingHostedZone, err = rawRoute53Client.CreateHostedZone(&route53.CreateHostedZoneInput{
+					_, err = rawRoute53Client.CreateHostedZone(&route53.CreateHostedZoneInput{
 						CallerReference: awssdk.String(fmt.Sprintf("1%d", now.UnixNano())),
 						Name:            awssdk.String("already.exists.test.example.com"),
 					})
-					Expect(err).NotTo(HaveOccurred())
-				})
-
-				AfterEach(func() {
-					_, err = rawRoute53Client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: alreadyExistingHostedZone.HostedZone.Id})
 					Expect(err).NotTo(HaveOccurred())
 				})
 
@@ -135,13 +84,51 @@ var _ = Describe("Route53 Resolver client", func() {
 					Expect(len(hostedZoneResponse.HostedZones)).To(Equal(1))
 				})
 			})
+		})
 
-			When("we want a private hosted zone", func() {
-				var alreadyExistingHostedZone *route53.CreateHostedZoneOutput
+		When("we want a private hosted zone", func() {
+			It("creates a private hosted zone successfully", func() {
+				hostedZoneId, err = route53Client.CreatePrivateHostedZone(ctx, logger, "joseprivate.test.example.com", VPCId, Region, tags, []string{MCVPCId})
+				Expect(err).NotTo(HaveOccurred())
 
+				var privateHostedZoneResponse *route53.ListHostedZonesByNameOutput
+				Eventually(func() (int, error) {
+					privateHostedZoneResponse, err = rawRoute53Client.ListHostedZonesByNameWithContext(ctx, &route53.ListHostedZonesByNameInput{
+						DNSName:  awssdk.String("joseprivate.test.example.com"),
+						MaxItems: awssdk.String("1"),
+					})
+					return len(privateHostedZoneResponse.HostedZones), err
+				}, "2s", "100ms").Should(Equal(1))
+
+				actualTags, err := rawRoute53Client.ListTagsForResourceWithContext(ctx, &route53.ListTagsForResourceInput{
+					ResourceId:   privateHostedZoneResponse.HostedZones[0].Id,
+					ResourceType: awssdk.String("hostedzone"),
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(actualTags.ResourceTagSet.Tags).To(ContainElement(&route53.Tag{
+					Key:   awssdk.String("Name"),
+					Value: awssdk.String("jose"),
+				}))
+
+				associatedHostedZones, err := rawRoute53Client.ListHostedZonesByVPCWithContext(ctx, &route53.ListHostedZonesByVPCInput{
+					VPCId:     awssdk.String(MCVPCId),
+					VPCRegion: awssdk.String(Region),
+				})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(associatedHostedZones.HostedZoneSummaries).To(ContainElement(&route53.HostedZoneSummary{
+					HostedZoneId: awssdk.String(strings.TrimPrefix(*privateHostedZoneResponse.HostedZones[0].Id, "/hostedzone/")),
+					Name:         awssdk.String("joseprivate.test.example.com."),
+					Owner: &route53.HostedZoneOwner{
+						OwningAccount: awssdk.String("000000000000"),
+					},
+				}))
+			})
+
+			When("the hosted zone already exists", func() {
 				BeforeEach(func() {
 					now := time.Now()
-					alreadyExistingHostedZone, err = rawRoute53Client.CreateHostedZone(&route53.CreateHostedZoneInput{
+					_, err = rawRoute53Client.CreateHostedZone(&route53.CreateHostedZoneInput{
 						CallerReference: awssdk.String(fmt.Sprintf("1%d", now.UnixNano())),
 						HostedZoneConfig: &route53.HostedZoneConfig{
 							Comment:     awssdk.String("Zone for CAPI cluster"),
@@ -153,11 +140,6 @@ var _ = Describe("Route53 Resolver client", func() {
 							VPCRegion: awssdk.String(Region),
 						},
 					})
-					Expect(err).NotTo(HaveOccurred())
-				})
-
-				AfterEach(func() {
-					_, err = rawRoute53Client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: alreadyExistingHostedZone.HostedZone.Id})
 					Expect(err).NotTo(HaveOccurred())
 				})
 
