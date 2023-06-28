@@ -19,8 +19,8 @@ type Route53 struct {
 	client *route53.Route53
 }
 
-func (r *Route53) CreatePublicHostedZone(ctx context.Context, logger logr.Logger, zoneName string, tags map[string]string) (string, error) {
-	hostedZoneId, err := r.GetHostedZoneIdByName(ctx, logger, zoneName)
+func (r *Route53) CreateHostedZone(ctx context.Context, logger logr.Logger, dnsZone resolver.DnsZone) (string, error) {
+	hostedZoneId, err := r.GetHostedZoneIdByName(ctx, logger, dnsZone.DnsName)
 	if err != nil && !errors.Is(err, &resolver.HostedZoneNotFoundError{}) {
 		return "", errors.WithStack(err)
 	}
@@ -33,7 +33,15 @@ func (r *Route53) CreatePublicHostedZone(ctx context.Context, logger logr.Logger
 			HostedZoneConfig: &route53.HostedZoneConfig{
 				Comment: awssdk.String("Zone for CAPI cluster"),
 			},
-			Name: awssdk.String(zoneName),
+			Name: awssdk.String(dnsZone.DnsName),
+		}
+
+		if dnsZone.IsPrivate {
+			createHostedZoneInput.HostedZoneConfig.PrivateZone = awssdk.Bool(true)
+			createHostedZoneInput.VPC = &route53.VPC{
+				VPCId:     awssdk.String(dnsZone.VPCId),
+				VPCRegion: awssdk.String(dnsZone.Region),
+			}
 		}
 
 		createdHostedZone, err := r.client.CreateHostedZoneWithContext(ctx, createHostedZoneInput)
@@ -43,60 +51,18 @@ func (r *Route53) CreatePublicHostedZone(ctx context.Context, logger logr.Logger
 		hostedZoneId = *createdHostedZone.HostedZone.Id
 	}
 
-	err = r.tagHostedZone(ctx, hostedZoneId, tags)
+	err = r.tagHostedZone(ctx, hostedZoneId, dnsZone.Tags)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
-	return hostedZoneId, nil
-}
+	if dnsZone.IsPrivate {
+		logger.Info("Associating hosted zone with VPCs", "hostedZoneId", hostedZoneId, "vpcsToAssociate", dnsZone.VPCsToAssociate)
 
-func (r *Route53) CreatePrivateHostedZone(ctx context.Context, logger logr.Logger, zoneName, vpcId, region string, tags map[string]string, vpcsToAssociate []string) (string, error) {
-	if vpcId == "" {
-		return "", errors.New("vpcId can't be empty when creating private hosted zones")
-	}
-	if region == "" {
-		return "", errors.New("region can't be empty when creating private hosted zones")
-	}
-
-	hostedZoneId, err := r.GetHostedZoneIdByName(ctx, logger, zoneName)
-	if err != nil && !errors.Is(err, &resolver.HostedZoneNotFoundError{}) {
-		return "", errors.WithStack(err)
-	}
-
-	// We didn't find the hosted zone, so we need to create it.
-	if err != nil {
-		now := time.Now()
-		createHostedZoneInput := &route53.CreateHostedZoneInput{
-			CallerReference: awssdk.String(fmt.Sprintf("%d", now.UnixNano())),
-			HostedZoneConfig: &route53.HostedZoneConfig{
-				Comment:     awssdk.String("Zone for CAPI cluster"),
-				PrivateZone: awssdk.Bool(true),
-			},
-			Name: awssdk.String(zoneName),
-			VPC: &route53.VPC{
-				VPCId:     awssdk.String(vpcId),
-				VPCRegion: awssdk.String(region),
-			},
-		}
-
-		createdHostedZone, err := r.client.CreateHostedZoneWithContext(ctx, createHostedZoneInput)
+		err = r.associateHostedZoneWithAdditionalVPCs(ctx, hostedZoneId, dnsZone.Region, dnsZone.VPCsToAssociate)
 		if err != nil {
 			return "", errors.WithStack(err)
 		}
-		hostedZoneId = *createdHostedZone.HostedZone.Id
-	}
-
-	logger.Info("Associating hosted zone with VPCs", "hostedZoneId", hostedZoneId, "vpcsToAssociate", vpcsToAssociate)
-
-	err = r.associateHostedZoneWithAdditionalVPCs(ctx, hostedZoneId, region, vpcsToAssociate)
-	if err != nil {
-		return "", errors.WithStack(err)
-	}
-
-	err = r.tagHostedZone(ctx, hostedZoneId, tags)
-	if err != nil {
-		return "", errors.WithStack(err)
 	}
 
 	return hostedZoneId, nil

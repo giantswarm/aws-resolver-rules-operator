@@ -204,19 +204,19 @@ var _ = Describe("Dns Zone reconciler", func() {
 				When("the cluster uses public dns mode", func() {
 					BeforeEach(func() {
 						route53Client.GetHostedZoneIdByNameReturns("parent-hosted-zone-id", nil)
-						route53Client.CreatePublicHostedZoneReturns("hosted-zone-id", nil)
+						route53Client.CreateHostedZoneReturns("hosted-zone-id", nil)
 					})
 
 					It("creates hosted zone", func() {
-						Expect(route53Client.CreatePublicHostedZoneCallCount()).To(Equal(1))
-						_, _, hostedZoneName, tags := route53Client.CreatePublicHostedZoneArgsForCall(0)
-						Expect(hostedZoneName).To(Equal(fmt.Sprintf("%s.%s", awsCluster.Name, "test.gigantic.io")))
+						Expect(route53Client.CreateHostedZoneCallCount()).To(Equal(1))
+						_, _, dnsZone := route53Client.CreateHostedZoneArgsForCall(0)
+						Expect(dnsZone.DnsName).To(Equal(fmt.Sprintf("%s.%s", awsCluster.Name, "test.gigantic.io")))
 						expectedTags := map[string]string{
 							"Name": awsCluster.Name,
 							fmt.Sprintf("sigs.k8s.io/cluster-api-provider-aws/cluster/%s", awsCluster.Name): "owned",
 							"sigs.k8s.io/cluster-api-provider-aws/role":                                     "common",
 						}
-						Expect(tags).To(Equal(expectedTags))
+						Expect(dnsZone.Tags).To(Equal(expectedTags))
 						Expect(reconcileErr).NotTo(HaveOccurred())
 					})
 
@@ -230,7 +230,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 					When("creating hosted zone fails", func() {
 						expectedError := errors.New("failed to find parent hosted zone")
 						BeforeEach(func() {
-							route53Client.CreatePublicHostedZoneReturns("", expectedError)
+							route53Client.CreateHostedZoneReturns("", expectedError)
 						})
 						It("doesn't really reconcile", func() {
 							Expect(route53Client.AddDelegationToParentZoneCallCount()).To(Equal(0))
@@ -241,7 +241,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 
 					When("creating hosted zone succeeds", func() {
 						BeforeEach(func() {
-							route53Client.CreatePublicHostedZoneReturns("hosted-zone-id", nil)
+							route53Client.CreateHostedZoneReturns("hosted-zone-id", nil)
 						})
 
 						When("error trying to find parent hosted zone", func() {
@@ -286,26 +286,26 @@ var _ = Describe("Dns Zone reconciler", func() {
 					})
 
 					It("creates hosted zone", func() {
-						Expect(route53Client.CreatePrivateHostedZoneCallCount()).To(Equal(1))
-						_, _, hostedZoneName, vpcId, region, tags, vpcIdsToAttach := route53Client.CreatePrivateHostedZoneArgsForCall(0)
-						Expect(hostedZoneName).To(Equal(fmt.Sprintf("%s.%s", awsCluster.Name, "test.gigantic.io")))
-						Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
-						Expect(region).To(Equal(awsCluster.Spec.Region))
+						Expect(route53Client.CreateHostedZoneCallCount()).To(Equal(1))
+						_, _, dnsZone := route53Client.CreateHostedZoneArgsForCall(0)
+						Expect(dnsZone.DnsName).To(Equal(fmt.Sprintf("%s.%s", awsCluster.Name, "test.gigantic.io")))
+						Expect(dnsZone.VPCId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
+						Expect(dnsZone.Region).To(Equal(awsCluster.Spec.Region))
 						expectedTags := map[string]string{
 							"Name": awsCluster.Name,
 							fmt.Sprintf("sigs.k8s.io/cluster-api-provider-aws/cluster/%s", awsCluster.Name): "owned",
 							"sigs.k8s.io/cluster-api-provider-aws/role":                                     "common",
 						}
-						Expect(tags).To(Equal(expectedTags))
+						Expect(dnsZone.Tags).To(Equal(expectedTags))
 						expectedVPCIdsToAttach := []string{"vpc-0011223344", "vpc-0987654321"}
-						Expect(vpcIdsToAttach).To(Equal(expectedVPCIdsToAttach))
+						Expect(dnsZone.VPCsToAssociate).To(Equal(expectedVPCIdsToAttach))
 						Expect(reconcileErr).NotTo(HaveOccurred())
 					})
 
 					When("creating hosted zone fails", func() {
 						expectedError := errors.New("failed to create hosted zone")
 						BeforeEach(func() {
-							route53Client.CreatePrivateHostedZoneReturns("", expectedError)
+							route53Client.CreateHostedZoneReturns("", expectedError)
 						})
 						It("doesn't really reconcile", func() {
 							Expect(reconcileErr).To(HaveOccurred())

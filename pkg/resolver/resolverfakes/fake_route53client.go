@@ -24,38 +24,18 @@ type FakeRoute53Client struct {
 	addDelegationToParentZoneReturnsOnCall map[int]struct {
 		result1 error
 	}
-	CreatePrivateHostedZoneStub        func(context.Context, logr.Logger, string, string, string, map[string]string, []string) (string, error)
-	createPrivateHostedZoneMutex       sync.RWMutex
-	createPrivateHostedZoneArgsForCall []struct {
+	CreateHostedZoneStub        func(context.Context, logr.Logger, resolver.DnsZone) (string, error)
+	createHostedZoneMutex       sync.RWMutex
+	createHostedZoneArgsForCall []struct {
 		arg1 context.Context
 		arg2 logr.Logger
-		arg3 string
-		arg4 string
-		arg5 string
-		arg6 map[string]string
-		arg7 []string
+		arg3 resolver.DnsZone
 	}
-	createPrivateHostedZoneReturns struct {
+	createHostedZoneReturns struct {
 		result1 string
 		result2 error
 	}
-	createPrivateHostedZoneReturnsOnCall map[int]struct {
-		result1 string
-		result2 error
-	}
-	CreatePublicHostedZoneStub        func(context.Context, logr.Logger, string, map[string]string) (string, error)
-	createPublicHostedZoneMutex       sync.RWMutex
-	createPublicHostedZoneArgsForCall []struct {
-		arg1 context.Context
-		arg2 logr.Logger
-		arg3 string
-		arg4 map[string]string
-	}
-	createPublicHostedZoneReturns struct {
-		result1 string
-		result2 error
-	}
-	createPublicHostedZoneReturnsOnCall map[int]struct {
+	createHostedZoneReturnsOnCall map[int]struct {
 		result1 string
 		result2 error
 	}
@@ -169,29 +149,20 @@ func (fake *FakeRoute53Client) AddDelegationToParentZoneReturnsOnCall(i int, res
 	}{result1}
 }
 
-func (fake *FakeRoute53Client) CreatePrivateHostedZone(arg1 context.Context, arg2 logr.Logger, arg3 string, arg4 string, arg5 string, arg6 map[string]string, arg7 []string) (string, error) {
-	var arg7Copy []string
-	if arg7 != nil {
-		arg7Copy = make([]string, len(arg7))
-		copy(arg7Copy, arg7)
-	}
-	fake.createPrivateHostedZoneMutex.Lock()
-	ret, specificReturn := fake.createPrivateHostedZoneReturnsOnCall[len(fake.createPrivateHostedZoneArgsForCall)]
-	fake.createPrivateHostedZoneArgsForCall = append(fake.createPrivateHostedZoneArgsForCall, struct {
+func (fake *FakeRoute53Client) CreateHostedZone(arg1 context.Context, arg2 logr.Logger, arg3 resolver.DnsZone) (string, error) {
+	fake.createHostedZoneMutex.Lock()
+	ret, specificReturn := fake.createHostedZoneReturnsOnCall[len(fake.createHostedZoneArgsForCall)]
+	fake.createHostedZoneArgsForCall = append(fake.createHostedZoneArgsForCall, struct {
 		arg1 context.Context
 		arg2 logr.Logger
-		arg3 string
-		arg4 string
-		arg5 string
-		arg6 map[string]string
-		arg7 []string
-	}{arg1, arg2, arg3, arg4, arg5, arg6, arg7Copy})
-	stub := fake.CreatePrivateHostedZoneStub
-	fakeReturns := fake.createPrivateHostedZoneReturns
-	fake.recordInvocation("CreatePrivateHostedZone", []interface{}{arg1, arg2, arg3, arg4, arg5, arg6, arg7Copy})
-	fake.createPrivateHostedZoneMutex.Unlock()
+		arg3 resolver.DnsZone
+	}{arg1, arg2, arg3})
+	stub := fake.CreateHostedZoneStub
+	fakeReturns := fake.createHostedZoneReturns
+	fake.recordInvocation("CreateHostedZone", []interface{}{arg1, arg2, arg3})
+	fake.createHostedZoneMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+		return stub(arg1, arg2, arg3)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -199,113 +170,46 @@ func (fake *FakeRoute53Client) CreatePrivateHostedZone(arg1 context.Context, arg
 	return fakeReturns.result1, fakeReturns.result2
 }
 
-func (fake *FakeRoute53Client) CreatePrivateHostedZoneCallCount() int {
-	fake.createPrivateHostedZoneMutex.RLock()
-	defer fake.createPrivateHostedZoneMutex.RUnlock()
-	return len(fake.createPrivateHostedZoneArgsForCall)
+func (fake *FakeRoute53Client) CreateHostedZoneCallCount() int {
+	fake.createHostedZoneMutex.RLock()
+	defer fake.createHostedZoneMutex.RUnlock()
+	return len(fake.createHostedZoneArgsForCall)
 }
 
-func (fake *FakeRoute53Client) CreatePrivateHostedZoneCalls(stub func(context.Context, logr.Logger, string, string, string, map[string]string, []string) (string, error)) {
-	fake.createPrivateHostedZoneMutex.Lock()
-	defer fake.createPrivateHostedZoneMutex.Unlock()
-	fake.CreatePrivateHostedZoneStub = stub
+func (fake *FakeRoute53Client) CreateHostedZoneCalls(stub func(context.Context, logr.Logger, resolver.DnsZone) (string, error)) {
+	fake.createHostedZoneMutex.Lock()
+	defer fake.createHostedZoneMutex.Unlock()
+	fake.CreateHostedZoneStub = stub
 }
 
-func (fake *FakeRoute53Client) CreatePrivateHostedZoneArgsForCall(i int) (context.Context, logr.Logger, string, string, string, map[string]string, []string) {
-	fake.createPrivateHostedZoneMutex.RLock()
-	defer fake.createPrivateHostedZoneMutex.RUnlock()
-	argsForCall := fake.createPrivateHostedZoneArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5, argsForCall.arg6, argsForCall.arg7
+func (fake *FakeRoute53Client) CreateHostedZoneArgsForCall(i int) (context.Context, logr.Logger, resolver.DnsZone) {
+	fake.createHostedZoneMutex.RLock()
+	defer fake.createHostedZoneMutex.RUnlock()
+	argsForCall := fake.createHostedZoneArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
-func (fake *FakeRoute53Client) CreatePrivateHostedZoneReturns(result1 string, result2 error) {
-	fake.createPrivateHostedZoneMutex.Lock()
-	defer fake.createPrivateHostedZoneMutex.Unlock()
-	fake.CreatePrivateHostedZoneStub = nil
-	fake.createPrivateHostedZoneReturns = struct {
+func (fake *FakeRoute53Client) CreateHostedZoneReturns(result1 string, result2 error) {
+	fake.createHostedZoneMutex.Lock()
+	defer fake.createHostedZoneMutex.Unlock()
+	fake.CreateHostedZoneStub = nil
+	fake.createHostedZoneReturns = struct {
 		result1 string
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeRoute53Client) CreatePrivateHostedZoneReturnsOnCall(i int, result1 string, result2 error) {
-	fake.createPrivateHostedZoneMutex.Lock()
-	defer fake.createPrivateHostedZoneMutex.Unlock()
-	fake.CreatePrivateHostedZoneStub = nil
-	if fake.createPrivateHostedZoneReturnsOnCall == nil {
-		fake.createPrivateHostedZoneReturnsOnCall = make(map[int]struct {
+func (fake *FakeRoute53Client) CreateHostedZoneReturnsOnCall(i int, result1 string, result2 error) {
+	fake.createHostedZoneMutex.Lock()
+	defer fake.createHostedZoneMutex.Unlock()
+	fake.CreateHostedZoneStub = nil
+	if fake.createHostedZoneReturnsOnCall == nil {
+		fake.createHostedZoneReturnsOnCall = make(map[int]struct {
 			result1 string
 			result2 error
 		})
 	}
-	fake.createPrivateHostedZoneReturnsOnCall[i] = struct {
-		result1 string
-		result2 error
-	}{result1, result2}
-}
-
-func (fake *FakeRoute53Client) CreatePublicHostedZone(arg1 context.Context, arg2 logr.Logger, arg3 string, arg4 map[string]string) (string, error) {
-	fake.createPublicHostedZoneMutex.Lock()
-	ret, specificReturn := fake.createPublicHostedZoneReturnsOnCall[len(fake.createPublicHostedZoneArgsForCall)]
-	fake.createPublicHostedZoneArgsForCall = append(fake.createPublicHostedZoneArgsForCall, struct {
-		arg1 context.Context
-		arg2 logr.Logger
-		arg3 string
-		arg4 map[string]string
-	}{arg1, arg2, arg3, arg4})
-	stub := fake.CreatePublicHostedZoneStub
-	fakeReturns := fake.createPublicHostedZoneReturns
-	fake.recordInvocation("CreatePublicHostedZone", []interface{}{arg1, arg2, arg3, arg4})
-	fake.createPublicHostedZoneMutex.Unlock()
-	if stub != nil {
-		return stub(arg1, arg2, arg3, arg4)
-	}
-	if specificReturn {
-		return ret.result1, ret.result2
-	}
-	return fakeReturns.result1, fakeReturns.result2
-}
-
-func (fake *FakeRoute53Client) CreatePublicHostedZoneCallCount() int {
-	fake.createPublicHostedZoneMutex.RLock()
-	defer fake.createPublicHostedZoneMutex.RUnlock()
-	return len(fake.createPublicHostedZoneArgsForCall)
-}
-
-func (fake *FakeRoute53Client) CreatePublicHostedZoneCalls(stub func(context.Context, logr.Logger, string, map[string]string) (string, error)) {
-	fake.createPublicHostedZoneMutex.Lock()
-	defer fake.createPublicHostedZoneMutex.Unlock()
-	fake.CreatePublicHostedZoneStub = stub
-}
-
-func (fake *FakeRoute53Client) CreatePublicHostedZoneArgsForCall(i int) (context.Context, logr.Logger, string, map[string]string) {
-	fake.createPublicHostedZoneMutex.RLock()
-	defer fake.createPublicHostedZoneMutex.RUnlock()
-	argsForCall := fake.createPublicHostedZoneArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
-}
-
-func (fake *FakeRoute53Client) CreatePublicHostedZoneReturns(result1 string, result2 error) {
-	fake.createPublicHostedZoneMutex.Lock()
-	defer fake.createPublicHostedZoneMutex.Unlock()
-	fake.CreatePublicHostedZoneStub = nil
-	fake.createPublicHostedZoneReturns = struct {
-		result1 string
-		result2 error
-	}{result1, result2}
-}
-
-func (fake *FakeRoute53Client) CreatePublicHostedZoneReturnsOnCall(i int, result1 string, result2 error) {
-	fake.createPublicHostedZoneMutex.Lock()
-	defer fake.createPublicHostedZoneMutex.Unlock()
-	fake.CreatePublicHostedZoneStub = nil
-	if fake.createPublicHostedZoneReturnsOnCall == nil {
-		fake.createPublicHostedZoneReturnsOnCall = make(map[int]struct {
-			result1 string
-			result2 error
-		})
-	}
-	fake.createPublicHostedZoneReturnsOnCall[i] = struct {
+	fake.createHostedZoneReturnsOnCall[i] = struct {
 		result1 string
 		result2 error
 	}{result1, result2}
@@ -509,10 +413,8 @@ func (fake *FakeRoute53Client) Invocations() map[string][][]interface{} {
 	defer fake.invocationsMutex.RUnlock()
 	fake.addDelegationToParentZoneMutex.RLock()
 	defer fake.addDelegationToParentZoneMutex.RUnlock()
-	fake.createPrivateHostedZoneMutex.RLock()
-	defer fake.createPrivateHostedZoneMutex.RUnlock()
-	fake.createPublicHostedZoneMutex.RLock()
-	defer fake.createPublicHostedZoneMutex.RUnlock()
+	fake.createHostedZoneMutex.RLock()
+	defer fake.createHostedZoneMutex.RUnlock()
 	fake.deleteDelegationFromParentZoneMutex.RLock()
 	defer fake.deleteDelegationFromParentZoneMutex.RUnlock()
 	fake.deleteHostedZoneMutex.RLock()

@@ -32,8 +32,7 @@ type RAMClient interface {
 
 //counterfeiter:generate . Route53Client
 type Route53Client interface {
-	CreatePublicHostedZone(ctx context.Context, logger logr.Logger, zoneName string, tags map[string]string) (string, error)
-	CreatePrivateHostedZone(ctx context.Context, logger logr.Logger, zoneName, vpcId, region string, tags map[string]string, vpcsToAssociate []string) (string, error)
+	CreateHostedZone(ctx context.Context, logger logr.Logger, dnsZone DnsZone) (string, error)
 	DeleteHostedZone(ctx context.Context, logger logr.Logger, zoneId string) error
 	GetHostedZoneIdByName(ctx context.Context, logger logr.Logger, zoneName string) (string, error)
 	AddDelegationToParentZone(ctx context.Context, logger logr.Logger, parentZoneId, zoneId string) error

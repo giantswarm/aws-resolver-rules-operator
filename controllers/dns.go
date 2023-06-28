@@ -34,10 +34,10 @@ const (
 // When a workload cluster is deleted, the hosted zone is deleted, together with the delegation on the parent zone.
 type DnsReconciler struct {
 	awsClusterClient AWSClusterClient
-	dnsZone          resolver.DnsZone
+	dnsZone          resolver.Zoner
 }
 
-func NewDnsReconciler(awsClusterClient AWSClusterClient, dns resolver.DnsZone) *DnsReconciler {
+func NewDnsReconciler(awsClusterClient AWSClusterClient, dns resolver.Zoner) *DnsReconciler {
 	return &DnsReconciler{
 		awsClusterClient: awsClusterClient,
 		dnsZone:          dns,

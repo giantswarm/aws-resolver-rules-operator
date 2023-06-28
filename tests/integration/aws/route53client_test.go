@@ -10,6 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/route53"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
 
 var _ = Describe("Route53 Resolver client", func() {
@@ -32,15 +34,15 @@ var _ = Describe("Route53 Resolver client", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		When("we want a public hosted zone", func() {
+		Context("we want a public hosted zone", func() {
 			It("creates a public hosted zone successfully", func() {
-				hostedZoneId, err = route53Client.CreatePublicHostedZone(ctx, logger, "josepublic.test.example.com", tags)
+				hostedZoneId, err = route53Client.CreateHostedZone(ctx, logger, resolver.BuildPublicHostedZone("apublic.test.example.com", tags))
 				Expect(err).NotTo(HaveOccurred())
 
 				var publicListHostedZoneResponse *route53.ListHostedZonesByNameOutput
 				Eventually(func() (int, error) {
 					publicListHostedZoneResponse, err = rawRoute53Client.ListHostedZonesByNameWithContext(ctx, &route53.ListHostedZonesByNameInput{
-						DNSName:  awssdk.String("josepublic.test.example.com"),
+						DNSName:  awssdk.String("apublic.test.example.com"),
 						MaxItems: awssdk.String("1"),
 					})
 					return len(publicListHostedZoneResponse.HostedZones), err
@@ -67,17 +69,17 @@ var _ = Describe("Route53 Resolver client", func() {
 					now := time.Now()
 					_, err = rawRoute53Client.CreateHostedZone(&route53.CreateHostedZoneInput{
 						CallerReference: awssdk.String(fmt.Sprintf("1%d", now.UnixNano())),
-						Name:            awssdk.String("already.exists.test.example.com"),
+						Name:            awssdk.String("already.public.exists.test.example.com"),
 					})
 					Expect(err).NotTo(HaveOccurred())
 				})
 
 				It("doesn't return error", func() {
-					hostedZoneId, err = route53Client.CreatePublicHostedZone(ctx, logger, "already.exists.test.example.com", tags)
+					hostedZoneId, err = route53Client.CreateHostedZone(ctx, logger, resolver.BuildPublicHostedZone("already.public.exists.test.example.com", tags))
 					Expect(err).NotTo(HaveOccurred())
 
 					hostedZoneResponse, err := rawRoute53Client.ListHostedZonesByNameWithContext(ctx, &route53.ListHostedZonesByNameInput{
-						DNSName:  awssdk.String("already.exists.test.example.com"),
+						DNSName:  awssdk.String("already.public.exists.test.example.com"),
 						MaxItems: awssdk.String("1"),
 					})
 					Expect(err).NotTo(HaveOccurred())
@@ -86,19 +88,32 @@ var _ = Describe("Route53 Resolver client", func() {
 			})
 		})
 
-		When("we want a private hosted zone", func() {
+		Context("we want a private hosted zone", func() {
+			var cluster resolver.Cluster
+			var dnsZone resolver.DnsZone
+
+			BeforeEach(func() {
+				cluster = resolver.Cluster{
+					Name:   "aprivate",
+					Region: Region,
+					VPCId:  VPCId,
+				}
+				dnsZone = resolver.BuildPrivateHostedZone("aprivate.test.example.com", cluster, tags, []string{MCVPCId})
+			})
+
 			It("creates a private hosted zone successfully", func() {
-				hostedZoneId, err = route53Client.CreatePrivateHostedZone(ctx, logger, "joseprivate.test.example.com", VPCId, Region, tags, []string{MCVPCId})
+				hostedZoneId, err = route53Client.CreateHostedZone(ctx, logger, dnsZone)
 				Expect(err).NotTo(HaveOccurred())
 
 				var privateHostedZoneResponse *route53.ListHostedZonesByNameOutput
 				Eventually(func() (int, error) {
 					privateHostedZoneResponse, err = rawRoute53Client.ListHostedZonesByNameWithContext(ctx, &route53.ListHostedZonesByNameInput{
-						DNSName:  awssdk.String("joseprivate.test.example.com"),
+						DNSName:  awssdk.String("aprivate.test.example.com"),
 						MaxItems: awssdk.String("1"),
 					})
 					return len(privateHostedZoneResponse.HostedZones), err
 				}, "2s", "100ms").Should(Equal(1))
+				Expect(*privateHostedZoneResponse.HostedZones[0].Name).To(Equal("aprivate.test.example.com."))
 
 				actualTags, err := rawRoute53Client.ListTagsForResourceWithContext(ctx, &route53.ListTagsForResourceInput{
 					ResourceId:   privateHostedZoneResponse.HostedZones[0].Id,
@@ -118,7 +133,7 @@ var _ = Describe("Route53 Resolver client", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(associatedHostedZones.HostedZoneSummaries).To(ContainElement(&route53.HostedZoneSummary{
 					HostedZoneId: awssdk.String(strings.TrimPrefix(*privateHostedZoneResponse.HostedZones[0].Id, "/hostedzone/")),
-					Name:         awssdk.String("joseprivate.test.example.com."),
+					Name:         awssdk.String("aprivate.test.example.com."),
 					Owner: &route53.HostedZoneOwner{
 						OwningAccount: awssdk.String("000000000000"),
 					},
@@ -134,7 +149,7 @@ var _ = Describe("Route53 Resolver client", func() {
 							Comment:     awssdk.String("Zone for CAPI cluster"),
 							PrivateZone: awssdk.Bool(true),
 						},
-						Name: awssdk.String("already.exists.test.example.com"),
+						Name: awssdk.String("already.private.exists.test.example.com"),
 						VPC: &route53.VPC{
 							VPCId:     awssdk.String(VPCId),
 							VPCRegion: awssdk.String(Region),
@@ -144,11 +159,11 @@ var _ = Describe("Route53 Resolver client", func() {
 				})
 
 				It("doesn't return error", func() {
-					hostedZoneId, err = route53Client.CreatePrivateHostedZone(ctx, logger, "already.exists.test.example.com", VPCId, Region, tags, []string{MCVPCId})
+					hostedZoneId, err = route53Client.CreateHostedZone(ctx, logger, dnsZone)
 					Expect(err).NotTo(HaveOccurred())
 
 					hostedZoneResponse, err := rawRoute53Client.ListHostedZonesByNameWithContext(ctx, &route53.ListHostedZonesByNameInput{
-						DNSName:  awssdk.String("already.exists.test.example.com"),
+						DNSName:  awssdk.String("already.private.exists.test.example.com"),
 						MaxItems: awssdk.String("1"),
 					})
 					Expect(err).NotTo(HaveOccurred())
