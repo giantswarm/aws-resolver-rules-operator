@@ -92,7 +92,7 @@ func (d *Zoner) DeleteHostedZone(ctx context.Context, logger logr.Logger, cluste
 		}
 	}
 
-	err = route53Client.DeleteDnsRecordsFromHostedZone(ctx, logger, hostedZoneId, d.getWorkloadClusterDnsRecords(hostedZoneName, cluster))
+	err = route53Client.DeleteDnsRecordsFromHostedZone(ctx, logger, hostedZoneId)
 	if err != nil {
 		return errors.WithStack(err)
 	}

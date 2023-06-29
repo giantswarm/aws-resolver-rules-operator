@@ -90,10 +90,7 @@ func (r *Route53) CreateHostedZone(ctx context.Context, logger logr.Logger, dnsZ
 	}
 
 	if dnsZone.IsPrivate {
-		err = r.associateHostedZoneWithAdditionalVPCs(ctx, logger, hostedZoneId, dnsZone.Region, dnsZone.VPCsToAssociate)
-		if err != nil {
-			return "", errors.WithStack(err)
-		}
+		r.associateHostedZoneWithAdditionalVPCs(ctx, logger, hostedZoneId, dnsZone.Region, dnsZone.VPCsToAssociate)
 	}
 	logger.Info("Hosted zone created")
 
@@ -125,23 +122,22 @@ func (r *Route53) tagHostedZone(ctx context.Context, hostedZoneId string, tags m
 	return nil
 }
 
-func (r *Route53) associateHostedZoneWithAdditionalVPCs(ctx context.Context, logger logr.Logger, hostedZoneId, region string, vpcsToAssociate []string) error {
-	var err error
+// associateHostedZoneWithAdditionalVPCs will associate the hosted zone with all the VPCs passed as parameters.
+// If there is an error while associating one of them, it will log the error and continue with the next VPC.
+func (r *Route53) associateHostedZoneWithAdditionalVPCs(ctx context.Context, logger logr.Logger, hostedZoneId, region string, vpcsToAssociate []string) {
 	logger.Info("Associating hosted zone with VPCs", "vpcsToAssociate", vpcsToAssociate)
 	for _, vpcIdToAssociate := range vpcsToAssociate {
-		_, err = r.client.AssociateVPCWithHostedZoneWithContext(ctx, &route53.AssociateVPCWithHostedZoneInput{
+		_, err := r.client.AssociateVPCWithHostedZoneWithContext(ctx, &route53.AssociateVPCWithHostedZoneInput{
 			HostedZoneId: awssdk.String(hostedZoneId),
 			VPC: &route53.VPC{
 				VPCId:     awssdk.String(vpcIdToAssociate),
 				VPCRegion: awssdk.String(region),
 			},
 		})
+		if err != nil {
+			logger.Error(err, "error while associating VPC with hosted zone, skipping association", "vpcid", vpcIdToAssociate, "region", region)
+		}
 	}
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	return nil
 }
 
 func (r *Route53) DeleteHostedZone(ctx context.Context, logger logr.Logger, zoneId string) error {
@@ -235,8 +231,33 @@ func (r *Route53) AddDnsRecordsToHostedZone(ctx context.Context, logger logr.Log
 	return nil
 }
 
-func (r *Route53) DeleteDnsRecordsFromHostedZone(ctx context.Context, logger logr.Logger, hostedZoneId string, dnsRecords []resolver.DNSRecord) error {
+func (r *Route53) DeleteDnsRecordsFromHostedZone(ctx context.Context, logger logr.Logger, hostedZoneId string) error {
 	logger.Info("Deleting cluster dns records from hosted zone")
+	listRecordsResponse, err := r.client.ListResourceRecordSetsWithContext(ctx, &route53.ListResourceRecordSetsInput{
+		HostedZoneId: awssdk.String(hostedZoneId),
+	})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	for _, recordSet := range listRecordsResponse.ResourceRecordSets {
+		if *recordSet.Type == string(resolver.DnsRecordTypeCname) || *recordSet.Type == string(resolver.DnsRecordTypeA) {
+			_, err = r.client.ChangeResourceRecordSetsWithContext(ctx, &route53.ChangeResourceRecordSetsInput{
+				ChangeBatch: &route53.ChangeBatch{
+					Changes: []*route53.Change{
+						{
+							Action:            awssdk.String("DELETE"),
+							ResourceRecordSet: recordSet,
+						},
+					},
+				},
+				HostedZoneId: awssdk.String(hostedZoneId),
+			})
+			if err != nil {
+				return errors.WithStack(err)
+			}
+		}
+	}
+
 	return nil
 }
 

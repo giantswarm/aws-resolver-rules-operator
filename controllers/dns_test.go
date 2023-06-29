@@ -176,7 +176,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 
 				When("the cluster uses public dns mode", func() {
 					It("deletes the workload cluster dns records", func() {
-						_, _, hostedZoneId, _ := route53Client.DeleteDnsRecordsFromHostedZoneArgsForCall(0)
+						_, _, hostedZoneId := route53Client.DeleteDnsRecordsFromHostedZoneArgsForCall(0)
 						Expect(hostedZoneId).To(Equal("hosted-zone-id"))
 					})
 
@@ -222,7 +222,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 
 				When("the cluster uses private dns mode", func() {
 					It("deletes the workload cluster dns records", func() {
-						_, _, hostedZoneId, _ := route53Client.DeleteDnsRecordsFromHostedZoneArgsForCall(0)
+						_, _, hostedZoneId := route53Client.DeleteDnsRecordsFromHostedZoneArgsForCall(0)
 						Expect(hostedZoneId).To(Equal("hosted-zone-id"))
 					})
 

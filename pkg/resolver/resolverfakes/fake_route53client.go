@@ -67,13 +67,12 @@ type FakeRoute53Client struct {
 	deleteDelegationFromParentZoneReturnsOnCall map[int]struct {
 		result1 error
 	}
-	DeleteDnsRecordsFromHostedZoneStub        func(context.Context, logr.Logger, string, []resolver.DNSRecord) error
+	DeleteDnsRecordsFromHostedZoneStub        func(context.Context, logr.Logger, string) error
 	deleteDnsRecordsFromHostedZoneMutex       sync.RWMutex
 	deleteDnsRecordsFromHostedZoneArgsForCall []struct {
 		arg1 context.Context
 		arg2 logr.Logger
 		arg3 string
-		arg4 []resolver.DNSRecord
 	}
 	deleteDnsRecordsFromHostedZoneReturns struct {
 		result1 error
@@ -376,26 +375,20 @@ func (fake *FakeRoute53Client) DeleteDelegationFromParentZoneReturnsOnCall(i int
 	}{result1}
 }
 
-func (fake *FakeRoute53Client) DeleteDnsRecordsFromHostedZone(arg1 context.Context, arg2 logr.Logger, arg3 string, arg4 []resolver.DNSRecord) error {
-	var arg4Copy []resolver.DNSRecord
-	if arg4 != nil {
-		arg4Copy = make([]resolver.DNSRecord, len(arg4))
-		copy(arg4Copy, arg4)
-	}
+func (fake *FakeRoute53Client) DeleteDnsRecordsFromHostedZone(arg1 context.Context, arg2 logr.Logger, arg3 string) error {
 	fake.deleteDnsRecordsFromHostedZoneMutex.Lock()
 	ret, specificReturn := fake.deleteDnsRecordsFromHostedZoneReturnsOnCall[len(fake.deleteDnsRecordsFromHostedZoneArgsForCall)]
 	fake.deleteDnsRecordsFromHostedZoneArgsForCall = append(fake.deleteDnsRecordsFromHostedZoneArgsForCall, struct {
 		arg1 context.Context
 		arg2 logr.Logger
 		arg3 string
-		arg4 []resolver.DNSRecord
-	}{arg1, arg2, arg3, arg4Copy})
+	}{arg1, arg2, arg3})
 	stub := fake.DeleteDnsRecordsFromHostedZoneStub
 	fakeReturns := fake.deleteDnsRecordsFromHostedZoneReturns
-	fake.recordInvocation("DeleteDnsRecordsFromHostedZone", []interface{}{arg1, arg2, arg3, arg4Copy})
+	fake.recordInvocation("DeleteDnsRecordsFromHostedZone", []interface{}{arg1, arg2, arg3})
 	fake.deleteDnsRecordsFromHostedZoneMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3, arg4)
+		return stub(arg1, arg2, arg3)
 	}
 	if specificReturn {
 		return ret.result1
@@ -409,17 +402,17 @@ func (fake *FakeRoute53Client) DeleteDnsRecordsFromHostedZoneCallCount() int {
 	return len(fake.deleteDnsRecordsFromHostedZoneArgsForCall)
 }
 
-func (fake *FakeRoute53Client) DeleteDnsRecordsFromHostedZoneCalls(stub func(context.Context, logr.Logger, string, []resolver.DNSRecord) error) {
+func (fake *FakeRoute53Client) DeleteDnsRecordsFromHostedZoneCalls(stub func(context.Context, logr.Logger, string) error) {
 	fake.deleteDnsRecordsFromHostedZoneMutex.Lock()
 	defer fake.deleteDnsRecordsFromHostedZoneMutex.Unlock()
 	fake.DeleteDnsRecordsFromHostedZoneStub = stub
 }
 
-func (fake *FakeRoute53Client) DeleteDnsRecordsFromHostedZoneArgsForCall(i int) (context.Context, logr.Logger, string, []resolver.DNSRecord) {
+func (fake *FakeRoute53Client) DeleteDnsRecordsFromHostedZoneArgsForCall(i int) (context.Context, logr.Logger, string) {
 	fake.deleteDnsRecordsFromHostedZoneMutex.RLock()
 	defer fake.deleteDnsRecordsFromHostedZoneMutex.RUnlock()
 	argsForCall := fake.deleteDnsRecordsFromHostedZoneArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
 func (fake *FakeRoute53Client) DeleteDnsRecordsFromHostedZoneReturns(result1 error) {
