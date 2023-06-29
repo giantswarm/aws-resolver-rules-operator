@@ -556,6 +556,10 @@ var _ = Describe("AWSClusterClient", func() {
 				Expect(k8sClient.Create(ctx, bastionMachine)).To(Succeed())
 			})
 
+			AfterEach(func() {
+				Expect(k8sClient.Delete(ctx, bastionMachine))
+			})
+
 			When("machine still has no IP set in status field", func() {
 				It("returns empty string", func() {
 					bastionIp, err := awsClusterClient.GetBastionIp(ctx, awsCluster, capi.MachineInternalIP)

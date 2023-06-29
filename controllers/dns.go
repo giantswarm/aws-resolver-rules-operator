@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"strings"
 
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
 	"github.com/pkg/errors"
@@ -101,18 +100,7 @@ func (r *DnsReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AW
 	cluster.BastionIp = bastionIp
 	cluster.ControlPlaneEndpoint = capiCluster.Spec.ControlPlaneEndpoint.Host
 
-	annotation, ok := awsCluster.Annotations[gsannotations.AWSDNSMode]
-	if ok && annotation == gsannotations.DNSModePrivate {
-		additionalVPCToAssociate := strings.Split(awsCluster.Annotations[gsannotations.AWSDNSAdditionalVPC], ",")
-		err = r.dnsZone.CreatePrivateHostedZone(ctx, logger, cluster, additionalVPCToAssociate)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-
-		return ctrl.Result{}, nil
-	}
-
-	err = r.dnsZone.CreatePublicHostedZone(ctx, logger, cluster)
+	err = r.dnsZone.CreateHostedZone(ctx, logger, cluster)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

@@ -22,51 +22,42 @@ func NewDnsZone(awsClients AWSClients, workloadClusterBaseDomain string) (Zoner,
 	}, nil
 }
 
-func (d *Zoner) CreatePublicHostedZone(ctx context.Context, logger logr.Logger, cluster Cluster) error {
+func (d *Zoner) CreateHostedZone(ctx context.Context, logger logr.Logger, cluster Cluster) error {
 	route53Client, err := d.awsClients.NewRoute53Client(cluster.Region, cluster.IAMRoleARN)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	logger.Info("Creating public hosted zone", "hostedZoneName", d.getHostedZoneName(cluster))
-	hostedZoneId, err := route53Client.CreateHostedZone(ctx, logger, BuildPublicHostedZone(d.getHostedZoneName(cluster), d.getTagsForHostedZone(cluster)))
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	logger.Info("Hosted zone created", "hostedZoneId", hostedZoneId, "hostedZoneName", d.getHostedZoneName(cluster))
+	hostedZoneName := d.getHostedZoneName(cluster)
+	logger = logger.WithValues("hostedZoneName", hostedZoneName)
 
-	parentHostedZoneId, err := route53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName())
-	if err != nil {
-		return errors.WithStack(err)
+	dnsZoneToCreate := BuildPublicHostedZone(hostedZoneName, d.getTagsForHostedZone(cluster))
+	if cluster.IsDnsModePrivate {
+		dnsZoneToCreate = BuildPrivateHostedZone(hostedZoneName, d.getTagsForHostedZone(cluster), cluster.VPCId, cluster.Region, cluster.VPCsToAssociateToHostedZone)
 	}
 
-	logger.Info("Adding delegation to parent hosted zone", "parentHostedZoneId", parentHostedZoneId)
-	err = route53Client.AddDelegationToParentZone(ctx, logger, parentHostedZoneId, hostedZoneId)
+	hostedZoneId, err := route53Client.CreateHostedZone(ctx, logger, dnsZoneToCreate)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	logger.Info("Added delegation to parent hosted zone")
+	logger = logger.WithValues("hostedZoneId", hostedZoneId)
 
 	err = d.createDnsRecords(ctx, logger, cluster, hostedZoneId)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	return nil
-}
+	if !cluster.IsDnsModePrivate {
+		parentHostedZoneId, err := route53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName())
+		if err != nil {
+			return errors.WithStack(err)
+		}
 
-func (d *Zoner) CreatePrivateHostedZone(ctx context.Context, logger logr.Logger, cluster Cluster, vpcsToAssociate []string) error {
-	route53Client, err := d.awsClients.NewRoute53Client(cluster.Region, cluster.IAMRoleARN)
-	if err != nil {
-		return errors.WithStack(err)
+		err = route53Client.AddDelegationToParentZone(ctx, logger, parentHostedZoneId, hostedZoneId)
+		if err != nil {
+			return errors.WithStack(err)
+		}
 	}
-
-	logger.Info("Creating private hosted zone")
-	hostedZoneId, err := route53Client.CreateHostedZone(ctx, logger, BuildPrivateHostedZone(d.getHostedZoneName(cluster), cluster, d.getTagsForHostedZone(cluster), vpcsToAssociate))
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	logger.Info("Hosted zone created", "hostedZoneId", hostedZoneId, "hostedZoneName", d.getHostedZoneName(cluster))
 
 	return nil
 }
@@ -76,40 +67,40 @@ func (d *Zoner) DeleteHostedZone(ctx context.Context, logger logr.Logger, cluste
 	if err != nil {
 		return errors.WithStack(err)
 	}
-
-	parentHostedZoneId, err := route53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName())
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	hostedZoneId, err := route53Client.GetHostedZoneIdByName(ctx, logger, d.getHostedZoneName(cluster))
+	hostedZoneName := d.getHostedZoneName(cluster)
+	hostedZoneId, err := route53Client.GetHostedZoneIdByName(ctx, logger, hostedZoneName)
 	if err != nil {
 		if errors.Is(err, &HostedZoneNotFoundError{}) {
-			logger.Info("Hosted zone can't be found, skipping deletion", "parentHostedZoneId", parentHostedZoneId, "hostedZoneId", hostedZoneId, "hostedZoneName", d.getHostedZoneName(cluster))
+			logger.Info("Hosted zone can't be found, skipping deletion", "hostedZoneId", hostedZoneId, "hostedZoneName", hostedZoneName)
 			return nil
 		}
 
 		return errors.WithStack(err)
 	}
+	logger = logger.WithValues("hostedZoneId", hostedZoneId)
 
-	logger.Info("Deleting delegation from parent hosted zone", "parentHostedZoneId", parentHostedZoneId, "hostedZoneId", hostedZoneId)
-	err = route53Client.DeleteDelegationFromParentZone(ctx, logger, parentHostedZoneId, hostedZoneId)
+	if !cluster.IsDnsModePrivate {
+		parentHostedZoneId, err := route53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName())
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		logger.Info("Deleting delegation from parent hosted zone", "parentHostedZoneId", parentHostedZoneId)
+		err = route53Client.DeleteDelegationFromParentZone(ctx, logger, parentHostedZoneId, hostedZoneId)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+	}
+
+	err = route53Client.DeleteDnsRecordsFromHostedZone(ctx, logger, hostedZoneId, d.getWorkloadClusterDnsRecords(hostedZoneName, cluster))
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	logger.Info("Deleting cluster dns records from hosted zone")
-	err = route53Client.DeleteDnsRecordsFromHostedZone(ctx, logger, hostedZoneId, d.getWorkloadClusterDnsRecords(d.getHostedZoneName(cluster), cluster))
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	logger.Info("Deleting hosted zone")
 	err = route53Client.DeleteHostedZone(ctx, logger, hostedZoneId)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	logger.Info("Hosted zone deleted", "hostedZoneId", hostedZoneId)
 
 	return nil
 }
@@ -121,12 +112,10 @@ func (d *Zoner) createDnsRecords(ctx context.Context, logger logr.Logger, cluste
 	}
 
 	dnsRecordsToCreate := d.getWorkloadClusterDnsRecords(d.getHostedZoneName(cluster), cluster)
-	logger.Info("Creating DNS records", "dnsRecords", dnsRecordsToCreate, "hostedZoneId", hostedZoneId)
 	err = route53Client.AddDnsRecordsToHostedZone(ctx, logger, hostedZoneId, dnsRecordsToCreate)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	logger.Info("DNS records created", "dnsRecords", dnsRecordsToCreate, "hostedZoneId", hostedZoneId)
 
 	return nil
 }
@@ -150,7 +139,7 @@ func (d *Zoner) getTagsForHostedZone(cluster Cluster) map[string]string {
 func (d *Zoner) getWorkloadClusterDnsRecords(workloadClusterHostedZoneName string, cluster Cluster) []DNSRecord {
 	dnsRecords := []DNSRecord{
 		{
-			Kind:  "CNAME",
+			Kind:  DnsRecordTypeCname,
 			Name:  fmt.Sprintf("*.%s", workloadClusterHostedZoneName),
 			Value: fmt.Sprintf("ingress.%s", workloadClusterHostedZoneName),
 		},
@@ -158,7 +147,7 @@ func (d *Zoner) getWorkloadClusterDnsRecords(workloadClusterHostedZoneName strin
 
 	if cluster.ControlPlaneEndpoint != "" {
 		dnsRecords = append(dnsRecords, DNSRecord{
-			Kind:   "ALIAS",
+			Kind:   DnsRecordTypeAlias,
 			Name:   fmt.Sprintf("api.%s", workloadClusterHostedZoneName),
 			Value:  cluster.ControlPlaneEndpoint,
 			Region: cluster.Region,
@@ -167,7 +156,7 @@ func (d *Zoner) getWorkloadClusterDnsRecords(workloadClusterHostedZoneName strin
 
 	if cluster.BastionIp != "" {
 		dnsRecords = append(dnsRecords, DNSRecord{
-			Kind:  "A",
+			Kind:  DnsRecordTypeA,
 			Name:  fmt.Sprintf("bastion1.%s", workloadClusterHostedZoneName),
 			Value: cluster.BastionIp,
 		})

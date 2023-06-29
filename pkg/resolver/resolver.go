@@ -17,17 +17,6 @@ type Resolver struct {
 	workloadClusterBaseDomain string
 }
 
-type Cluster struct {
-	Name                 string
-	BastionIp            string
-	ControlPlaneEndpoint string
-	Region               string
-	VPCCidr              string
-	VPCId                string
-	IAMRoleARN           string
-	Subnets              []string
-}
-
 func NewResolver(awsClients AWSClients, dnsServer DNSServer, workloadClusterBaseDomain string) (Resolver, error) {
 	return Resolver{
 		awsClients:                awsClients,

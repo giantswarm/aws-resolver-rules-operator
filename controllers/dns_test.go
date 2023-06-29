@@ -170,18 +170,13 @@ var _ = Describe("Dns Zone reconciler", func() {
 				BeforeEach(func() {
 					deletionTime := metav1.Now()
 					awsCluster.DeletionTimestamp = &deletionTime
-					route53Client.GetHostedZoneIdByNameReturnsOnCall(0, "parent-hosted-zone-id", nil)
-					route53Client.GetHostedZoneIdByNameReturnsOnCall(1, "hosted-zone-id", nil)
+					route53Client.GetHostedZoneIdByNameReturnsOnCall(0, "hosted-zone-id", nil)
+					route53Client.GetHostedZoneIdByNameReturnsOnCall(1, "parent-hosted-zone-id", nil)
 				})
 
-				When("the hosted zone hasn't been deleted yet", func() {
+				When("the cluster uses public dns mode", func() {
 					It("deletes the workload cluster dns records", func() {
 						_, _, hostedZoneId, _ := route53Client.DeleteDnsRecordsFromHostedZoneArgsForCall(0)
-						Expect(hostedZoneId).To(Equal("hosted-zone-id"))
-					})
-
-					It("deletes the workload cluster hosted zone", func() {
-						_, _, hostedZoneId := route53Client.DeleteHostedZoneArgsForCall(0)
 						Expect(hostedZoneId).To(Equal("hosted-zone-id"))
 					})
 
@@ -189,6 +184,11 @@ var _ = Describe("Dns Zone reconciler", func() {
 						Expect(route53Client.DeleteDelegationFromParentZoneCallCount()).To(Equal(1))
 						_, _, parentHostedZoneId, hostedZoneId := route53Client.DeleteDelegationFromParentZoneArgsForCall(0)
 						Expect(parentHostedZoneId).To(Equal("parent-hosted-zone-id"))
+						Expect(hostedZoneId).To(Equal("hosted-zone-id"))
+					})
+
+					It("deletes the workload cluster hosted zone", func() {
+						_, _, hostedZoneId := route53Client.DeleteHostedZoneArgsForCall(0)
 						Expect(hostedZoneId).To(Equal("hosted-zone-id"))
 					})
 
@@ -205,16 +205,56 @@ var _ = Describe("Dns Zone reconciler", func() {
 							Expect(awsClusterClient.RemoveFinalizerCallCount()).To(Equal(0))
 						})
 					})
+
+					When("the hosted zone was already deleted", func() {
+						BeforeEach(func() {
+							route53Client.GetHostedZoneIdByNameReturnsOnCall(0, "", &resolver.HostedZoneNotFoundError{})
+						})
+
+						It("doesn't return an error", func() {
+							Expect(route53Client.DeleteDnsRecordsFromHostedZoneCallCount()).To(Equal(0))
+							Expect(route53Client.DeleteDelegationFromParentZoneCallCount()).To(Equal(0))
+							Expect(route53Client.DeleteHostedZoneCallCount()).To(Equal(0))
+							Expect(reconcileErr).NotTo(HaveOccurred())
+						})
+					})
 				})
 
-				When("the hosted zone was already deleted", func() {
-					BeforeEach(func() {
-						route53Client.GetHostedZoneIdByNameReturnsOnCall(1, "", &resolver.HostedZoneNotFoundError{})
+				When("the cluster uses private dns mode", func() {
+					It("deletes the workload cluster dns records", func() {
+						_, _, hostedZoneId, _ := route53Client.DeleteDnsRecordsFromHostedZoneArgsForCall(0)
+						Expect(hostedZoneId).To(Equal("hosted-zone-id"))
 					})
 
-					It("doesn't return an error", func() {
-						Expect(route53Client.DeleteDelegationFromParentZoneCallCount()).To(Equal(0))
-						Expect(reconcileErr).NotTo(HaveOccurred())
+					It("deletes the workload cluster hosted zone", func() {
+						_, _, hostedZoneId := route53Client.DeleteHostedZoneArgsForCall(0)
+						Expect(hostedZoneId).To(Equal("hosted-zone-id"))
+					})
+
+					It("deletes the finalizer", func() {
+						Expect(awsClusterClient.RemoveFinalizerCallCount()).To(Equal(1))
+					})
+
+					When("it fails to delete the hosted zone", func() {
+						BeforeEach(func() {
+							route53Client.DeleteHostedZoneReturns(errors.New("failed to remove hosted zone"))
+						})
+
+						It("does not delete the finalizer", func() {
+							Expect(awsClusterClient.RemoveFinalizerCallCount()).To(Equal(0))
+						})
+					})
+
+					When("the hosted zone was already deleted", func() {
+						BeforeEach(func() {
+							route53Client.GetHostedZoneIdByNameReturnsOnCall(0, "", &resolver.HostedZoneNotFoundError{})
+						})
+
+						It("doesn't return an error", func() {
+							Expect(route53Client.DeleteDnsRecordsFromHostedZoneCallCount()).To(Equal(0))
+							Expect(route53Client.DeleteHostedZoneCallCount()).To(Equal(0))
+							Expect(reconcileErr).NotTo(HaveOccurred())
+						})
 					})
 				})
 			})
@@ -256,7 +296,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 						_, _, hostedZoneId, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
 						Expect(hostedZoneId).To(Equal("hosted-zone-id"))
 						Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
-							Kind:  "CNAME",
+							Kind:  resolver.DnsRecordTypeCname,
 							Name:  fmt.Sprintf("*.%s.%s", ClusterName, WorkloadClusterBaseDomain),
 							Value: fmt.Sprintf("ingress.%s.%s", ClusterName, WorkloadClusterBaseDomain),
 						}))
@@ -270,7 +310,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 						It("creates DNS records for workload cluster", func() {
 							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
 							Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
-								Kind:   "ALIAS",
+								Kind:   resolver.DnsRecordTypeAlias,
 								Name:   fmt.Sprintf("api.%s.%s", ClusterName, WorkloadClusterBaseDomain),
 								Value:  "control-plane-load-balancer-hostname",
 								Region: awsCluster.Spec.Region,
@@ -296,7 +336,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 						It("it creates DNS record for the bastion", func() {
 							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
 							Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
-								Kind:  "A",
+								Kind:  resolver.DnsRecordTypeA,
 								Name:  fmt.Sprintf("bastion1.%s.%s", ClusterName, WorkloadClusterBaseDomain),
 								Value: "192.168.0.1",
 							}))
@@ -373,7 +413,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 							gsannotations.AWSDNSMode:          "private",
 							gsannotations.AWSDNSAdditionalVPC: "vpc-0011223344,vpc-0987654321",
 						}
-						route53Client.CreatePrivateHostedZoneReturns("hosted-zone-id", nil)
+						route53Client.CreateHostedZoneReturns("hosted-zone-id", nil)
 					})
 
 					It("creates hosted zone", func() {

@@ -89,16 +89,10 @@ var _ = Describe("Route53 Resolver client", func() {
 		})
 
 		Context("we want a private hosted zone", func() {
-			var cluster resolver.Cluster
 			var dnsZone resolver.DnsZone
 
 			BeforeEach(func() {
-				cluster = resolver.Cluster{
-					Name:   "aprivate",
-					Region: Region,
-					VPCId:  VPCId,
-				}
-				dnsZone = resolver.BuildPrivateHostedZone("aprivate.test.example.com", cluster, tags, []string{MCVPCId})
+				dnsZone = resolver.BuildPrivateHostedZone("aprivate.test.example.com", tags, VPCId, Region, []string{MCVPCId})
 			})
 
 			It("creates a private hosted zone successfully", func() {
