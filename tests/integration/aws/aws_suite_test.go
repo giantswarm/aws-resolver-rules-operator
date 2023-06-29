@@ -25,14 +25,13 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	awssession "github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/aws/aws-sdk-go/service/route53resolver"
 	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
-	"go.uber.org/zap/zapcore"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	// +kubebuilder:scaffold:imports
 
@@ -50,7 +49,7 @@ func TestControllers(t *testing.T) {
 }
 
 const (
-	AWS_IAM_ARN            = "arn:aws:iam::1234567890:role/IamRole"
+	AwsIamArn              = "arn:aws:iam::1234567890:role/IamRole"
 	Region                 = "eu-central-1"
 	LocalstackAWSAccountId = "000000000000"
 )
@@ -61,30 +60,37 @@ var (
 	ec2Client         resolver.EC2Client
 	logger            logr.Logger
 	resolverClient    resolver.ResolverClient
+	route53Client     resolver.Route53Client
 	err               error
 	rawEC2Client      *ec2.EC2
 	rawResolverClient *route53resolver.Route53Resolver
+	rawRoute53Client  *route53.Route53
 	subnets           []string
+	MCVPCId           string
 	VPCId             string
 )
 
 var _ = BeforeSuite(func() {
-	opts := zap.Options{
-		DestWriter:  GinkgoWriter,
-		Development: true,
-		TimeEncoder: zapcore.RFC3339TimeEncoder,
-	}
-	logger = zap.New(zap.UseFlagOptions(&opts))
+	logger = GinkgoLogr
 	logf.SetLogger(logger)
 	tests.GetEnvOrSkip("AWS_ENDPOINT")
 
 	awsClients = aws.NewClients(os.Getenv("AWS_ENDPOINT"))
 
-	rawEC2Client, err = NewEC2Client(Region, AWS_IAM_ARN, "")
+	rawEC2Client, err = NewEC2Client(Region, AwsIamArn, "")
 	Expect(err).NotTo(HaveOccurred())
 
-	rawResolverClient, err = NewResolverClient(Region, AWS_IAM_ARN, "")
+	rawResolverClient, err = NewResolverClient(Region, AwsIamArn, "")
 	Expect(err).NotTo(HaveOccurred())
+
+	rawRoute53Client, err = NewRoute53Client(Region, AwsIamArn, "")
+	Expect(err).NotTo(HaveOccurred())
+
+	createMCVPCResponse, err := rawEC2Client.CreateVpc(&ec2.CreateVpcInput{
+		CidrBlock: awssdk.String("10.0.0.0/16"),
+	})
+	Expect(err).NotTo(HaveOccurred())
+	MCVPCId = *createMCVPCResponse.Vpc.VpcId
 
 	createVPCResponse, err := rawEC2Client.CreateVpc(&ec2.CreateVpcInput{
 		CidrBlock: awssdk.String("10.0.0.0/16"),
@@ -134,6 +140,24 @@ func NewResolverClient(region, arn, externalId string) (*route53resolver.Route53
 	}
 
 	client := route53resolver.New(session, &awssdk.Config{Credentials: stscreds.NewCredentials(session, arn, func(assumeRoleProvider *stscreds.AssumeRoleProvider) {
+		if externalId != "" {
+			assumeRoleProvider.ExternalID = awssdk.String(externalId)
+		}
+	})})
+
+	return client, nil
+}
+
+func NewRoute53Client(region, arn, externalId string) (*route53.Route53, error) {
+	session, err := awssession.NewSession(&awssdk.Config{
+		Region:   awssdk.String(region),
+		Endpoint: awssdk.String(os.Getenv("AWS_ENDPOINT")),
+	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	client := route53.New(session, &awssdk.Config{Credentials: stscreds.NewCredentials(session, arn, func(assumeRoleProvider *stscreds.AssumeRoleProvider) {
 		if externalId != "" {
 			assumeRoleProvider.ExternalID = awssdk.String(externalId)
 		}

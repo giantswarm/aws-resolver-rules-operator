@@ -112,12 +112,23 @@ func main() {
 		os.Exit(1)
 	}
 
+	dns, err := resolver.NewDnsZone(awsClients, workloadClusterBaseDomain)
+	if err != nil {
+		setupLog.Error(err, "unable to create Resolver")
+		os.Exit(1)
+	}
+
 	if err = (controllers.NewResolverRulesReconciler(k8sAwsClusterClient, awsResolver)).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller")
 		os.Exit(1)
 	}
 
 	if err = (controllers.NewUnpauseReconciler(k8sAwsClusterClient)).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller")
+		os.Exit(1)
+	}
+
+	if err = (controllers.NewDnsReconciler(k8sAwsClusterClient, dns)).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller")
 		os.Exit(1)
 	}

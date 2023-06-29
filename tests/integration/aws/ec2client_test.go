@@ -18,7 +18,7 @@ var _ = Describe("EC2 client", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 
-		ec2Client, err = awsClients.NewEC2Client(Region, AWS_IAM_ARN)
+		ec2Client, err = awsClients.NewEC2Client(Region, AwsIamArn)
 		Expect(err).NotTo(HaveOccurred())
 	})
 

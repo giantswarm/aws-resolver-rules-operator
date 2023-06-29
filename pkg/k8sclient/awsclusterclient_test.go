@@ -242,24 +242,24 @@ var _ = Describe("AWSClusterClient", func() {
 		})
 
 		It("adds the finalizer to the cluster", func() {
-			err := awsClusterClient.AddFinalizer(ctx, awsCluster, controllers.Finalizer)
+			err := awsClusterClient.AddFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
 			Expect(err).NotTo(HaveOccurred())
 
 			actualCluster := &capa.AWSCluster{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: awsCluster.Name, Namespace: awsCluster.Namespace}, actualCluster)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(actualCluster.Finalizers).To(ContainElement(controllers.Finalizer))
+			Expect(actualCluster.Finalizers).To(ContainElement(controllers.ResolverRulesFinalizer))
 		})
 
 		When("the finalizer already exists", func() {
 			BeforeEach(func() {
-				err := awsClusterClient.AddFinalizer(ctx, awsCluster, controllers.Finalizer)
+				err := awsClusterClient.AddFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("does not return an error", func() {
-				err := awsClusterClient.AddFinalizer(ctx, awsCluster, controllers.Finalizer)
+				err := awsClusterClient.AddFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -272,7 +272,7 @@ var _ = Describe("AWSClusterClient", func() {
 						Namespace: namespace,
 					},
 				}
-				err := awsClusterClient.AddFinalizer(ctx, awsCluster, controllers.Finalizer)
+				err := awsClusterClient.AddFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
 				Expect(k8serrors.IsNotFound(err)).To(BeTrue())
 			})
 		})
@@ -285,7 +285,7 @@ var _ = Describe("AWSClusterClient", func() {
 			})
 
 			It("returns an error", func() {
-				err := awsClusterClient.AddFinalizer(ctx, awsCluster, controllers.Finalizer)
+				err := awsClusterClient.AddFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
 				Expect(err).To(MatchError(ContainSubstring("context canceled")))
 			})
 		})
@@ -300,7 +300,7 @@ var _ = Describe("AWSClusterClient", func() {
 					Name:      "test-cluster",
 					Namespace: namespace,
 					Finalizers: []string{
-						controllers.Finalizer,
+						controllers.ResolverRulesFinalizer,
 					},
 				},
 			}
@@ -308,24 +308,24 @@ var _ = Describe("AWSClusterClient", func() {
 		})
 
 		It("removes the finalizer to the cluster", func() {
-			err := awsClusterClient.RemoveFinalizer(ctx, awsCluster, controllers.Finalizer)
+			err := awsClusterClient.RemoveFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
 			Expect(err).NotTo(HaveOccurred())
 
 			actualCluster := &capa.AWSCluster{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: awsCluster.Name, Namespace: awsCluster.Namespace}, actualCluster)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(actualCluster.Finalizers).NotTo(ContainElement(controllers.Finalizer))
+			Expect(actualCluster.Finalizers).NotTo(ContainElement(controllers.ResolverRulesFinalizer))
 		})
 
 		When("the finalizer doesn't exists", func() {
 			BeforeEach(func() {
-				err := awsClusterClient.RemoveFinalizer(ctx, awsCluster, controllers.Finalizer)
+				err := awsClusterClient.RemoveFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("does not return an error", func() {
-				err := awsClusterClient.RemoveFinalizer(ctx, awsCluster, controllers.Finalizer)
+				err := awsClusterClient.RemoveFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -338,7 +338,7 @@ var _ = Describe("AWSClusterClient", func() {
 						Namespace: namespace,
 					},
 				}
-				err := awsClusterClient.RemoveFinalizer(ctx, awsCluster, controllers.Finalizer)
+				err := awsClusterClient.RemoveFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
 				Expect(k8serrors.IsNotFound(err)).To(BeTrue())
 			})
 		})
@@ -351,7 +351,7 @@ var _ = Describe("AWSClusterClient", func() {
 			})
 
 			It("returns an error", func() {
-				err := awsClusterClient.RemoveFinalizer(ctx, awsCluster, controllers.Finalizer)
+				err := awsClusterClient.RemoveFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
 				Expect(err).To(MatchError(ContainSubstring("context canceled")))
 			})
 		})

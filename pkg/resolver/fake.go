@@ -5,6 +5,7 @@ type FakeClients struct {
 	RAMClient              RAMClient
 	ResolverClient         ResolverClient
 	ExternalResolverClient ResolverClient
+	Route53Client          Route53Client
 }
 
 func (f *FakeClients) NewResolverClient(region, roleToAssume string) (ResolverClient, error) {
@@ -29,4 +30,8 @@ func (f *FakeClients) NewEC2ClientWithExternalId(region, arn, externalId string)
 
 func (f *FakeClients) NewRAMClientWithExternalId(region, arn, externalId string) (RAMClient, error) {
 	return f.RAMClient, nil
+}
+
+func (f *FakeClients) NewRoute53Client(region, arn string) (Route53Client, error) {
+	return f.Route53Client, nil
 }
