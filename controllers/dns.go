@@ -59,26 +59,21 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	cluster, err := r.awsClusterClient.GetCluster(ctx, req.NamespacedName)
-	if err != nil {
-		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
-	}
-
 	if identity == nil {
 		logger.Info("AWSCluster has no identityRef set, skipping")
 		return ctrl.Result{}, nil
 	}
 
 	if !awsCluster.DeletionTimestamp.IsZero() {
-		return r.reconcileDelete(ctx, awsCluster, cluster, identity)
+		return r.reconcileDelete(ctx, awsCluster, identity)
 	}
 
-	return r.reconcileNormal(ctx, awsCluster, cluster, identity)
+	return r.reconcileNormal(ctx, awsCluster, identity)
 }
 
 // reconcileNormal creates the hosted zone and the DNS records for the workload cluster.
 // It will take care of dns delegation in the parent hosted zone when using public dns mode.
-func (r *DnsReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AWSCluster, capiCluster *capi.Cluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
+func (r *DnsReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	err := r.awsClusterClient.AddFinalizer(ctx, awsCluster, DnsFinalizer)
@@ -98,7 +93,6 @@ func (r *DnsReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AW
 
 	cluster := buildCluster(awsCluster, identity)
 	cluster.BastionIp = bastionIp
-	cluster.ControlPlaneEndpoint = capiCluster.Spec.ControlPlaneEndpoint.Host
 
 	err = r.dnsZone.CreateHostedZone(ctx, logger, cluster)
 	if err != nil {
@@ -110,7 +104,7 @@ func (r *DnsReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AW
 
 // reconcileDelete deletes the hosted zone and the DNS records for the workload cluster.
 // It will delete the delegation records in the parent hosted zone when using public dns mode.
-func (r *DnsReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AWSCluster, capiCluster *capi.Cluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
+func (r *DnsReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	cluster := buildCluster(awsCluster, identity)

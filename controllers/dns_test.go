@@ -9,11 +9,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/aws-resolver-rules-operator/controllers"
@@ -28,7 +26,6 @@ var _ = Describe("Dns Zone reconciler", func() {
 		ctx                     context.Context
 		reconciler              *controllers.DnsReconciler
 		awsCluster              *capa.AWSCluster
-		cluster                 *capi.Cluster
 		awsClusterRoleIdentity  *capa.AWSClusterRoleIdentity
 		result                  ctrl.Result
 		reconcileErr            error
@@ -90,18 +87,6 @@ var _ = Describe("Dns Zone reconciler", func() {
 				},
 			},
 		}
-		cluster = &capi.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      ClusterName,
-				Namespace: ClusterNamespace,
-			},
-			Spec: capi.ClusterSpec{
-				InfrastructureRef: &corev1.ObjectReference{
-					Namespace: ClusterNamespace,
-					Name:      ClusterName,
-				},
-			},
-		}
 	})
 
 	JustBeforeEach(func() {
@@ -131,7 +116,6 @@ var _ = Describe("Dns Zone reconciler", func() {
 	When("reconciling an existing cluster", func() {
 		BeforeEach(func() {
 			awsClusterClient.GetAWSClusterReturns(awsCluster, nil)
-			awsClusterClient.GetClusterReturns(cluster, nil)
 		})
 
 		When("we get an error trying to get the cluster identity", func() {
@@ -304,7 +288,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 
 					When("the k8s API endpoint of the workload cluster is set", func() {
 						BeforeEach(func() {
-							cluster.Spec.ControlPlaneEndpoint.Host = "control-plane-load-balancer-hostname"
+							awsCluster.Spec.ControlPlaneEndpoint.Host = "control-plane-load-balancer-hostname"
 						})
 
 						It("creates DNS records for workload cluster", func() {
@@ -444,9 +428,24 @@ var _ = Describe("Dns Zone reconciler", func() {
 						}))
 					})
 
+					When("there are no additional VPCs to associate", func() {
+						BeforeEach(func() {
+							awsCluster.Annotations = map[string]string{
+								gsannotations.AWSDNSMode: "private",
+							}
+						})
+
+						It("creates hosted zone", func() {
+							Expect(route53Client.CreateHostedZoneCallCount()).To(Equal(1))
+							_, _, dnsZone := route53Client.CreateHostedZoneArgsForCall(0)
+							Expect(dnsZone.VPCsToAssociate).To(HaveLen(0))
+							Expect(reconcileErr).NotTo(HaveOccurred())
+						})
+					})
+
 					When("the k8s API endpoint of the workload cluster is set", func() {
 						BeforeEach(func() {
-							cluster.Spec.ControlPlaneEndpoint.Host = "control-plane-load-balancer-hostname"
+							awsCluster.Spec.ControlPlaneEndpoint.Host = "control-plane-load-balancer-hostname"
 						})
 
 						It("creates DNS records for workload cluster", func() {
