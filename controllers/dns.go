@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/util/annotations"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -52,6 +53,21 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	awsCluster, err := r.awsClusterClient.GetAWSCluster(ctx, req.NamespacedName)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
+	}
+
+	cluster, err := r.awsClusterClient.GetOwner(ctx, awsCluster)
+	if err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
+	if cluster == nil {
+		logger.Info("AWSCluster does not have an owner cluster yet, skipping")
+		return ctrl.Result{}, nil
+	}
+
+	if annotations.IsPaused(cluster, awsCluster) {
+		logger.Info("Infrastructure or core cluster is marked as paused, skipping")
+		return ctrl.Result{}, nil
 	}
 
 	identity, err := r.awsClusterClient.GetIdentity(ctx, awsCluster)
