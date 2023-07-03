@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add necessary values for PSS policy warnings.
 - Add new reconciler that creates hosted zones for reconciled clusters.
 
+### Changed
+
+- Don't fail at start up if DNS server settings for resolver rules reconciler are missing.
+
 ## [0.6.0] - 2023-05-05
 
 ### Fixed

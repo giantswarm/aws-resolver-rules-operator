@@ -1,9 +1,5 @@
 package resolver
 
-import (
-	"github.com/pkg/errors"
-)
-
 type DNSServer struct {
 	// AWSAccountId is the AWS account id where the DNS server is deployed.
 	AWSAccountId string
@@ -18,22 +14,6 @@ type DNSServer struct {
 }
 
 func NewDNSServer(awsAccountId, iamExternalId, awsRegion, iamRoleToAssume, vpcId string) (DNSServer, error) {
-	if awsAccountId == "" {
-		return DNSServer{}, errors.New("AWS Account id can't be empty")
-	}
-	if iamExternalId == "" {
-		return DNSServer{}, errors.New("IAM External id can't be empty")
-	}
-	if awsRegion == "" {
-		return DNSServer{}, errors.New("AWS Region can't be empty")
-	}
-	if iamRoleToAssume == "" {
-		return DNSServer{}, errors.New("AWS IAM role can't be empty")
-	}
-	if vpcId == "" {
-		return DNSServer{}, errors.New("AWS VPC id can't be empty")
-	}
-
 	return DNSServer{
 		AWSAccountId:    awsAccountId,
 		IAMExternalId:   iamExternalId,
