@@ -491,4 +491,102 @@ var _ = Describe("AWSClusterClient", func() {
 			Expect(capi.PausedAnnotation).ShouldNot(BeKeyOf(actualAwsCluster.Annotations))
 		})
 	})
+
+	Describe("GetBastionIp", func() {
+		var awsCluster *capa.AWSCluster
+		var cluster *capi.Cluster
+
+		BeforeEach(func() {
+			clusterUUID := types.UID(uuid.NewString())
+			cluster = &capi.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: namespace,
+					UID:       clusterUUID,
+				},
+				Spec: capi.ClusterSpec{
+					Paused: true,
+				},
+			}
+			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
+
+			awsCluster = &capa.AWSCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-cluster",
+					Namespace:   namespace,
+					Annotations: map[string]string{capi.PausedAnnotation: "true"},
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion: capi.GroupVersion.String(),
+							Kind:       "Cluster",
+							Name:       "test-cluster",
+							UID:        clusterUUID,
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, awsCluster)).To(Succeed())
+		})
+
+		When("there is no bastion machine", func() {
+			It("returns empty string", func() {
+				bastionIp, err := awsClusterClient.GetBastionIp(ctx, awsCluster, capi.MachineInternalIP)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(bastionIp).To(Equal(""))
+			})
+		})
+
+		When("there is bastion machine", func() {
+			var bastionMachine *capi.Machine
+
+			BeforeEach(func() {
+				bastionMachine = &capi.Machine{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-cluster",
+						Namespace: namespace,
+						Labels: map[string]string{
+							capi.ClusterLabelName:   "test-cluster",
+							"cluster.x-k8s.io/role": "bastion",
+						},
+					},
+					Spec: capi.MachineSpec{
+						ClusterName: "test-cluster",
+					},
+				}
+				Expect(k8sClient.Create(ctx, bastionMachine)).To(Succeed())
+			})
+
+			AfterEach(func() {
+				Expect(k8sClient.Delete(ctx, bastionMachine))
+			})
+
+			When("machine still has no IP set in status field", func() {
+				It("returns empty string", func() {
+					bastionIp, err := awsClusterClient.GetBastionIp(ctx, awsCluster, capi.MachineInternalIP)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(bastionIp).To(Equal(""))
+				})
+			})
+
+			When("machine has IP in status field", func() {
+				BeforeEach(func() {
+					bastionMachine.Status = capi.MachineStatus{
+						Addresses: capi.MachineAddresses{
+							{
+								Type:    capi.MachineInternalIP,
+								Address: "192.168.1.1",
+							},
+						},
+					}
+					Expect(k8sClient.Status().Update(ctx, bastionMachine)).To(Succeed())
+				})
+
+				It("it returns the bastion ip", func() {
+					bastionIp, err := awsClusterClient.GetBastionIp(ctx, awsCluster, capi.MachineInternalIP)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(bastionIp).To(Equal("192.168.1.1"))
+				})
+			})
+		})
+	})
 })

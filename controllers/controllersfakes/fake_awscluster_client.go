@@ -39,6 +39,21 @@ type FakeAWSClusterClient struct {
 		result1 *v1beta1.AWSCluster
 		result2 error
 	}
+	GetBastionIpStub        func(context.Context, *v1beta1.AWSCluster, v1beta1a.MachineAddressType) (string, error)
+	getBastionIpMutex       sync.RWMutex
+	getBastionIpArgsForCall []struct {
+		arg1 context.Context
+		arg2 *v1beta1.AWSCluster
+		arg3 v1beta1a.MachineAddressType
+	}
+	getBastionIpReturns struct {
+		result1 string
+		result2 error
+	}
+	getBastionIpReturnsOnCall map[int]struct {
+		result1 string
+		result2 error
+	}
 	GetClusterStub        func(context.Context, types.NamespacedName) (*v1beta1a.Cluster, error)
 	getClusterMutex       sync.RWMutex
 	getClusterArgsForCall []struct {
@@ -248,6 +263,72 @@ func (fake *FakeAWSClusterClient) GetAWSClusterReturnsOnCall(i int, result1 *v1b
 	}
 	fake.getAWSClusterReturnsOnCall[i] = struct {
 		result1 *v1beta1.AWSCluster
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeAWSClusterClient) GetBastionIp(arg1 context.Context, arg2 *v1beta1.AWSCluster, arg3 v1beta1a.MachineAddressType) (string, error) {
+	fake.getBastionIpMutex.Lock()
+	ret, specificReturn := fake.getBastionIpReturnsOnCall[len(fake.getBastionIpArgsForCall)]
+	fake.getBastionIpArgsForCall = append(fake.getBastionIpArgsForCall, struct {
+		arg1 context.Context
+		arg2 *v1beta1.AWSCluster
+		arg3 v1beta1a.MachineAddressType
+	}{arg1, arg2, arg3})
+	stub := fake.GetBastionIpStub
+	fakeReturns := fake.getBastionIpReturns
+	fake.recordInvocation("GetBastionIp", []interface{}{arg1, arg2, arg3})
+	fake.getBastionIpMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeAWSClusterClient) GetBastionIpCallCount() int {
+	fake.getBastionIpMutex.RLock()
+	defer fake.getBastionIpMutex.RUnlock()
+	return len(fake.getBastionIpArgsForCall)
+}
+
+func (fake *FakeAWSClusterClient) GetBastionIpCalls(stub func(context.Context, *v1beta1.AWSCluster, v1beta1a.MachineAddressType) (string, error)) {
+	fake.getBastionIpMutex.Lock()
+	defer fake.getBastionIpMutex.Unlock()
+	fake.GetBastionIpStub = stub
+}
+
+func (fake *FakeAWSClusterClient) GetBastionIpArgsForCall(i int) (context.Context, *v1beta1.AWSCluster, v1beta1a.MachineAddressType) {
+	fake.getBastionIpMutex.RLock()
+	defer fake.getBastionIpMutex.RUnlock()
+	argsForCall := fake.getBastionIpArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeAWSClusterClient) GetBastionIpReturns(result1 string, result2 error) {
+	fake.getBastionIpMutex.Lock()
+	defer fake.getBastionIpMutex.Unlock()
+	fake.GetBastionIpStub = nil
+	fake.getBastionIpReturns = struct {
+		result1 string
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeAWSClusterClient) GetBastionIpReturnsOnCall(i int, result1 string, result2 error) {
+	fake.getBastionIpMutex.Lock()
+	defer fake.getBastionIpMutex.Unlock()
+	fake.GetBastionIpStub = nil
+	if fake.getBastionIpReturnsOnCall == nil {
+		fake.getBastionIpReturnsOnCall = make(map[int]struct {
+			result1 string
+			result2 error
+		})
+	}
+	fake.getBastionIpReturnsOnCall[i] = struct {
+		result1 string
 		result2 error
 	}{result1, result2}
 }
@@ -643,6 +724,8 @@ func (fake *FakeAWSClusterClient) Invocations() map[string][][]interface{} {
 	defer fake.addFinalizerMutex.RUnlock()
 	fake.getAWSClusterMutex.RLock()
 	defer fake.getAWSClusterMutex.RUnlock()
+	fake.getBastionIpMutex.RLock()
+	defer fake.getBastionIpMutex.RUnlock()
 	fake.getClusterMutex.RLock()
 	defer fake.getClusterMutex.RUnlock()
 	fake.getIdentityMutex.RLock()

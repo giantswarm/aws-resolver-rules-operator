@@ -17,12 +17,12 @@ func BuildPublicHostedZone(dnsName string, tags map[string]string) DnsZone {
 	}
 }
 
-func BuildPrivateHostedZone(dnsName string, cluster Cluster, tags map[string]string, vpcsToAssociate []string) DnsZone {
+func BuildPrivateHostedZone(dnsName string, tags map[string]string, vpcId, region string, vpcsToAssociate []string) DnsZone {
 	return DnsZone{
 		DnsName:         dnsName,
 		IsPrivate:       true,
-		VPCId:           cluster.VPCId,
-		Region:          cluster.Region,
+		VPCId:           vpcId,
+		Region:          region,
 		Tags:            tags,
 		VPCsToAssociate: vpcsToAssociate,
 	}
