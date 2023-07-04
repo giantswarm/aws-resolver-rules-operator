@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Don't fail at start up if DNS server settings for resolver rules reconciler are missing.
+- Use `abs` to generate chart version metadata.
 
 ## [0.6.0] - 2023-05-05
 
