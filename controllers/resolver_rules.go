@@ -48,6 +48,7 @@ type AWSClusterClient interface {
 	RemoveFinalizer(context.Context, *capa.AWSCluster, string) error
 	GetIdentity(context.Context, *capa.AWSCluster) (*capa.AWSClusterRoleIdentity, error)
 	MarkConditionTrue(context.Context, *capa.AWSCluster, capi.ConditionType) error
+	GetBastionIp(ctx context.Context, awsCluster *capa.AWSCluster, addressType capi.MachineAddressType) (string, error)
 }
 
 // ResolverRulesReconciler reconciles AWSClusters.
@@ -181,28 +182,4 @@ func (r *ResolverRulesReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Named("resolverrules").
 		For(&capa.AWSCluster{}).
 		Complete(r)
-}
-
-// getSubnetIds will fetch the subnet ids for the subnets in the spec that contain certain tag.
-// These are the subnets in your VPC that you forward DNS queries to.
-func getSubnetIds(awsCluster *capa.AWSCluster) []string {
-	var subnetIds []string
-	for _, subnet := range awsCluster.Spec.NetworkSpec.Subnets {
-		if _, ok := subnet.Tags["subnet.giantswarm.io/endpoints"]; ok {
-			subnetIds = append(subnetIds, subnet.ID)
-		}
-	}
-
-	return subnetIds
-}
-
-func buildCluster(awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity) resolver.Cluster {
-	return resolver.Cluster{
-		Name:       awsCluster.Name,
-		Region:     awsCluster.Spec.Region,
-		VPCCidr:    awsCluster.Spec.NetworkSpec.VPC.CidrBlock,
-		VPCId:      awsCluster.Spec.NetworkSpec.VPC.ID,
-		IAMRoleARN: identity.Spec.RoleArn,
-		Subnets:    getSubnetIds(awsCluster),
-	}
 }

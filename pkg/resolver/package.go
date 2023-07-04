@@ -37,6 +37,8 @@ type Route53Client interface {
 	GetHostedZoneIdByName(ctx context.Context, logger logr.Logger, zoneName string) (string, error)
 	AddDelegationToParentZone(ctx context.Context, logger logr.Logger, parentZoneId, zoneId string) error
 	DeleteDelegationFromParentZone(ctx context.Context, logger logr.Logger, parentZoneId, zoneId string) error
+	AddDnsRecordsToHostedZone(ctx context.Context, logger logr.Logger, hostedZoneId string, dnsRecords []DNSRecord) error
+	DeleteDnsRecordsFromHostedZone(ctx context.Context, logger logr.Logger, hostedZoneId string) error
 }
 
 //counterfeiter:generate . ResolverClient

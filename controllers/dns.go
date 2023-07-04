@@ -2,11 +2,12 @@ package controllers
 
 import (
 	"context"
-	"strings"
 
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
 	"github.com/pkg/errors"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/util/annotations"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -54,6 +55,21 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
 	}
 
+	cluster, err := r.awsClusterClient.GetOwner(ctx, awsCluster)
+	if err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
+	if cluster == nil {
+		logger.Info("AWSCluster does not have an owner cluster yet, skipping")
+		return ctrl.Result{}, nil
+	}
+
+	if annotations.IsPaused(cluster, awsCluster) {
+		logger.Info("Infrastructure or core cluster is marked as paused, skipping")
+		return ctrl.Result{}, nil
+	}
+
 	identity, err := r.awsClusterClient.GetIdentity(ctx, awsCluster)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
@@ -81,20 +97,20 @@ func (r *DnsReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AW
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	cluster := buildCluster(awsCluster, identity)
-
-	annotation, ok := awsCluster.Annotations[gsannotations.AWSDNSMode]
-	if ok && annotation == gsannotations.DNSModePrivate {
-		additionalVPCToAssociate := strings.Split(awsCluster.Annotations[gsannotations.AWSDNSAdditionalVPC], ",")
-		err = r.dnsZone.CreatePrivateHostedZone(ctx, logger, cluster, additionalVPCToAssociate)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-
-		return ctrl.Result{}, nil
+	addrType := capi.MachineExternalIP
+	if awsCluster.Annotations[gsannotations.AWSVPCMode] == gsannotations.AWSVPCModePrivate {
+		addrType = capi.MachineInternalIP
 	}
 
-	err = r.dnsZone.CreatePublicHostedZone(ctx, logger, cluster)
+	bastionIp, err := r.awsClusterClient.GetBastionIp(ctx, awsCluster, addrType)
+	if err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
+	cluster := buildCluster(awsCluster, identity)
+	cluster.BastionIp = bastionIp
+
+	err = r.dnsZone.CreateHostedZone(ctx, logger, cluster)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -108,6 +124,7 @@ func (r *DnsReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AW
 	logger := log.FromContext(ctx)
 
 	cluster := buildCluster(awsCluster, identity)
+
 	err := r.dnsZone.DeleteHostedZone(ctx, logger, cluster)
 	if err != nil {
 		return ctrl.Result{}, err
