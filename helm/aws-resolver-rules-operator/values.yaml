@@ -6,6 +6,7 @@ aws:
 image:
   registry: docker.io
   name: giantswarm/aws-resolver-rules-operator
+  tag: ""
   pullPolicy: IfNotPresent
 
 pod:
