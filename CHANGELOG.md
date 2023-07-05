@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add necessary values for PSS policy warnings.
 - Add new reconciler that creates hosted zones dns records for reconciled clusters.
+- Add `readOnlyRootFilesystem` to container `securityContext` in Helm chart.
 
 ### Changed
 
