@@ -2,7 +2,7 @@ apiVersion: v2
 name: aws-resolver-rules-operator
 description: Please add description
 home: https://github.com/giantswarm/aws-resolver-rules-operator
-version: "0.6.0"
+version: "0.7.0"
 appVersion: "0.6.0"
 annotations:
   application.giantswarm.io/team: "phoenix"
