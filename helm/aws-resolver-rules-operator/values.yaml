@@ -3,14 +3,9 @@ aws:
   secretAccessKey: secretkey
   region: region
 
-project:
-  branch: "[[ .Branch ]]"
-  commit: "[[ .SHA ]]"
-
 image:
   registry: docker.io
   name: giantswarm/aws-resolver-rules-operator
-  tag: "[[ .Version ]]"
   pullPolicy: IfNotPresent
 
 pod:
