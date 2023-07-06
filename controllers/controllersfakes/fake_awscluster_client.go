@@ -39,19 +39,18 @@ type FakeAWSClusterClient struct {
 		result1 *v1beta1.AWSCluster
 		result2 error
 	}
-	GetBastionIpStub        func(context.Context, *v1beta1.AWSCluster, v1beta1a.MachineAddressType) (string, error)
-	getBastionIpMutex       sync.RWMutex
-	getBastionIpArgsForCall []struct {
+	GetBastionMachineStub        func(context.Context, string) (*v1beta1a.Machine, error)
+	getBastionMachineMutex       sync.RWMutex
+	getBastionMachineArgsForCall []struct {
 		arg1 context.Context
-		arg2 *v1beta1.AWSCluster
-		arg3 v1beta1a.MachineAddressType
+		arg2 string
 	}
-	getBastionIpReturns struct {
-		result1 string
+	getBastionMachineReturns struct {
+		result1 *v1beta1a.Machine
 		result2 error
 	}
-	getBastionIpReturnsOnCall map[int]struct {
-		result1 string
+	getBastionMachineReturnsOnCall map[int]struct {
+		result1 *v1beta1a.Machine
 		result2 error
 	}
 	GetClusterStub        func(context.Context, types.NamespacedName) (*v1beta1a.Cluster, error)
@@ -267,20 +266,19 @@ func (fake *FakeAWSClusterClient) GetAWSClusterReturnsOnCall(i int, result1 *v1b
 	}{result1, result2}
 }
 
-func (fake *FakeAWSClusterClient) GetBastionIp(arg1 context.Context, arg2 *v1beta1.AWSCluster, arg3 v1beta1a.MachineAddressType) (string, error) {
-	fake.getBastionIpMutex.Lock()
-	ret, specificReturn := fake.getBastionIpReturnsOnCall[len(fake.getBastionIpArgsForCall)]
-	fake.getBastionIpArgsForCall = append(fake.getBastionIpArgsForCall, struct {
+func (fake *FakeAWSClusterClient) GetBastionMachine(arg1 context.Context, arg2 string) (*v1beta1a.Machine, error) {
+	fake.getBastionMachineMutex.Lock()
+	ret, specificReturn := fake.getBastionMachineReturnsOnCall[len(fake.getBastionMachineArgsForCall)]
+	fake.getBastionMachineArgsForCall = append(fake.getBastionMachineArgsForCall, struct {
 		arg1 context.Context
-		arg2 *v1beta1.AWSCluster
-		arg3 v1beta1a.MachineAddressType
-	}{arg1, arg2, arg3})
-	stub := fake.GetBastionIpStub
-	fakeReturns := fake.getBastionIpReturns
-	fake.recordInvocation("GetBastionIp", []interface{}{arg1, arg2, arg3})
-	fake.getBastionIpMutex.Unlock()
+		arg2 string
+	}{arg1, arg2})
+	stub := fake.GetBastionMachineStub
+	fakeReturns := fake.getBastionMachineReturns
+	fake.recordInvocation("GetBastionMachine", []interface{}{arg1, arg2})
+	fake.getBastionMachineMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3)
+		return stub(arg1, arg2)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -288,47 +286,47 @@ func (fake *FakeAWSClusterClient) GetBastionIp(arg1 context.Context, arg2 *v1bet
 	return fakeReturns.result1, fakeReturns.result2
 }
 
-func (fake *FakeAWSClusterClient) GetBastionIpCallCount() int {
-	fake.getBastionIpMutex.RLock()
-	defer fake.getBastionIpMutex.RUnlock()
-	return len(fake.getBastionIpArgsForCall)
+func (fake *FakeAWSClusterClient) GetBastionMachineCallCount() int {
+	fake.getBastionMachineMutex.RLock()
+	defer fake.getBastionMachineMutex.RUnlock()
+	return len(fake.getBastionMachineArgsForCall)
 }
 
-func (fake *FakeAWSClusterClient) GetBastionIpCalls(stub func(context.Context, *v1beta1.AWSCluster, v1beta1a.MachineAddressType) (string, error)) {
-	fake.getBastionIpMutex.Lock()
-	defer fake.getBastionIpMutex.Unlock()
-	fake.GetBastionIpStub = stub
+func (fake *FakeAWSClusterClient) GetBastionMachineCalls(stub func(context.Context, string) (*v1beta1a.Machine, error)) {
+	fake.getBastionMachineMutex.Lock()
+	defer fake.getBastionMachineMutex.Unlock()
+	fake.GetBastionMachineStub = stub
 }
 
-func (fake *FakeAWSClusterClient) GetBastionIpArgsForCall(i int) (context.Context, *v1beta1.AWSCluster, v1beta1a.MachineAddressType) {
-	fake.getBastionIpMutex.RLock()
-	defer fake.getBastionIpMutex.RUnlock()
-	argsForCall := fake.getBastionIpArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+func (fake *FakeAWSClusterClient) GetBastionMachineArgsForCall(i int) (context.Context, string) {
+	fake.getBastionMachineMutex.RLock()
+	defer fake.getBastionMachineMutex.RUnlock()
+	argsForCall := fake.getBastionMachineArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeAWSClusterClient) GetBastionIpReturns(result1 string, result2 error) {
-	fake.getBastionIpMutex.Lock()
-	defer fake.getBastionIpMutex.Unlock()
-	fake.GetBastionIpStub = nil
-	fake.getBastionIpReturns = struct {
-		result1 string
+func (fake *FakeAWSClusterClient) GetBastionMachineReturns(result1 *v1beta1a.Machine, result2 error) {
+	fake.getBastionMachineMutex.Lock()
+	defer fake.getBastionMachineMutex.Unlock()
+	fake.GetBastionMachineStub = nil
+	fake.getBastionMachineReturns = struct {
+		result1 *v1beta1a.Machine
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeAWSClusterClient) GetBastionIpReturnsOnCall(i int, result1 string, result2 error) {
-	fake.getBastionIpMutex.Lock()
-	defer fake.getBastionIpMutex.Unlock()
-	fake.GetBastionIpStub = nil
-	if fake.getBastionIpReturnsOnCall == nil {
-		fake.getBastionIpReturnsOnCall = make(map[int]struct {
-			result1 string
+func (fake *FakeAWSClusterClient) GetBastionMachineReturnsOnCall(i int, result1 *v1beta1a.Machine, result2 error) {
+	fake.getBastionMachineMutex.Lock()
+	defer fake.getBastionMachineMutex.Unlock()
+	fake.GetBastionMachineStub = nil
+	if fake.getBastionMachineReturnsOnCall == nil {
+		fake.getBastionMachineReturnsOnCall = make(map[int]struct {
+			result1 *v1beta1a.Machine
 			result2 error
 		})
 	}
-	fake.getBastionIpReturnsOnCall[i] = struct {
-		result1 string
+	fake.getBastionMachineReturnsOnCall[i] = struct {
+		result1 *v1beta1a.Machine
 		result2 error
 	}{result1, result2}
 }
@@ -724,8 +722,8 @@ func (fake *FakeAWSClusterClient) Invocations() map[string][][]interface{} {
 	defer fake.addFinalizerMutex.RUnlock()
 	fake.getAWSClusterMutex.RLock()
 	defer fake.getAWSClusterMutex.RUnlock()
-	fake.getBastionIpMutex.RLock()
-	defer fake.getBastionIpMutex.RUnlock()
+	fake.getBastionMachineMutex.RLock()
+	defer fake.getBastionMachineMutex.RUnlock()
 	fake.getClusterMutex.RLock()
 	defer fake.getClusterMutex.RUnlock()
 	fake.getIdentityMutex.RLock()

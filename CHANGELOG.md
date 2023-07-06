@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Make the dns controller requeue if there is a bastion machine but has no IP yet, because we want to create a dns record for the bastion as soon as possible.
+
 ## [0.7.1] - 2023-07-05
 
 ### Changed

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
 	. "github.com/onsi/ginkgo/v2"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/aws-resolver-rules-operator/controllers"
 	"github.com/aws-resolver-rules-operator/controllers/controllersfakes"
+	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 	"github.com/aws-resolver-rules-operator/pkg/resolver/resolverfakes"
 )
@@ -104,7 +106,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 				Namespace: ClusterNamespace,
 			},
 		}
-		_, reconcileErr = reconciler.Reconcile(ctx, request)
+		result, reconcileErr = reconciler.Reconcile(ctx, request)
 	})
 
 	When("there is an error trying to get the AWSCluster being reconciled", func() {
@@ -124,6 +126,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 	When("reconciling an existing cluster", func() {
 		BeforeEach(func() {
 			awsClusterClient.GetAWSClusterReturns(awsCluster, nil)
+			awsClusterClient.GetBastionMachineReturns(nil, &k8sclient.BastionNotFoundError{})
 		})
 
 		When("the aws cluster doesn't have an owner yet", func() {
@@ -376,8 +379,25 @@ var _ = Describe("Dns Zone reconciler", func() {
 						})
 
 						When("there is a bastion server deployed", func() {
+							bastionMachine := &capi.Machine{
+								ObjectMeta: metav1.ObjectMeta{
+									Name: "",
+									Labels: map[string]string{
+										capi.ClusterLabelName:   ClusterName,
+										"cluster.x-k8s.io/role": "bastion",
+									},
+								},
+								Status: capi.MachineStatus{
+									Addresses: []capi.MachineAddress{
+										{
+											Type:    capi.MachineExternalIP,
+											Address: "192.168.0.1",
+										},
+									},
+								},
+							}
 							BeforeEach(func() {
-								awsClusterClient.GetBastionIpReturns("192.168.0.1", nil)
+								awsClusterClient.GetBastionMachineReturns(bastionMachine, nil)
 							})
 
 							It("it creates DNS record for the bastion", func() {
@@ -390,17 +410,42 @@ var _ = Describe("Dns Zone reconciler", func() {
 							})
 						})
 
-						When("there is no bastion server deployed or it's deployed but it has no IP set yet", func() {
+						When("there is bastion server deployed but it has no IP set yet", func() {
+							bastionMachine := &capi.Machine{
+								ObjectMeta: metav1.ObjectMeta{
+									Name: "",
+									Labels: map[string]string{
+										capi.ClusterLabelName:   ClusterName,
+										"cluster.x-k8s.io/role": "bastion",
+									},
+								},
+							}
 							BeforeEach(func() {
-								awsClusterClient.GetBastionIpReturns("", nil)
+								awsClusterClient.GetBastionMachineReturns(bastionMachine, nil)
 							})
 
-							It("it creates DNS record for the bastion", func() {
+							It("it doesn't create DNS record for the bastion but requeues", func() {
 								_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
 								Expect(dnsRecords).ToNot(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 									"Kind": Equal("A"),
 									"Name": Equal(fmt.Sprintf("bastion1.%s.%s", ClusterName, WorkloadClusterBaseDomain)),
 								})))
+								Expect(result.RequeueAfter).Should(Equal(1 * time.Minute))
+							})
+						})
+
+						When("there is no bastion server deployed", func() {
+							BeforeEach(func() {
+								awsClusterClient.GetBastionMachineReturns(nil, &k8sclient.BastionNotFoundError{})
+							})
+
+							It("it doesn't create DNS record for the bastion", func() {
+								_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+								Expect(dnsRecords).ToNot(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+									"Kind": Equal("A"),
+									"Name": Equal(fmt.Sprintf("bastion1.%s.%s", ClusterName, WorkloadClusterBaseDomain)),
+								})))
+								Expect(result.RequeueAfter).Should(Equal(0 * time.Minute))
 							})
 						})
 
@@ -533,8 +578,25 @@ var _ = Describe("Dns Zone reconciler", func() {
 						})
 
 						When("there is a bastion server deployed", func() {
+							bastionMachine := &capi.Machine{
+								ObjectMeta: metav1.ObjectMeta{
+									Name: "",
+									Labels: map[string]string{
+										capi.ClusterLabelName:   ClusterName,
+										"cluster.x-k8s.io/role": "bastion",
+									},
+								},
+								Status: capi.MachineStatus{
+									Addresses: []capi.MachineAddress{
+										{
+											Type:    capi.MachineExternalIP,
+											Address: "192.168.0.1",
+										},
+									},
+								},
+							}
 							BeforeEach(func() {
-								awsClusterClient.GetBastionIpReturns("192.168.0.1", nil)
+								awsClusterClient.GetBastionMachineReturns(bastionMachine, nil)
 							})
 
 							It("it creates DNS record for the bastion", func() {
@@ -547,9 +609,18 @@ var _ = Describe("Dns Zone reconciler", func() {
 							})
 						})
 
-						When("there is no bastion server deployed or it's deployed but it has no IP set yet", func() {
+						When("there is a bastion server deployed but it has no IP set yet", func() {
+							bastionMachine := &capi.Machine{
+								ObjectMeta: metav1.ObjectMeta{
+									Name: "",
+									Labels: map[string]string{
+										capi.ClusterLabelName:   ClusterName,
+										"cluster.x-k8s.io/role": "bastion",
+									},
+								},
+							}
 							BeforeEach(func() {
-								awsClusterClient.GetBastionIpReturns("", nil)
+								awsClusterClient.GetBastionMachineReturns(bastionMachine, nil)
 							})
 
 							It("it creates DNS record for the bastion", func() {

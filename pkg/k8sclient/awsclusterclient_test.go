@@ -492,7 +492,7 @@ var _ = Describe("AWSClusterClient", func() {
 		})
 	})
 
-	Describe("GetBastionIp", func() {
+	Describe("GetBastionMachine", func() {
 		var awsCluster *capa.AWSCluster
 		var cluster *capi.Cluster
 
@@ -529,10 +529,11 @@ var _ = Describe("AWSClusterClient", func() {
 		})
 
 		When("there is no bastion machine", func() {
+			expectedErr := &k8sclient.BastionNotFoundError{}
 			It("returns empty string", func() {
-				bastionIp, err := awsClusterClient.GetBastionIp(ctx, awsCluster, capi.MachineInternalIP)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(bastionIp).To(Equal(""))
+				_, err := awsClusterClient.GetBastionMachine(ctx, awsCluster.Name)
+				Expect(err).To(HaveOccurred())
+				Expect(err).Should(MatchError(expectedErr))
 			})
 		})
 
@@ -558,34 +559,6 @@ var _ = Describe("AWSClusterClient", func() {
 
 			AfterEach(func() {
 				Expect(k8sClient.Delete(ctx, bastionMachine))
-			})
-
-			When("machine still has no IP set in status field", func() {
-				It("returns empty string", func() {
-					bastionIp, err := awsClusterClient.GetBastionIp(ctx, awsCluster, capi.MachineInternalIP)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(bastionIp).To(Equal(""))
-				})
-			})
-
-			When("machine has IP in status field", func() {
-				BeforeEach(func() {
-					bastionMachine.Status = capi.MachineStatus{
-						Addresses: capi.MachineAddresses{
-							{
-								Type:    capi.MachineInternalIP,
-								Address: "192.168.1.1",
-							},
-						},
-					}
-					Expect(k8sClient.Status().Update(ctx, bastionMachine)).To(Succeed())
-				})
-
-				It("it returns the bastion ip", func() {
-					bastionIp, err := awsClusterClient.GetBastionIp(ctx, awsCluster, capi.MachineInternalIP)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(bastionIp).To(Equal("192.168.1.1"))
-				})
 			})
 		})
 	})

@@ -78,27 +78,21 @@ func (a *AWSClusterClient) GetIdentity(ctx context.Context, awsCluster *capa.AWS
 	return roleIdentity, nil
 }
 
-func (a *AWSClusterClient) GetBastionIp(ctx context.Context, awsCluster *capa.AWSCluster, addressType capi.MachineAddressType) (string, error) {
+func (a *AWSClusterClient) GetBastionMachine(ctx context.Context, clusterName string) (*capi.Machine, error) {
 	bastionMachineList := &capi.MachineList{}
 	err := a.client.List(ctx, bastionMachineList, client.MatchingLabels{
-		capi.ClusterLabelName:   awsCluster.Name,
+		capi.ClusterLabelName:   clusterName,
 		"cluster.x-k8s.io/role": "bastion",
 	})
 	if err != nil {
-		return "", errors.WithStack(err)
+		return &capi.Machine{}, errors.WithStack(err)
 	}
 
 	if len(bastionMachineList.Items) < 1 {
-		return "", nil
+		return &capi.Machine{}, &BastionNotFoundError{}
 	}
 
-	for _, addr := range bastionMachineList.Items[0].Status.Addresses {
-		if addr.Type == addressType {
-			return addr.Address, nil
-		}
-	}
-
-	return "", nil
+	return &bastionMachineList.Items[0], nil
 }
 
 func (a *AWSClusterClient) MarkConditionTrue(ctx context.Context, awsCluster *capa.AWSCluster, condition capi.ConditionType) error {
