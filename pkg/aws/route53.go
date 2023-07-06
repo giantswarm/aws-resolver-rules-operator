@@ -84,6 +84,8 @@ func (r *Route53) CreateHostedZone(ctx context.Context, logger logr.Logger, dnsZ
 		hostedZoneId = *createdHostedZone.HostedZone.Id
 	}
 
+	logger = logger.WithValues("hostedZoneId", hostedZoneId)
+
 	err = r.tagHostedZone(ctx, hostedZoneId, dnsZone.Tags)
 	if err != nil {
 		return "", errors.WithStack(err)

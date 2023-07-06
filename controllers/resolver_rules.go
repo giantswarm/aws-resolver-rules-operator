@@ -48,7 +48,7 @@ type AWSClusterClient interface {
 	RemoveFinalizer(context.Context, *capa.AWSCluster, string) error
 	GetIdentity(context.Context, *capa.AWSCluster) (*capa.AWSClusterRoleIdentity, error)
 	MarkConditionTrue(context.Context, *capa.AWSCluster, capi.ConditionType) error
-	GetBastionIp(ctx context.Context, awsCluster *capa.AWSCluster, addressType capi.MachineAddressType) (string, error)
+	GetBastionMachine(ctx context.Context, clusterName string) (*capi.Machine, error)
 }
 
 // ResolverRulesReconciler reconciles AWSClusters.

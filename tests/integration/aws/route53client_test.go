@@ -110,7 +110,10 @@ var _ = Describe("Route53 Resolver client", func() {
 						DNSName:  awssdk.String("aprivate.test.example.com."),
 						MaxItems: awssdk.String("1"),
 					})
-					return *privateHostedZoneResponse.HostedZones[0].Name, err
+					if len(privateHostedZoneResponse.HostedZones) > 0 {
+						return *privateHostedZoneResponse.HostedZones[0].Name, err
+					}
+					return "no_what_we_are_looking_for", nil
 				}, "3s", "100ms").Should(Equal("aprivate.test.example.com."))
 				Expect(*privateHostedZoneResponse.HostedZones[0].Name).To(Equal("aprivate.test.example.com."))
 
