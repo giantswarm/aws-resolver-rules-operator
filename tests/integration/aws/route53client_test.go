@@ -90,24 +90,20 @@ var _ = Describe("Route53 Resolver client", func() {
 
 		Context("we want a private hosted zone", func() {
 			var hostedZoneId string
-			var dnsZone resolver.DnsZone
-
-			BeforeEach(func() {
-				dnsZone = resolver.BuildPrivateHostedZone("aprivate.test.example.com", tags, VPCId, Region, []string{MCVPCId})
-			})
 
 			AfterEach(func() {
 				_, _ = rawRoute53Client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: awssdk.String(hostedZoneId)})
 			})
 
 			It("creates a private hosted zone successfully", func() {
+				dnsZone := resolver.BuildPrivateHostedZone("aprivate.test.example.com", tags, VPCId, Region, []string{MCVPCId})
 				hostedZoneId, err = route53Client.CreateHostedZone(ctx, logger, dnsZone)
 				Expect(err).NotTo(HaveOccurred())
 
 				var privateHostedZoneResponse *route53.ListHostedZonesByNameOutput
 				Eventually(func() (string, error) {
 					privateHostedZoneResponse, err = rawRoute53Client.ListHostedZonesByNameWithContext(ctx, &route53.ListHostedZonesByNameInput{
-						DNSName:  awssdk.String("aprivate.test.example.com."),
+						DNSName:  awssdk.String("aprivate.test.example.com"),
 						MaxItems: awssdk.String("1"),
 					})
 					if len(privateHostedZoneResponse.HostedZones) > 0 {
@@ -115,7 +111,6 @@ var _ = Describe("Route53 Resolver client", func() {
 					}
 					return "no_what_we_are_looking_for", nil
 				}, "3s", "100ms").Should(Equal("aprivate.test.example.com."))
-				Expect(*privateHostedZoneResponse.HostedZones[0].Name).To(Equal("aprivate.test.example.com."))
 
 				actualTags, err := rawRoute53Client.ListTagsForResourceWithContext(ctx, &route53.ListTagsForResourceInput{
 					ResourceId:   privateHostedZoneResponse.HostedZones[0].Id,
@@ -161,6 +156,7 @@ var _ = Describe("Route53 Resolver client", func() {
 				})
 
 				It("doesn't return error", func() {
+					dnsZone := resolver.BuildPrivateHostedZone("already.private.exists.test.example.com", tags, VPCId, Region, []string{MCVPCId})
 					hostedZoneId, err = route53Client.CreateHostedZone(ctx, logger, dnsZone)
 					Expect(err).NotTo(HaveOccurred())
 
@@ -203,11 +199,11 @@ var _ = Describe("Route53 Resolver client", func() {
 			hostedZoneId, err := route53Client.GetHostedZoneIdByName(ctx, logger, "findid.test.example.com")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(hostedZoneId).To(Equal(*hostedZoneToFind.HostedZone.Id))
-		})
 
-		It("returns error when hosted zone does not exist", func() {
+			By("looking for a non existing zone, we expect an error")
 			_, err = route53Client.GetHostedZoneIdByName(ctx, logger, "nonexisting.test.example.com.")
 			Expect(err).To(HaveOccurred())
+			Expect(err).Should(MatchError(&resolver.HostedZoneNotFoundError{}))
 		})
 	})
 
