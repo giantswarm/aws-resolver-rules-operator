@@ -34,14 +34,14 @@ var _ = Describe("ClusterClient", func() {
 		BeforeEach(func() {
 			cluster := &capi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cluster",
+					Name:      "test-cluster2",
 					Namespace: namespace,
 				},
 			}
 			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
 			awsCluster := &capa.AWSCluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cluster",
+					Name:      "test-cluster2",
 					Namespace: namespace,
 				},
 			}
@@ -51,11 +51,11 @@ var _ = Describe("ClusterClient", func() {
 		It("gets the desired cluster", func() {
 			actualCluster, err := clusterClient.GetAWSCluster(ctx, types.NamespacedName{
 				Namespace: namespace,
-				Name:      "test-cluster",
+				Name:      "test-cluster2",
 			})
 
 			Expect(err).NotTo(HaveOccurred())
-			Expect(actualCluster.Name).To(Equal("test-cluster"))
+			Expect(actualCluster.Name).To(Equal("test-cluster2"))
 			Expect(actualCluster.Namespace).To(Equal(namespace))
 		})
 
@@ -79,7 +79,7 @@ var _ = Describe("ClusterClient", func() {
 			It("returns an error", func() {
 				actualCluster, err := clusterClient.GetAWSCluster(ctx, types.NamespacedName{
 					Namespace: namespace,
-					Name:      "test-cluster",
+					Name:      "test-cluster2",
 				})
 				Expect(err).To(MatchError(ContainSubstring("context canceled")))
 				Expect(actualCluster).To(BeNil())
@@ -91,7 +91,7 @@ var _ = Describe("ClusterClient", func() {
 		BeforeEach(func() {
 			cluster := &capi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cluster",
+					Name:      "test-cluster2",
 					Namespace: namespace,
 				},
 			}
@@ -101,11 +101,11 @@ var _ = Describe("ClusterClient", func() {
 		It("gets the desired cluster", func() {
 			actualCluster, err := clusterClient.GetCluster(ctx, types.NamespacedName{
 				Namespace: namespace,
-				Name:      "test-cluster",
+				Name:      "test-cluster2",
 			})
 
 			Expect(err).NotTo(HaveOccurred())
-			Expect(actualCluster.Name).To(Equal("test-cluster"))
+			Expect(actualCluster.Name).To(Equal("test-cluster2"))
 			Expect(actualCluster.Namespace).To(Equal(namespace))
 		})
 
@@ -129,7 +129,7 @@ var _ = Describe("ClusterClient", func() {
 			It("returns an error", func() {
 				actualCluster, err := clusterClient.GetCluster(ctx, types.NamespacedName{
 					Namespace: namespace,
-					Name:      "test-cluster",
+					Name:      "test-cluster2",
 				})
 				Expect(err).To(MatchError(ContainSubstring("context canceled")))
 				Expect(actualCluster).To(BeNil())
@@ -143,7 +143,7 @@ var _ = Describe("ClusterClient", func() {
 		BeforeEach(func() {
 			cluster = &capi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cluster",
+					Name:      "test-cluster2",
 					Namespace: namespace,
 				},
 			}
@@ -206,7 +206,7 @@ var _ = Describe("ClusterClient", func() {
 		BeforeEach(func() {
 			cluster = &capi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cluster",
+					Name:      "test-cluster2",
 					Namespace: namespace,
 					Finalizers: []string{
 						controllers.ResolverRulesFinalizer,
@@ -274,30 +274,30 @@ var _ = Describe("ClusterClient", func() {
 			BeforeEach(func() {
 				cluster = &capi.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-cluster",
+						Name:      "test-cluster2",
 						Namespace: namespace,
 					},
 				}
 				Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
 				awsCluster := &capa.AWSCluster{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-cluster",
+						Name:      "test-cluster2",
 						Namespace: namespace,
 					},
 					Spec: capa.AWSClusterSpec{
-						IdentityRef: &capa.AWSIdentityReference{Name: "default", Kind: capa.ClusterRoleIdentityKind},
+						IdentityRef: &capa.AWSIdentityReference{Name: "default2", Kind: capa.ClusterRoleIdentityKind},
 					},
 				}
 				Expect(k8sClient.Create(ctx, awsCluster)).To(Succeed())
 
 				clusterRoleIdentity = &capa.AWSClusterRoleIdentity{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "default",
+						Name:      "default2",
 						Namespace: namespace,
 					},
 					Spec: capa.AWSClusterRoleIdentitySpec{},
 				}
-				_ = k8sClient.Create(ctx, clusterRoleIdentity)
+				Expect(k8sClient.Create(ctx, clusterRoleIdentity)).To(Succeed())
 			})
 
 			It("gets the identity used for this cluster", func() {
@@ -312,14 +312,14 @@ var _ = Describe("ClusterClient", func() {
 			BeforeEach(func() {
 				cluster = &capi.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-cluster",
+						Name:      "test-cluster2",
 						Namespace: namespace,
 					},
 				}
 				Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
 				awsCluster := &capa.AWSCluster{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-cluster",
+						Name:      "test-cluster2",
 						Namespace: namespace,
 					},
 					Spec: capa.AWSClusterSpec{},
@@ -341,7 +341,7 @@ var _ = Describe("ClusterClient", func() {
 		BeforeEach(func() {
 			cluster = &capi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cluster",
+					Name:      "test-cluster2",
 					Namespace: namespace,
 				},
 			}
@@ -371,7 +371,7 @@ var _ = Describe("ClusterClient", func() {
 			clusterUUID := types.UID(uuid.NewString())
 			cluster = &capi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cluster",
+					Name:      "test-cluster2",
 					Namespace: namespace,
 					UID:       clusterUUID,
 				},
@@ -383,14 +383,14 @@ var _ = Describe("ClusterClient", func() {
 
 			awsCluster = &capa.AWSCluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        "test-cluster",
+					Name:        "test-cluster2",
 					Namespace:   namespace,
 					Annotations: map[string]string{capi.PausedAnnotation: "true"},
 					OwnerReferences: []metav1.OwnerReference{
 						{
 							APIVersion: capi.GroupVersion.String(),
 							Kind:       "Cluster",
-							Name:       "test-cluster",
+							Name:       "test-cluster2",
 							UID:        clusterUUID,
 						},
 					},
@@ -423,7 +423,7 @@ var _ = Describe("ClusterClient", func() {
 			clusterUUID := types.UID(uuid.NewString())
 			cluster = &capi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cluster",
+					Name:      "test-cluster2",
 					Namespace: namespace,
 					UID:       clusterUUID,
 				},
@@ -435,14 +435,14 @@ var _ = Describe("ClusterClient", func() {
 
 			awsCluster = &capa.AWSCluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        "test-cluster",
+					Name:        "test-cluster2",
 					Namespace:   namespace,
 					Annotations: map[string]string{capi.PausedAnnotation: "true"},
 					OwnerReferences: []metav1.OwnerReference{
 						{
 							APIVersion: capi.GroupVersion.String(),
 							Kind:       "Cluster",
-							Name:       "test-cluster",
+							Name:       "test-cluster2",
 							UID:        clusterUUID,
 						},
 					},
@@ -466,15 +466,15 @@ var _ = Describe("ClusterClient", func() {
 			BeforeEach(func() {
 				bastionMachine = &capi.Machine{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-cluster",
+						Name:      "test-cluster2",
 						Namespace: namespace,
 						Labels: map[string]string{
-							capi.ClusterLabelName:   "test-cluster",
+							capi.ClusterLabelName:   "test-cluster2",
 							"cluster.x-k8s.io/role": "bastion",
 						},
 					},
 					Spec: capi.MachineSpec{
-						ClusterName: "test-cluster",
+						ClusterName: "test-cluster2",
 					},
 				}
 				Expect(k8sClient.Create(ctx, bastionMachine)).To(Succeed())
