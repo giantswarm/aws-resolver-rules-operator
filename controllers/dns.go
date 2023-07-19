@@ -70,17 +70,17 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
 	}
 
-	cluster, err := r.clusterClient.GetCluster(ctx, req.NamespacedName)
+	capiCluster, err := r.clusterClient.GetCluster(ctx, req.NamespacedName)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	if annotations.IsPaused(cluster, awsCluster) {
+	if annotations.IsPaused(capiCluster, awsCluster) {
 		logger.Info("Infrastructure or core cluster is marked as paused, skipping")
 		return ctrl.Result{}, nil
 	}
 
-	identity, err := r.clusterClient.GetIdentity(ctx, cluster)
+	identity, err := r.clusterClient.GetIdentity(ctx, capiCluster)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
@@ -90,34 +90,35 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, nil
 	}
 
-	if !cluster.DeletionTimestamp.IsZero() {
-		return r.reconcileDelete(ctx, cluster, identity)
+	cluster := buildClusterFromAWSCluster(awsCluster, identity)
+
+	if !capiCluster.DeletionTimestamp.IsZero() {
+		return r.reconcileDelete(ctx, capiCluster, cluster)
 	}
 
-	return r.reconcileNormal(ctx, cluster, identity)
+	return r.reconcileNormal(ctx, capiCluster, cluster)
 }
 
 // reconcileNormal creates the hosted zone and the DNS records for the workload cluster.
 // It will take care of dns delegation in the parent hosted zone when using public dns mode.
-func (r *DnsReconciler) reconcileNormal(ctx context.Context, cluster *capi.Cluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
+func (r *DnsReconciler) reconcileNormal(ctx context.Context, capiCluster *capi.Cluster, cluster resolver.Cluster) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	err := r.clusterClient.AddFinalizer(ctx, cluster, DnsFinalizer)
+	err := r.clusterClient.AddFinalizer(ctx, capiCluster, DnsFinalizer)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	awsCluster, err := r.clusterClient.GetAWSCluster(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace})
+	awsCluster, err := r.clusterClient.GetAWSCluster(ctx, types.NamespacedName{Name: capiCluster.Name, Namespace: capiCluster.Namespace})
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
-	dnsCluster := buildCluster(awsCluster, identity)
 
 	bastionIp, err := r.getBastionIp(ctx, cluster.Name, awsCluster.Annotations)
 	if err != nil && !errors.Is(err, &k8sclient.BastionNotFoundError{}) {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
-	dnsCluster.BastionIp = bastionIp
+	cluster.BastionIp = bastionIp
 
 	requeueAfter := 0 * time.Minute
 	// If there is a bastion machine, but it has no IP address just yet, we want to reconcile again soonish
@@ -125,7 +126,7 @@ func (r *DnsReconciler) reconcileNormal(ctx context.Context, cluster *capi.Clust
 		requeueAfter = 1 * time.Minute
 	}
 
-	err = r.dnsZone.CreateHostedZone(ctx, logger, dnsCluster)
+	err = r.dnsZone.CreateHostedZone(ctx, logger, cluster)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -159,21 +160,15 @@ func (r *DnsReconciler) getBastionIp(ctx context.Context, clusterName string, an
 
 // reconcileDelete deletes the hosted zone and the DNS records for the workload cluster.
 // It will delete the delegation records in the parent hosted zone when using public dns mode.
-func (r *DnsReconciler) reconcileDelete(ctx context.Context, cluster *capi.Cluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
+func (r *DnsReconciler) reconcileDelete(ctx context.Context, capiCluster *capi.Cluster, cluster resolver.Cluster) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	awsCluster, err := r.clusterClient.GetAWSCluster(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace})
-	if err != nil {
-		return ctrl.Result{}, errors.WithStack(err)
-	}
-	dnsCluster := buildCluster(awsCluster, identity)
-
-	err = r.dnsZone.DeleteHostedZone(ctx, logger, dnsCluster)
+	err := r.dnsZone.DeleteHostedZone(ctx, logger, cluster)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	err = r.clusterClient.RemoveFinalizer(ctx, cluster, DnsFinalizer)
+	err = r.clusterClient.RemoveFinalizer(ctx, capiCluster, DnsFinalizer)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
