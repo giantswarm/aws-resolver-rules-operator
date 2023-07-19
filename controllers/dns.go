@@ -27,7 +27,7 @@ type ClusterClient interface {
 	GetAWSCluster(context.Context, types.NamespacedName) (*capa.AWSCluster, error)
 	GetCluster(ctx context.Context, namespacedName types.NamespacedName) (*capi.Cluster, error)
 	AddFinalizer(context.Context, *capi.Cluster, string) error
-	Unpause(context.Context, *capi.Cluster, *capi.Cluster) error
+	Unpause(context.Context, *capa.AWSCluster, *capi.Cluster) error
 	RemoveFinalizer(context.Context, *capi.Cluster, string) error
 	GetIdentity(context.Context, *capi.Cluster) (*capa.AWSClusterRoleIdentity, error)
 	MarkConditionTrue(context.Context, *capi.Cluster, capi.ConditionType) error

@@ -25,7 +25,7 @@ import (
 
 var _ = Describe("Dns Zone reconciler", func() {
 	var (
-		clusterClient        *controllersfakes.FakeClusterClient
+		clusterClient           *controllersfakes.FakeClusterClient
 		ctx                     context.Context
 		reconciler              *controllers.DnsReconciler
 		awsCluster              *capa.AWSCluster
@@ -128,6 +128,23 @@ var _ = Describe("Dns Zone reconciler", func() {
 			clusterClient.GetAWSClusterReturns(awsCluster, nil)
 			clusterClient.GetBastionMachineReturns(nil, &k8sclient.BastionNotFoundError{})
 		})
+
+		When("the aws cluster already has an owner", func() {
+			BeforeEach(func() {
+				clusterClient.GetClusterReturns(cluster, nil)
+			})
+
+			When("the cluster is paused", func() {
+				BeforeEach(func() {
+					cluster.Spec.Paused = true
+					clusterClient.GetClusterReturns(cluster, nil)
+				})
+
+				It("does not reconcile", func() {
+					Expect(clusterClient.GetIdentityCallCount()).To(BeZero())
+					Expect(reconcileErr).NotTo(HaveOccurred())
+				})
+			})
 
 			When("the infrastructure cluster is paused", func() {
 				BeforeEach(func() {

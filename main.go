@@ -98,6 +98,8 @@ func main() {
 	}
 
 	k8sAwsClusterClient := k8sclient.NewAWSClusterClient(mgr.GetClient())
+	k8sClusterClient := k8sclient.NewClusterClient(mgr.GetClient())
+
 	awsClients := aws.NewClients(os.Getenv("AWS_ENDPOINT"))
 
 	dnsserver, err := resolver.NewDNSServer(dnsServerAWSAccountId, dnsServerIAMRoleExternalId, dnsServerRegion, dnsServerIAMRoleArn, dnsServerVpcId)
@@ -128,7 +130,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (controllers.NewDnsReconciler(k8sAwsClusterClient, dns)).SetupWithManager(mgr); err != nil {
+	if err = (controllers.NewDnsReconciler(k8sClusterClient, dns)).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller")
 		os.Exit(1)
 	}

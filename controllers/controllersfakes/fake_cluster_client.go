@@ -107,11 +107,11 @@ type FakeClusterClient struct {
 	removeFinalizerReturnsOnCall map[int]struct {
 		result1 error
 	}
-	UnpauseStub        func(context.Context, *v1beta1.Cluster, *v1beta1.Cluster) error
+	UnpauseStub        func(context.Context, *v1beta1a.AWSCluster, *v1beta1.Cluster) error
 	unpauseMutex       sync.RWMutex
 	unpauseArgsForCall []struct {
 		arg1 context.Context
-		arg2 *v1beta1.Cluster
+		arg2 *v1beta1a.AWSCluster
 		arg3 *v1beta1.Cluster
 	}
 	unpauseReturns struct {
@@ -573,12 +573,12 @@ func (fake *FakeClusterClient) RemoveFinalizerReturnsOnCall(i int, result1 error
 	}{result1}
 }
 
-func (fake *FakeClusterClient) Unpause(arg1 context.Context, arg2 *v1beta1.Cluster, arg3 *v1beta1.Cluster) error {
+func (fake *FakeClusterClient) Unpause(arg1 context.Context, arg2 *v1beta1a.AWSCluster, arg3 *v1beta1.Cluster) error {
 	fake.unpauseMutex.Lock()
 	ret, specificReturn := fake.unpauseReturnsOnCall[len(fake.unpauseArgsForCall)]
 	fake.unpauseArgsForCall = append(fake.unpauseArgsForCall, struct {
 		arg1 context.Context
-		arg2 *v1beta1.Cluster
+		arg2 *v1beta1a.AWSCluster
 		arg3 *v1beta1.Cluster
 	}{arg1, arg2, arg3})
 	stub := fake.UnpauseStub
@@ -600,13 +600,13 @@ func (fake *FakeClusterClient) UnpauseCallCount() int {
 	return len(fake.unpauseArgsForCall)
 }
 
-func (fake *FakeClusterClient) UnpauseCalls(stub func(context.Context, *v1beta1.Cluster, *v1beta1.Cluster) error) {
+func (fake *FakeClusterClient) UnpauseCalls(stub func(context.Context, *v1beta1a.AWSCluster, *v1beta1.Cluster) error) {
 	fake.unpauseMutex.Lock()
 	defer fake.unpauseMutex.Unlock()
 	fake.UnpauseStub = stub
 }
 
-func (fake *FakeClusterClient) UnpauseArgsForCall(i int) (context.Context, *v1beta1.Cluster, *v1beta1.Cluster) {
+func (fake *FakeClusterClient) UnpauseArgsForCall(i int) (context.Context, *v1beta1a.AWSCluster, *v1beta1.Cluster) {
 	fake.unpauseMutex.RLock()
 	defer fake.unpauseMutex.RUnlock()
 	argsForCall := fake.unpauseArgsForCall[i]
