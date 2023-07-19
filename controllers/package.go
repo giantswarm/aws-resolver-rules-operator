@@ -44,3 +44,11 @@ func getSubnetIds(awsCluster *capa.AWSCluster) []string {
 
 	return subnetIds
 }
+
+// isPrivateVPC check the annotations for private VPC
+func isPrivateVPC(annotations map[string]string) bool {
+	if value, ok := annotations[gsannotations.AWSVPCMode]; ok {
+		return value == gsannotations.AWSVPCModePrivate
+	}
+	return false
+}
