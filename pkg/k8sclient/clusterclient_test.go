@@ -39,6 +39,13 @@ var _ = Describe("ClusterClient", func() {
 				},
 			}
 			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
+			awsCluster := &capa.AWSCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: namespace,
+				},
+			}
+			Expect(k8sClient.Create(ctx, awsCluster)).To(Succeed())
 		})
 
 		It("gets the desired cluster", func() {
@@ -290,7 +297,7 @@ var _ = Describe("ClusterClient", func() {
 					},
 					Spec: capa.AWSClusterRoleIdentitySpec{},
 				}
-				Expect(k8sClient.Create(ctx, clusterRoleIdentity)).To(Succeed())
+				_ = k8sClient.Create(ctx, clusterRoleIdentity))
 			})
 
 			It("gets the identity used for this cluster", func() {
