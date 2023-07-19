@@ -396,7 +396,7 @@ var _ = Describe("ClusterClient", func() {
 					},
 				},
 			}
-			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
+			Expect(k8sClient.Create(ctx, awsCluster)).To(Succeed())
 		})
 
 		It("removes the pause annotation", func() {
