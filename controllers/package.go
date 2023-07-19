@@ -18,6 +18,7 @@ func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSC
 		ControlPlaneEndpoint: awsCluster.Spec.ControlPlaneEndpoint.Host,
 		Region:               awsCluster.Spec.Region,
 		IsDnsModePrivate:     awsCluster.Annotations[gsannotations.AWSDNSMode] == gsannotations.DNSModePrivate,
+		IsVpcModePrivate:     awsCluster.Annotations[gsannotations.AWSVPCMode] == gsannotations.AWSVPCModePrivate,
 		VPCCidr:              awsCluster.Spec.NetworkSpec.VPC.CidrBlock,
 		VPCId:                awsCluster.Spec.NetworkSpec.VPC.ID,
 		IAMRoleARN:           identity.Spec.RoleArn,
@@ -43,12 +44,4 @@ func getSubnetIds(awsCluster *capa.AWSCluster) []string {
 	}
 
 	return subnetIds
-}
-
-// isPrivateVPC check the annotations for private VPC
-func isPrivateVPC(annotations map[string]string) bool {
-	if value, ok := annotations[gsannotations.AWSVPCMode]; ok {
-		return value == gsannotations.AWSVPCModePrivate
-	}
-	return false
 }

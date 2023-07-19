@@ -95,12 +95,12 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return r.reconcileDelete(ctx, capiCluster, cluster)
 	}
 
-	return r.reconcileNormal(ctx, capiCluster, cluster, isPrivateVPC(awsCluster.Annotations))
+	return r.reconcileNormal(ctx, capiCluster, cluster)
 }
 
 // reconcileNormal creates the hosted zone and the DNS records for the workload cluster.
 // It will take care of dns delegation in the parent hosted zone when using public dns mode.
-func (r *DnsReconciler) reconcileNormal(ctx context.Context, capiCluster *capi.Cluster, cluster resolver.Cluster, privateVPC bool) (ctrl.Result, error) {
+func (r *DnsReconciler) reconcileNormal(ctx context.Context, capiCluster *capi.Cluster, cluster resolver.Cluster) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	err := r.clusterClient.AddFinalizer(ctx, capiCluster, DnsFinalizer)
@@ -108,7 +108,7 @@ func (r *DnsReconciler) reconcileNormal(ctx context.Context, capiCluster *capi.C
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	bastionIp, err := r.getBastionIp(ctx, cluster.Name, privateVPC)
+	bastionIp, err := r.getBastionIp(ctx, cluster)
 	if err != nil && !errors.Is(err, &k8sclient.BastionNotFoundError{}) {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
@@ -132,14 +132,14 @@ func (r *DnsReconciler) reconcileNormal(ctx context.Context, capiCluster *capi.C
 
 // getBastionIp tries to find a bastion machine in this cluster and fetch its IP address from the status field.
 // It will return the internal IP address when using private VPC mode, or an external IP address otherwise.
-func (r *DnsReconciler) getBastionIp(ctx context.Context, clusterName string, privateVPC bool) (string, error) {
-	bastionMachine, err := r.clusterClient.GetBastionMachine(ctx, clusterName)
+func (r *DnsReconciler) getBastionIp(ctx context.Context, cluster resolver.Cluster) (string, error) {
+	bastionMachine, err := r.clusterClient.GetBastionMachine(ctx, cluster.Name)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
 	addressType := capi.MachineExternalIP
-	if privateVPC {
+	if cluster.IsVpcModePrivate {
 		addressType = capi.MachineInternalIP
 	}
 
