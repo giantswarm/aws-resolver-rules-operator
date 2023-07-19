@@ -14,7 +14,7 @@ It also requires the `ResolverRules` condition to be ready if using the private 
 
 ## DNS controller
 
-This controller reconciles `AWSClusters`. It creates a hosted zone that could be a private or a public one depending on the DNS mode of the workload cluster.
+This controller reconciles `Clusters`. It creates a hosted zone that could be a private or a public one depending on the DNS mode of the workload cluster.
 The mode is selected using the `aws.giantswarm.io/dns-mode` annotation on the `AWSCluster` CR. It also creates three DNS records in the hosted zone:
 
 - `api`: a dns record of type `A` pointing to the control plane Load Balancer
