@@ -113,7 +113,7 @@ func (r *DnsReconciler) reconcileNormal(ctx context.Context, cluster *capi.Clust
 	}
 	dnsCluster := buildCluster(awsCluster, identity)
 
-	bastionIp, err := r.getBastionIp(ctx, cluster)
+	bastionIp, err := r.getBastionIp(ctx, cluster.Name, awsCluster.Annotations)
 	if err != nil && !errors.Is(err, &k8sclient.BastionNotFoundError{}) {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
@@ -137,14 +137,14 @@ func (r *DnsReconciler) reconcileNormal(ctx context.Context, cluster *capi.Clust
 
 // getBastionIp tries to find a bastion machine in this cluster and fetch its IP address from the status field.
 // It will return the internal IP address when using private VPC mode, or an external IP address otherwise.
-func (r *DnsReconciler) getBastionIp(ctx context.Context, cluster *capi.Cluster) (string, error) {
-	bastionMachine, err := r.clusterClient.GetBastionMachine(ctx, cluster.Name)
+func (r *DnsReconciler) getBastionIp(ctx context.Context, clusterName string, annotations map[string]string) (string, error) {
+	bastionMachine, err := r.clusterClient.GetBastionMachine(ctx, clusterName)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
 	addressType := capi.MachineExternalIP
-	if cluster.Annotations[gsannotations.AWSVPCMode] == gsannotations.AWSVPCModePrivate {
+	if annotations[gsannotations.AWSVPCMode] == gsannotations.AWSVPCModePrivate {
 		addressType = capi.MachineInternalIP
 	}
 
