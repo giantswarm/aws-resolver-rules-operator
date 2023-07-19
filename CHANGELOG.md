@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Migrate `dnsController` to reconcile `Cluster` CR as prepration for reconcilaion of EKS clusters.
+
 ## [0.8.0] - 2023-07-06
 
 ### Changed
