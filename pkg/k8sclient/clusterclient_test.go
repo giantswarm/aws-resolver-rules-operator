@@ -297,7 +297,7 @@ var _ = Describe("ClusterClient", func() {
 					},
 					Spec: capa.AWSClusterRoleIdentitySpec{},
 				}
-				_ = k8sClient.Create(ctx, clusterRoleIdentity))
+				_ = k8sClient.Create(ctx, clusterRoleIdentity)
 			})
 
 			It("gets the identity used for this cluster", func() {
