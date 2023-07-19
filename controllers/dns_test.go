@@ -195,7 +195,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 				When("the cluster is being deleted", func() {
 					BeforeEach(func() {
 						deletionTime := metav1.Now()
-						awsCluster.DeletionTimestamp = &deletionTime
+						cluster.DeletionTimestamp = &deletionTime
 						route53Client.GetHostedZoneIdByNameReturnsOnCall(0, "hosted-zone-id", nil)
 						route53Client.GetHostedZoneIdByNameReturnsOnCall(1, "parent-hosted-zone-id", nil)
 					})
