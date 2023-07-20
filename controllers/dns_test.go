@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
+	eks "sigs.k8s.io/cluster-api-provider-aws/controlplane/eks/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -30,8 +31,9 @@ var _ = Describe("Dns Zone reconciler", func() {
 		ctx                     context.Context
 		reconciler              *controllers.DnsReconciler
 		awsCluster              *capa.AWSCluster
+		awsManagedControlPlane  *eks.AWSManagedControlPlane
 		awsClusterRoleIdentity  *capa.AWSClusterRoleIdentity
-		cluster                 *capi.Cluster
+		cluster, eksCluster     *capi.Cluster
 		result                  ctrl.Result
 		reconcileErr            error
 		resolverClient          *resolverfakes.FakeResolverClient
@@ -74,6 +76,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 			},
 			Spec: capa.AWSClusterRoleIdentitySpec{},
 		}
+		// CAPA
 		awsCluster = &capa.AWSCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ClusterName,
@@ -103,6 +106,36 @@ var _ = Describe("Dns Zone reconciler", func() {
 				},
 			},
 		}
+		// EKS
+		awsManagedControlPlane = &eks.AWSManagedControlPlane{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ClusterName,
+				Namespace: ClusterNamespace,
+			},
+			Spec: eks.AWSManagedControlPlaneSpec{
+				IdentityRef: &capa.AWSIdentityReference{
+					Name: "default",
+					Kind: capa.ClusterRoleIdentityKind,
+				},
+				Region: "eu-central-1",
+				NetworkSpec: capa.NetworkSpec{
+					VPC: capa.VPCSpec{
+						ID: "vpc-12345678",
+					},
+				},
+			},
+		}
+		eksCluster = &capi.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ClusterName,
+				Namespace: ClusterNamespace,
+			},
+			Spec: capi.ClusterSpec{
+				InfrastructureRef: &v1.ObjectReference{
+					Kind: "AWSManagedCluster",
+				},
+			},
+		}
 	})
 
 	JustBeforeEach(func() {
@@ -121,6 +154,21 @@ var _ = Describe("Dns Zone reconciler", func() {
 		BeforeEach(func() {
 			clusterClient.GetClusterReturns(cluster, nil)
 			clusterClient.GetAWSClusterReturns(awsCluster, expectedError)
+		})
+
+		It("returns the error", func() {
+			Expect(clusterClient.AddFinalizerCallCount()).To(BeZero())
+			Expect(reconcileErr).To(HaveOccurred())
+			Expect(reconcileErr).Should(MatchError(expectedError))
+		})
+	})
+
+	When("there is an error trying to get the AWSManagedControlPlane being reconciled", func() {
+		expectedError := errors.New("failed fetching the AWSManagedControlPlane")
+
+		BeforeEach(func() {
+			clusterClient.GetClusterReturns(eksCluster, nil)
+			clusterClient.GetAWSManagedControlPlaneReturns(awsManagedControlPlane, expectedError)
 		})
 
 		It("returns the error", func() {

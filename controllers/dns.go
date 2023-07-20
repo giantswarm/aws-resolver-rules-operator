@@ -205,6 +205,6 @@ func (r *DnsReconciler) reconcileDelete(ctx context.Context, capiCluster *capi.C
 func (r *DnsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("dnszone").
-		For(&capa.AWSCluster{}).
+		For(&capi.Cluster{}).
 		Complete(r)
 }
