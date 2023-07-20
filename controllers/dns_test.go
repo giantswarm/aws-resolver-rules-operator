@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
@@ -96,6 +97,11 @@ var _ = Describe("Dns Zone reconciler", func() {
 				Name:      ClusterName,
 				Namespace: ClusterNamespace,
 			},
+			Spec: capi.ClusterSpec{
+				InfrastructureRef: &v1.ObjectReference{
+					Kind: "AWSCluster",
+				},
+			},
 		}
 	})
 
@@ -113,6 +119,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 		expectedError := errors.New("failed fetching the AWSCluster")
 
 		BeforeEach(func() {
+			clusterClient.GetClusterReturns(cluster, nil)
 			clusterClient.GetAWSClusterReturns(awsCluster, expectedError)
 		})
 

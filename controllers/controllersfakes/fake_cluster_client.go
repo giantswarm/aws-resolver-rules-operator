@@ -8,6 +8,7 @@ import (
 	"github.com/aws-resolver-rules-operator/controllers"
 	"k8s.io/apimachinery/pkg/types"
 	v1beta1a "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
+	v1beta1b "sigs.k8s.io/cluster-api-provider-aws/controlplane/eks/api/v1beta1"
 	"sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -39,6 +40,20 @@ type FakeClusterClient struct {
 		result1 *v1beta1a.AWSCluster
 		result2 error
 	}
+	GetAWSManagedControlPlaneStub        func(context.Context, types.NamespacedName) (*v1beta1b.AWSManagedControlPlane, error)
+	getAWSManagedControlPlaneMutex       sync.RWMutex
+	getAWSManagedControlPlaneArgsForCall []struct {
+		arg1 context.Context
+		arg2 types.NamespacedName
+	}
+	getAWSManagedControlPlaneReturns struct {
+		result1 *v1beta1b.AWSManagedControlPlane
+		result2 error
+	}
+	getAWSManagedControlPlaneReturnsOnCall map[int]struct {
+		result1 *v1beta1b.AWSManagedControlPlane
+		result2 error
+	}
 	GetBastionMachineStub        func(context.Context, string) (*v1beta1.Machine, error)
 	getBastionMachineMutex       sync.RWMutex
 	getBastionMachineArgsForCall []struct {
@@ -67,11 +82,11 @@ type FakeClusterClient struct {
 		result1 *v1beta1.Cluster
 		result2 error
 	}
-	GetIdentityStub        func(context.Context, *v1beta1.Cluster) (*v1beta1a.AWSClusterRoleIdentity, error)
+	GetIdentityStub        func(context.Context, *v1beta1a.AWSIdentityReference) (*v1beta1a.AWSClusterRoleIdentity, error)
 	getIdentityMutex       sync.RWMutex
 	getIdentityArgsForCall []struct {
 		arg1 context.Context
-		arg2 *v1beta1.Cluster
+		arg2 *v1beta1a.AWSIdentityReference
 	}
 	getIdentityReturns struct {
 		result1 *v1beta1a.AWSClusterRoleIdentity
@@ -252,6 +267,71 @@ func (fake *FakeClusterClient) GetAWSClusterReturnsOnCall(i int, result1 *v1beta
 	}{result1, result2}
 }
 
+func (fake *FakeClusterClient) GetAWSManagedControlPlane(arg1 context.Context, arg2 types.NamespacedName) (*v1beta1b.AWSManagedControlPlane, error) {
+	fake.getAWSManagedControlPlaneMutex.Lock()
+	ret, specificReturn := fake.getAWSManagedControlPlaneReturnsOnCall[len(fake.getAWSManagedControlPlaneArgsForCall)]
+	fake.getAWSManagedControlPlaneArgsForCall = append(fake.getAWSManagedControlPlaneArgsForCall, struct {
+		arg1 context.Context
+		arg2 types.NamespacedName
+	}{arg1, arg2})
+	stub := fake.GetAWSManagedControlPlaneStub
+	fakeReturns := fake.getAWSManagedControlPlaneReturns
+	fake.recordInvocation("GetAWSManagedControlPlane", []interface{}{arg1, arg2})
+	fake.getAWSManagedControlPlaneMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeClusterClient) GetAWSManagedControlPlaneCallCount() int {
+	fake.getAWSManagedControlPlaneMutex.RLock()
+	defer fake.getAWSManagedControlPlaneMutex.RUnlock()
+	return len(fake.getAWSManagedControlPlaneArgsForCall)
+}
+
+func (fake *FakeClusterClient) GetAWSManagedControlPlaneCalls(stub func(context.Context, types.NamespacedName) (*v1beta1b.AWSManagedControlPlane, error)) {
+	fake.getAWSManagedControlPlaneMutex.Lock()
+	defer fake.getAWSManagedControlPlaneMutex.Unlock()
+	fake.GetAWSManagedControlPlaneStub = stub
+}
+
+func (fake *FakeClusterClient) GetAWSManagedControlPlaneArgsForCall(i int) (context.Context, types.NamespacedName) {
+	fake.getAWSManagedControlPlaneMutex.RLock()
+	defer fake.getAWSManagedControlPlaneMutex.RUnlock()
+	argsForCall := fake.getAWSManagedControlPlaneArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeClusterClient) GetAWSManagedControlPlaneReturns(result1 *v1beta1b.AWSManagedControlPlane, result2 error) {
+	fake.getAWSManagedControlPlaneMutex.Lock()
+	defer fake.getAWSManagedControlPlaneMutex.Unlock()
+	fake.GetAWSManagedControlPlaneStub = nil
+	fake.getAWSManagedControlPlaneReturns = struct {
+		result1 *v1beta1b.AWSManagedControlPlane
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeClusterClient) GetAWSManagedControlPlaneReturnsOnCall(i int, result1 *v1beta1b.AWSManagedControlPlane, result2 error) {
+	fake.getAWSManagedControlPlaneMutex.Lock()
+	defer fake.getAWSManagedControlPlaneMutex.Unlock()
+	fake.GetAWSManagedControlPlaneStub = nil
+	if fake.getAWSManagedControlPlaneReturnsOnCall == nil {
+		fake.getAWSManagedControlPlaneReturnsOnCall = make(map[int]struct {
+			result1 *v1beta1b.AWSManagedControlPlane
+			result2 error
+		})
+	}
+	fake.getAWSManagedControlPlaneReturnsOnCall[i] = struct {
+		result1 *v1beta1b.AWSManagedControlPlane
+		result2 error
+	}{result1, result2}
+}
+
 func (fake *FakeClusterClient) GetBastionMachine(arg1 context.Context, arg2 string) (*v1beta1.Machine, error) {
 	fake.getBastionMachineMutex.Lock()
 	ret, specificReturn := fake.getBastionMachineReturnsOnCall[len(fake.getBastionMachineArgsForCall)]
@@ -382,12 +462,12 @@ func (fake *FakeClusterClient) GetClusterReturnsOnCall(i int, result1 *v1beta1.C
 	}{result1, result2}
 }
 
-func (fake *FakeClusterClient) GetIdentity(arg1 context.Context, arg2 *v1beta1.Cluster) (*v1beta1a.AWSClusterRoleIdentity, error) {
+func (fake *FakeClusterClient) GetIdentity(arg1 context.Context, arg2 *v1beta1a.AWSIdentityReference) (*v1beta1a.AWSClusterRoleIdentity, error) {
 	fake.getIdentityMutex.Lock()
 	ret, specificReturn := fake.getIdentityReturnsOnCall[len(fake.getIdentityArgsForCall)]
 	fake.getIdentityArgsForCall = append(fake.getIdentityArgsForCall, struct {
 		arg1 context.Context
-		arg2 *v1beta1.Cluster
+		arg2 *v1beta1a.AWSIdentityReference
 	}{arg1, arg2})
 	stub := fake.GetIdentityStub
 	fakeReturns := fake.getIdentityReturns
@@ -408,13 +488,13 @@ func (fake *FakeClusterClient) GetIdentityCallCount() int {
 	return len(fake.getIdentityArgsForCall)
 }
 
-func (fake *FakeClusterClient) GetIdentityCalls(stub func(context.Context, *v1beta1.Cluster) (*v1beta1a.AWSClusterRoleIdentity, error)) {
+func (fake *FakeClusterClient) GetIdentityCalls(stub func(context.Context, *v1beta1a.AWSIdentityReference) (*v1beta1a.AWSClusterRoleIdentity, error)) {
 	fake.getIdentityMutex.Lock()
 	defer fake.getIdentityMutex.Unlock()
 	fake.GetIdentityStub = stub
 }
 
-func (fake *FakeClusterClient) GetIdentityArgsForCall(i int) (context.Context, *v1beta1.Cluster) {
+func (fake *FakeClusterClient) GetIdentityArgsForCall(i int) (context.Context, *v1beta1a.AWSIdentityReference) {
 	fake.getIdentityMutex.RLock()
 	defer fake.getIdentityMutex.RUnlock()
 	argsForCall := fake.getIdentityArgsForCall[i]
@@ -643,6 +723,8 @@ func (fake *FakeClusterClient) Invocations() map[string][][]interface{} {
 	defer fake.addFinalizerMutex.RUnlock()
 	fake.getAWSClusterMutex.RLock()
 	defer fake.getAWSClusterMutex.RUnlock()
+	fake.getAWSManagedControlPlaneMutex.RLock()
+	defer fake.getAWSManagedControlPlaneMutex.RUnlock()
 	fake.getBastionMachineMutex.RLock()
 	defer fake.getBastionMachineMutex.RUnlock()
 	fake.getClusterMutex.RLock()

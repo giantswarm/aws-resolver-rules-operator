@@ -69,9 +69,9 @@ func getSubnetIds(subnets capa.Subnets) []string {
 }
 
 func isCAPA(capiCluster *capi.Cluster) bool {
-	return capiCluster.Spec.InfrastructureRef.Kind == "AWSCluster"
+	return capiCluster.Spec.InfrastructureRef != nil && capiCluster.Spec.InfrastructureRef.Kind == "AWSCluster"
 }
 
 func isEKS(capiCluster *capi.Cluster) bool {
-	return capiCluster.Spec.InfrastructureRef.Kind == "AWSManagedCluster"
+	return capiCluster.Spec.InfrastructureRef != nil && capiCluster.Spec.InfrastructureRef.Kind == "AWSManagedCluster"
 }
