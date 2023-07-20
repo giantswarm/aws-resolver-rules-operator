@@ -3,6 +3,7 @@ package resolver
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -150,7 +151,7 @@ func (d *Zoner) getWorkloadClusterDnsRecords(workloadClusterHostedZoneName strin
 			dnsRecords = append(dnsRecords, DNSRecord{
 				Kind:   DnsRecordTypeCname,
 				Name:   fmt.Sprintf("api.%s", workloadClusterHostedZoneName),
-				Value:  cluster.ControlPlaneEndpoint,
+				Value:  strings.TrimPrefix(cluster.ControlPlaneEndpoint, "https://"),
 				Region: cluster.Region,
 			})
 		} else {
