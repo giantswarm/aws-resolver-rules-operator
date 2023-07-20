@@ -6,7 +6,6 @@ import (
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	eks "sigs.k8s.io/cluster-api-provider-aws/controlplane/eks/api/v1beta1"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
@@ -20,6 +19,7 @@ func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSC
 		Region:               awsCluster.Spec.Region,
 		IsDnsModePrivate:     awsCluster.Annotations[gsannotations.AWSDNSMode] == gsannotations.DNSModePrivate,
 		IsVpcModePrivate:     awsCluster.Annotations[gsannotations.AWSVPCMode] == gsannotations.AWSVPCModePrivate,
+		IsEKS:                false,
 		VPCCidr:              awsCluster.Spec.NetworkSpec.VPC.CidrBlock,
 		VPCId:                awsCluster.Spec.NetworkSpec.VPC.ID,
 		IAMRoleARN:           identity.Spec.RoleArn,
@@ -41,6 +41,7 @@ func buildClusterFromAWSManagedControlPlane(awsManagedControlPlane *eks.AWSManag
 		Region:               awsManagedControlPlane.Spec.Region,
 		IsDnsModePrivate:     awsManagedControlPlane.Annotations[gsannotations.AWSDNSMode] == gsannotations.DNSModePrivate,
 		IsVpcModePrivate:     awsManagedControlPlane.Annotations[gsannotations.AWSVPCMode] == gsannotations.AWSVPCModePrivate,
+		IsEKS:                true,
 		VPCCidr:              awsManagedControlPlane.Spec.NetworkSpec.VPC.CidrBlock,
 		VPCId:                awsManagedControlPlane.Spec.NetworkSpec.VPC.ID,
 		IAMRoleARN:           identity.Spec.RoleArn,
@@ -66,12 +67,4 @@ func getSubnetIds(subnets capa.Subnets) []string {
 	}
 
 	return subnetIds
-}
-
-func isCAPA(capiCluster *capi.Cluster) bool {
-	return capiCluster.Spec.InfrastructureRef != nil && capiCluster.Spec.InfrastructureRef.Kind == "AWSCluster"
-}
-
-func isEKS(capiCluster *capi.Cluster) bool {
-	return capiCluster.Spec.InfrastructureRef != nil && capiCluster.Spec.InfrastructureRef.Kind == "AWSManagedCluster"
 }

@@ -146,12 +146,21 @@ func (d *Zoner) getWorkloadClusterDnsRecords(workloadClusterHostedZoneName strin
 	}
 
 	if cluster.ControlPlaneEndpoint != "" {
-		dnsRecords = append(dnsRecords, DNSRecord{
-			Kind:   DnsRecordTypeAlias,
-			Name:   fmt.Sprintf("api.%s", workloadClusterHostedZoneName),
-			Value:  cluster.ControlPlaneEndpoint,
-			Region: cluster.Region,
-		})
+		if cluster.IsEKS {
+			dnsRecords = append(dnsRecords, DNSRecord{
+				Kind:   DnsRecordTypeCname,
+				Name:   fmt.Sprintf("api.%s", workloadClusterHostedZoneName),
+				Value:  cluster.ControlPlaneEndpoint,
+				Region: cluster.Region,
+			})
+		} else {
+			dnsRecords = append(dnsRecords, DNSRecord{
+				Kind:   DnsRecordTypeAlias,
+				Name:   fmt.Sprintf("api.%s", workloadClusterHostedZoneName),
+				Value:  cluster.ControlPlaneEndpoint,
+				Region: cluster.Region,
+			})
+		}
 	}
 
 	if cluster.BastionIp != "" {

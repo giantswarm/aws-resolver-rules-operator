@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
+	"github.com/aws-resolver-rules-operator/pkg/key"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
 
@@ -74,7 +75,7 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 	var cluster resolver.Cluster
 	// CAPA
-	if isCAPA(capiCluster) {
+	if key.IsCAPA(capiCluster) {
 		awsCluster, err := r.clusterClient.GetAWSCluster(ctx, req.NamespacedName)
 		if err != nil {
 			return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
@@ -95,7 +96,7 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 		cluster = buildClusterFromAWSCluster(awsCluster, identity)
 		// EKS
-	} else if isEKS(capiCluster) {
+	} else if key.IsEKS(capiCluster) {
 		awsManagedControlPlane, err := r.clusterClient.GetAWSManagedControlPlane(ctx, req.NamespacedName)
 		if err != nil {
 			return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))

@@ -7,6 +7,7 @@ type Cluster struct {
 	ControlPlaneEndpoint        string
 	IsDnsModePrivate            bool
 	IsVpcModePrivate            bool
+	IsEKS                       bool
 	Region                      string
 	VPCCidr                     string
 	VPCId                       string
