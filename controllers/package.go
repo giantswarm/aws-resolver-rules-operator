@@ -11,12 +11,14 @@ import (
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
-func buildCluster(awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity) resolver.Cluster {
+func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity) resolver.Cluster {
+
 	cluster := resolver.Cluster{
 		Name:                 awsCluster.Name,
 		ControlPlaneEndpoint: awsCluster.Spec.ControlPlaneEndpoint.Host,
 		Region:               awsCluster.Spec.Region,
 		IsDnsModePrivate:     awsCluster.Annotations[gsannotations.AWSDNSMode] == gsannotations.DNSModePrivate,
+		IsVpcModePrivate:     awsCluster.Annotations[gsannotations.AWSVPCMode] == gsannotations.AWSVPCModePrivate,
 		VPCCidr:              awsCluster.Spec.NetworkSpec.VPC.CidrBlock,
 		VPCId:                awsCluster.Spec.NetworkSpec.VPC.ID,
 		IAMRoleARN:           identity.Spec.RoleArn,

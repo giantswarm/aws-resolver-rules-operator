@@ -6,6 +6,7 @@ type Cluster struct {
 	BastionIp                   string
 	ControlPlaneEndpoint        string
 	IsDnsModePrivate            bool
+	IsVpcModePrivate            bool
 	Region                      string
 	VPCCidr                     string
 	VPCId                       string

@@ -25,7 +25,7 @@ import (
 
 var _ = Describe("Dns Zone reconciler", func() {
 	var (
-		awsClusterClient        *controllersfakes.FakeAWSClusterClient
+		clusterClient           *controllersfakes.FakeClusterClient
 		ctx                     context.Context
 		reconciler              *controllers.DnsReconciler
 		awsCluster              *capa.AWSCluster
@@ -48,7 +48,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 
 	BeforeEach(func() {
 		ctx = context.Background()
-		awsClusterClient = new(controllersfakes.FakeAWSClusterClient)
+		clusterClient = new(controllersfakes.FakeClusterClient)
 		dnsServerResolverClient = new(resolverfakes.FakeResolverClient)
 		ramClient = new(resolverfakes.FakeRAMClient)
 		ec2Client = new(resolverfakes.FakeEC2Client)
@@ -64,7 +64,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 		dns, err := resolver.NewDnsZone(fakeAWSClients, WorkloadClusterBaseDomain)
 		Expect(err).NotTo(HaveOccurred())
 
-		reconciler = controllers.NewDnsReconciler(awsClusterClient, dns)
+		reconciler = controllers.NewDnsReconciler(clusterClient, dns)
 
 		awsClusterRoleIdentity = &capa.AWSClusterRoleIdentity{
 			ObjectMeta: metav1.ObjectMeta{
@@ -113,11 +113,11 @@ var _ = Describe("Dns Zone reconciler", func() {
 		expectedError := errors.New("failed fetching the AWSCluster")
 
 		BeforeEach(func() {
-			awsClusterClient.GetAWSClusterReturns(awsCluster, expectedError)
+			clusterClient.GetAWSClusterReturns(awsCluster, expectedError)
 		})
 
 		It("returns the error", func() {
-			Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
+			Expect(clusterClient.AddFinalizerCallCount()).To(BeZero())
 			Expect(reconcileErr).To(HaveOccurred())
 			Expect(reconcileErr).Should(MatchError(expectedError))
 		})
@@ -125,47 +125,23 @@ var _ = Describe("Dns Zone reconciler", func() {
 
 	When("reconciling an existing cluster", func() {
 		BeforeEach(func() {
-			awsClusterClient.GetAWSClusterReturns(awsCluster, nil)
-			awsClusterClient.GetBastionMachineReturns(nil, &k8sclient.BastionNotFoundError{})
-		})
-
-		When("the aws cluster doesn't have an owner yet", func() {
-			BeforeEach(func() {
-				awsClusterClient.GetOwnerReturns(nil, nil)
-			})
-
-			It("doesn't really reconcile", func() {
-				Expect(awsClusterClient.GetIdentityCallCount()).To(BeZero())
-				Expect(reconcileErr).NotTo(HaveOccurred())
-			})
-		})
-
-		When("there is an error trying to find the owner cluster", func() {
-			expectedError := errors.New("failed fetching the AWSCluster")
-
-			BeforeEach(func() {
-				awsClusterClient.GetOwnerReturns(nil, expectedError)
-			})
-			It("returns the error", func() {
-				Expect(awsClusterClient.GetIdentityCallCount()).To(BeZero())
-				Expect(reconcileErr).To(HaveOccurred())
-				Expect(reconcileErr).Should(MatchError(expectedError))
-			})
+			clusterClient.GetAWSClusterReturns(awsCluster, nil)
+			clusterClient.GetBastionMachineReturns(nil, &k8sclient.BastionNotFoundError{})
 		})
 
 		When("the aws cluster already has an owner", func() {
 			BeforeEach(func() {
-				awsClusterClient.GetOwnerReturns(cluster, nil)
+				clusterClient.GetClusterReturns(cluster, nil)
 			})
 
 			When("the cluster is paused", func() {
 				BeforeEach(func() {
 					cluster.Spec.Paused = true
-					awsClusterClient.GetOwnerReturns(cluster, nil)
+					clusterClient.GetClusterReturns(cluster, nil)
 				})
 
 				It("does not reconcile", func() {
-					Expect(awsClusterClient.GetIdentityCallCount()).To(BeZero())
+					Expect(clusterClient.GetIdentityCallCount()).To(BeZero())
 					Expect(reconcileErr).NotTo(HaveOccurred())
 				})
 			})
@@ -175,11 +151,11 @@ var _ = Describe("Dns Zone reconciler", func() {
 					awsCluster.Annotations = map[string]string{
 						capi.PausedAnnotation: "true",
 					}
-					awsClusterClient.GetAWSClusterReturns(awsCluster, nil)
+					clusterClient.GetAWSClusterReturns(awsCluster, nil)
 				})
 
 				It("does not reconcile", func() {
-					Expect(awsClusterClient.GetIdentityCallCount()).To(BeZero())
+					Expect(clusterClient.GetIdentityCallCount()).To(BeZero())
 					Expect(reconcileErr).NotTo(HaveOccurred())
 				})
 			})
@@ -188,11 +164,11 @@ var _ = Describe("Dns Zone reconciler", func() {
 				expectedError := errors.New("failed fetching the AWSCluster")
 
 				BeforeEach(func() {
-					awsClusterClient.GetIdentityReturns(nil, expectedError)
+					clusterClient.GetIdentityReturns(nil, expectedError)
 				})
 
 				It("doesn't really reconcile", func() {
-					Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
+					Expect(clusterClient.AddFinalizerCallCount()).To(BeZero())
 					Expect(reconcileErr).To(HaveOccurred())
 					Expect(reconcileErr).Should(MatchError(expectedError))
 				})
@@ -200,11 +176,11 @@ var _ = Describe("Dns Zone reconciler", func() {
 
 			When("the cluster has no identity set", func() {
 				BeforeEach(func() {
-					awsClusterClient.GetIdentityReturns(nil, nil)
+					clusterClient.GetIdentityReturns(nil, nil)
 				})
 
 				It("doesn't really reconcile", func() {
-					Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
+					Expect(clusterClient.AddFinalizerCallCount()).To(BeZero())
 					Expect(result.Requeue).To(BeFalse())
 					Expect(result.RequeueAfter).To(BeZero())
 					Expect(reconcileErr).NotTo(HaveOccurred())
@@ -213,13 +189,13 @@ var _ = Describe("Dns Zone reconciler", func() {
 
 			When("the cluster has an identity set", func() {
 				BeforeEach(func() {
-					awsClusterClient.GetIdentityReturns(awsClusterRoleIdentity, nil)
+					clusterClient.GetIdentityReturns(awsClusterRoleIdentity, nil)
 				})
 
 				When("the cluster is being deleted", func() {
 					BeforeEach(func() {
 						deletionTime := metav1.Now()
-						awsCluster.DeletionTimestamp = &deletionTime
+						cluster.DeletionTimestamp = &deletionTime
 						route53Client.GetHostedZoneIdByNameReturnsOnCall(0, "hosted-zone-id", nil)
 						route53Client.GetHostedZoneIdByNameReturnsOnCall(1, "parent-hosted-zone-id", nil)
 					})
@@ -243,7 +219,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 						})
 
 						It("deletes the finalizer", func() {
-							Expect(awsClusterClient.RemoveFinalizerCallCount()).To(Equal(1))
+							Expect(clusterClient.RemoveFinalizerCallCount()).To(Equal(1))
 						})
 
 						When("it fails to delete the hosted zone", func() {
@@ -252,7 +228,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 							})
 
 							It("does not delete the finalizer", func() {
-								Expect(awsClusterClient.RemoveFinalizerCallCount()).To(Equal(0))
+								Expect(clusterClient.RemoveFinalizerCallCount()).To(Equal(0))
 							})
 						})
 
@@ -282,7 +258,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 						})
 
 						It("deletes the finalizer", func() {
-							Expect(awsClusterClient.RemoveFinalizerCallCount()).To(Equal(1))
+							Expect(clusterClient.RemoveFinalizerCallCount()).To(Equal(1))
 						})
 
 						When("it fails to delete the hosted zone", func() {
@@ -291,7 +267,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 							})
 
 							It("does not delete the finalizer", func() {
-								Expect(awsClusterClient.RemoveFinalizerCallCount()).To(Equal(0))
+								Expect(clusterClient.RemoveFinalizerCallCount()).To(Equal(0))
 							})
 						})
 
@@ -311,7 +287,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 
 				When("the cluster is not being deleted", func() {
 					It("adds the finalizer to the AWSCluster", func() {
-						Expect(awsClusterClient.AddFinalizerCallCount()).To(Equal(1))
+						Expect(clusterClient.AddFinalizerCallCount()).To(Equal(1))
 						Expect(reconcileErr).NotTo(HaveOccurred())
 					})
 
@@ -397,7 +373,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 								},
 							}
 							BeforeEach(func() {
-								awsClusterClient.GetBastionMachineReturns(bastionMachine, nil)
+								clusterClient.GetBastionMachineReturns(bastionMachine, nil)
 							})
 
 							It("it creates DNS record for the bastion", func() {
@@ -421,7 +397,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 								},
 							}
 							BeforeEach(func() {
-								awsClusterClient.GetBastionMachineReturns(bastionMachine, nil)
+								clusterClient.GetBastionMachineReturns(bastionMachine, nil)
 							})
 
 							It("it doesn't create DNS record for the bastion but requeues", func() {
@@ -436,7 +412,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 
 						When("there is no bastion server deployed", func() {
 							BeforeEach(func() {
-								awsClusterClient.GetBastionMachineReturns(nil, &k8sclient.BastionNotFoundError{})
+								clusterClient.GetBastionMachineReturns(nil, &k8sclient.BastionNotFoundError{})
 							})
 
 							It("it doesn't create DNS record for the bastion", func() {
@@ -596,7 +572,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 								},
 							}
 							BeforeEach(func() {
-								awsClusterClient.GetBastionMachineReturns(bastionMachine, nil)
+								clusterClient.GetBastionMachineReturns(bastionMachine, nil)
 							})
 
 							It("it creates DNS record for the bastion", func() {
@@ -620,7 +596,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 								},
 							}
 							BeforeEach(func() {
-								awsClusterClient.GetBastionMachineReturns(bastionMachine, nil)
+								clusterClient.GetBastionMachineReturns(bastionMachine, nil)
 							})
 
 							It("it creates DNS record for the bastion", func() {
