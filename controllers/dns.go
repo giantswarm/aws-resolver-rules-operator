@@ -2,11 +2,13 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
+	eks "sigs.k8s.io/cluster-api-provider-aws/controlplane/eks/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/annotations"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -24,11 +26,12 @@ const (
 //counterfeiter:generate . ClusterClient
 type ClusterClient interface {
 	GetAWSCluster(context.Context, types.NamespacedName) (*capa.AWSCluster, error)
-	GetCluster(ctx context.Context, namespacedName types.NamespacedName) (*capi.Cluster, error)
+	GetAWSManagedControlPlane(context.Context, types.NamespacedName) (*eks.AWSManagedControlPlane, error)
+	GetCluster(context.Context, types.NamespacedName) (*capi.Cluster, error)
 	AddFinalizer(context.Context, *capi.Cluster, string) error
 	Unpause(context.Context, *capa.AWSCluster, *capi.Cluster) error
 	RemoveFinalizer(context.Context, *capi.Cluster, string) error
-	GetIdentity(context.Context, *capi.Cluster) (*capa.AWSClusterRoleIdentity, error)
+	GetIdentity(context.Context, *capa.AWSIdentityReference) (*capa.AWSClusterRoleIdentity, error)
 	MarkConditionTrue(context.Context, *capi.Cluster, capi.ConditionType) error
 	GetBastionMachine(ctx context.Context, clusterName string) (*capi.Machine, error)
 }
@@ -64,32 +67,60 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	logger.Info("Reconciling")
 	defer logger.Info("Done reconciling")
 
-	awsCluster, err := r.clusterClient.GetAWSCluster(ctx, req.NamespacedName)
-	if err != nil {
-		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
-	}
-
 	capiCluster, err := r.clusterClient.GetCluster(ctx, req.NamespacedName)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	if annotations.IsPaused(capiCluster, awsCluster) {
-		logger.Info("Infrastructure or core cluster is marked as paused, skipping")
+	var cluster resolver.Cluster
+	// CAPA
+	if isCAPA(capiCluster) {
+		awsCluster, err := r.clusterClient.GetAWSCluster(ctx, req.NamespacedName)
+		if err != nil {
+			return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
+		}
+		if annotations.IsPaused(capiCluster, awsCluster) {
+			logger.Info("Infrastructure or core cluster is marked as paused, skipping")
+			return ctrl.Result{}, nil
+		}
+		identity, err := r.clusterClient.GetIdentity(ctx, awsCluster.Spec.IdentityRef)
+		if err != nil {
+			return ctrl.Result{}, errors.WithStack(err)
+		}
+
+		if identity == nil {
+			logger.Info("AWSCluster has no identityRef set, skipping")
+			return ctrl.Result{}, nil
+		}
+
+		cluster = buildClusterFromAWSCluster(awsCluster, identity)
+		// EKS
+	} else if isEKS(capiCluster) {
+		awsManagedControlPlane, err := r.clusterClient.GetAWSManagedControlPlane(ctx, req.NamespacedName)
+		if err != nil {
+			return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
+		}
+
+		if annotations.IsPaused(capiCluster, awsManagedControlPlane) {
+			logger.Info("Infrastructure or core cluster is marked as paused, skipping")
+			return ctrl.Result{}, nil
+		}
+
+		identity, err := r.clusterClient.GetIdentity(ctx, awsManagedControlPlane.Spec.IdentityRef)
+		if err != nil {
+			return ctrl.Result{}, errors.WithStack(err)
+		}
+
+		if identity == nil {
+			logger.Info("AWSManagedControlPlane has no identityRef set, skipping")
+			return ctrl.Result{}, nil
+		}
+
+		cluster = buildClusterFromAWSManagedControlPlane(awsManagedControlPlane, identity)
+	} else {
+		logger.Info(fmt.Sprintf("Unsupported infrastructure provider '%s'", capiCluster.Spec.InfrastructureRef.Kind))
 		return ctrl.Result{}, nil
 	}
-
-	identity, err := r.clusterClient.GetIdentity(ctx, capiCluster)
-	if err != nil {
-		return ctrl.Result{}, errors.WithStack(err)
-	}
-
-	if identity == nil {
-		logger.Info("AWSCluster has no identityRef set, skipping")
-		return ctrl.Result{}, nil
-	}
-
-	cluster := buildClusterFromAWSCluster(awsCluster, identity)
 
 	if !capiCluster.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, capiCluster, cluster)
