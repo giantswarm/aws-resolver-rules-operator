@@ -233,30 +233,37 @@ func (r *Route53) AddDnsRecordsToHostedZone(ctx context.Context, logger logr.Log
 	return nil
 }
 
+// DeleteDnsRecordsFromHostedZone will delete all dns records from the zone, except for SOA and NS records.
 func (r *Route53) DeleteDnsRecordsFromHostedZone(ctx context.Context, logger logr.Logger, hostedZoneId string) error {
-	logger.Info("Deleting cluster dns records from hosted zone")
+	logger.Info("Deleting dns records from hosted zone")
 	listRecordsResponse, err := r.client.ListResourceRecordSetsWithContext(ctx, &route53.ListResourceRecordSetsInput{
 		HostedZoneId: awssdk.String(hostedZoneId),
 	})
 	if err != nil {
 		return errors.WithStack(err)
 	}
+
+	changes := []*route53.Change{}
 	for _, recordSet := range listRecordsResponse.ResourceRecordSets {
-		if *recordSet.Type == string(resolver.DnsRecordTypeCname) || *recordSet.Type == string(resolver.DnsRecordTypeA) {
-			_, err = r.client.ChangeResourceRecordSetsWithContext(ctx, &route53.ChangeResourceRecordSetsInput{
-				ChangeBatch: &route53.ChangeBatch{
-					Changes: []*route53.Change{
-						{
-							Action:            awssdk.String("DELETE"),
-							ResourceRecordSet: recordSet,
-						},
-					},
-				},
-				HostedZoneId: awssdk.String(hostedZoneId),
-			})
-			if err != nil {
-				return errors.WithStack(err)
-			}
+		if *recordSet.Type == route53.RRTypeSoa || *recordSet.Type == route53.RRTypeNs {
+			continue
+		}
+
+		changes = append(changes, &route53.Change{
+			Action:            awssdk.String("DELETE"),
+			ResourceRecordSet: recordSet,
+		})
+	}
+
+	if len(changes) > 0 {
+		_, err = r.client.ChangeResourceRecordSetsWithContext(ctx, &route53.ChangeResourceRecordSetsInput{
+			ChangeBatch: &route53.ChangeBatch{
+				Changes: changes,
+			},
+			HostedZoneId: awssdk.String(hostedZoneId),
+		})
+		if err != nil {
+			return errors.WithStack(err)
 		}
 	}
 
