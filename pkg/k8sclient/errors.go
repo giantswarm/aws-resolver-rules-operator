@@ -5,7 +5,6 @@ import (
 )
 
 type BastionNotFoundError struct {
-	error
 }
 
 func (e *BastionNotFoundError) Error() string {

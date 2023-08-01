@@ -5,7 +5,6 @@ import (
 )
 
 type ResolverRuleNotFoundError struct {
-	error
 }
 
 func (e *ResolverRuleNotFoundError) Error() string {
@@ -17,7 +16,6 @@ func (e *ResolverRuleNotFoundError) Is(target error) bool {
 }
 
 type HostedZoneNotFoundError struct {
-	error
 }
 
 func (e *HostedZoneNotFoundError) Error() string {
