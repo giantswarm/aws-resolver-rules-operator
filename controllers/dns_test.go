@@ -387,7 +387,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 							BeforeEach(func() {
 								clusterClient.GetClusterReturns(eksCluster, nil)
 								clusterClient.GetAWSManagedControlPlaneReturns(awsManagedControlPlane, nil)
-								awsManagedControlPlane.Spec.ControlPlaneEndpoint.Host = "control-plane-load-balancer-hostname"
+								awsManagedControlPlane.Spec.ControlPlaneEndpoint.Host = "control-plane-eks-load-balancer-hostname"
 							})
 
 							It("creates DNS records for workload cluster", func() {
@@ -395,7 +395,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 								Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
 									Kind:   resolver.DnsRecordTypeCname,
 									Name:   fmt.Sprintf("api.%s.%s", ClusterName, WorkloadClusterBaseDomain),
-									Value:  "control-plane-load-balancer-hostname",
+									Value:  "control-plane-eks-load-balancer-hostname",
 									Region: awsCluster.Spec.Region,
 								}))
 							})
