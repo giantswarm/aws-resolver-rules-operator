@@ -16,7 +16,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
-	"github.com/aws-resolver-rules-operator/pkg/key"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
 
@@ -75,7 +74,7 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 	var cluster resolver.Cluster
 	// CAPA
-	if key.IsCAPA(capiCluster) {
+	if isCAPA(capiCluster) {
 		awsCluster, err := r.clusterClient.GetAWSCluster(ctx, req.NamespacedName)
 		if err != nil {
 			return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
@@ -96,7 +95,7 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 		cluster = buildClusterFromAWSCluster(awsCluster, identity)
 		// EKS
-	} else if key.IsEKS(capiCluster) {
+	} else if isEKS(capiCluster) {
 		awsManagedControlPlane, err := r.clusterClient.GetAWSManagedControlPlane(ctx, req.NamespacedName)
 		if err != nil {
 			return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
@@ -208,4 +207,12 @@ func (r *DnsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Named("dnszone").
 		For(&capi.Cluster{}).
 		Complete(r)
+}
+
+func isCAPA(capiCluster *capi.Cluster) bool {
+	return capiCluster.Spec.InfrastructureRef != nil && capiCluster.Spec.InfrastructureRef.Kind == "AWSCluster"
+}
+
+func isEKS(capiCluster *capi.Cluster) bool {
+	return capiCluster.Spec.InfrastructureRef != nil && capiCluster.Spec.InfrastructureRef.Kind == "AWSManagedCluster"
 }
