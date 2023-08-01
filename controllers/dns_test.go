@@ -388,8 +388,6 @@ var _ = Describe("Dns Zone reconciler", func() {
 								clusterClient.GetClusterReturns(eksCluster, nil)
 								clusterClient.GetAWSManagedControlPlaneReturns(awsManagedControlPlane, nil)
 								awsManagedControlPlane.Spec.ControlPlaneEndpoint.Host = "control-plane-load-balancer-hostname"
-								eksCluster.Spec.ControlPlaneEndpoint.Host = "control-plane-load-balancer-hostname"
-
 							})
 
 							It("creates DNS records for workload cluster", func() {
