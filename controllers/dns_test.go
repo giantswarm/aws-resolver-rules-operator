@@ -341,7 +341,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 				})
 
 				When("the cluster is not being deleted", func() {
-					It("adds the finalizer to the AWSCluster", func() {
+					It("adds the finalizer to the Cluster", func() {
 						Expect(clusterClient.AddFinalizerCallCount()).To(Equal(1))
 						Expect(reconcileErr).NotTo(HaveOccurred())
 					})
@@ -383,8 +383,29 @@ var _ = Describe("Dns Zone reconciler", func() {
 							}))
 						})
 
-						When("the k8s API endpoint of the workload cluster is set", func() {
+						When("the k8s API endpoint of the EKS workload cluster is set", func() {
 							BeforeEach(func() {
+								clusterClient.GetClusterReturns(eksCluster, nil)
+								clusterClient.GetAWSManagedControlPlaneReturns(awsManagedControlPlane, nil)
+								awsManagedControlPlane.Spec.ControlPlaneEndpoint.Host = "control-plane-load-balancer-hostname"
+								eksCluster.Spec.ControlPlaneEndpoint.Host = "control-plane-load-balancer-hostname"
+
+							})
+
+							It("creates DNS records for workload cluster", func() {
+								_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+								Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
+									Kind:   resolver.DnsRecordTypeCname,
+									Name:   fmt.Sprintf("api.%s.%s", ClusterName, WorkloadClusterBaseDomain),
+									Value:  "control-plane-load-balancer-hostname",
+									Region: awsCluster.Spec.Region,
+								}))
+							})
+						})
+
+						When("the k8s API endpoint of the CAPA workload cluster is set", func() {
+							BeforeEach(func() {
+								clusterClient.GetClusterReturns(cluster, nil)
 								awsCluster.Spec.ControlPlaneEndpoint.Host = "control-plane-load-balancer-hostname"
 							})
 
