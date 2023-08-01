@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
+	eks "sigs.k8s.io/cluster-api-provider-aws/controlplane/eks/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 
 	"github.com/aws-resolver-rules-operator/controllers"
@@ -80,6 +81,63 @@ var _ = Describe("ClusterClient", func() {
 				actualCluster, err := clusterClient.GetAWSCluster(ctx, types.NamespacedName{
 					Namespace: namespace,
 					Name:      "test-cluster2",
+				})
+				Expect(err).To(MatchError(ContainSubstring("context canceled")))
+				Expect(actualCluster).To(BeNil())
+			})
+		})
+	})
+
+	Describe("GetAWSManagedControlPlane", func() {
+		BeforeEach(func() {
+			cluster := &capi.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster3",
+					Namespace: namespace,
+				},
+			}
+			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
+			awsManagedControlPlane := &eks.AWSManagedControlPlane{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster3",
+					Namespace: namespace,
+				},
+			}
+			Expect(k8sClient.Create(ctx, awsManagedControlPlane)).To(Succeed())
+		})
+
+		It("gets the desired awsManagedControlPlane", func() {
+			actualCluster, err := clusterClient.GetAWSManagedControlPlane(ctx, types.NamespacedName{
+				Namespace: namespace,
+				Name:      "test-cluster3",
+			})
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(actualCluster.Name).To(Equal("test-cluster3"))
+			Expect(actualCluster.Namespace).To(Equal(namespace))
+		})
+
+		When("the awsManagedControlPlane does not exist", func() {
+			It("returns an error", func() {
+				_, err := clusterClient.GetAWSManagedControlPlane(ctx, types.NamespacedName{
+					Namespace: namespace,
+					Name:      "does-not-exist",
+				})
+				Expect(k8serrors.IsNotFound(err)).To(BeTrue())
+			})
+		})
+
+		When("the context is cancelled", func() {
+			BeforeEach(func() {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			})
+
+			It("returns an error", func() {
+				actualCluster, err := clusterClient.GetAWSManagedControlPlane(ctx, types.NamespacedName{
+					Namespace: namespace,
+					Name:      "test-cluster3",
 				})
 				Expect(err).To(MatchError(ContainSubstring("context canceled")))
 				Expect(actualCluster).To(BeNil())
@@ -267,29 +325,12 @@ var _ = Describe("ClusterClient", func() {
 	})
 
 	Describe("GetIdentity", func() {
-		var cluster *capi.Cluster
+		var identityRef *capa.AWSIdentityReference
 		var clusterRoleIdentity *capa.AWSClusterRoleIdentity
 
 		When("the identity is set", func() {
 			BeforeEach(func() {
-				cluster = &capi.Cluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-cluster2",
-						Namespace: namespace,
-					},
-				}
-				Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
-				awsCluster := &capa.AWSCluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-cluster2",
-						Namespace: namespace,
-					},
-					Spec: capa.AWSClusterSpec{
-						IdentityRef: &capa.AWSIdentityReference{Name: "default2", Kind: capa.ClusterRoleIdentityKind},
-					},
-				}
-				Expect(k8sClient.Create(ctx, awsCluster)).To(Succeed())
-
+				identityRef = &capa.AWSIdentityReference{Name: "default2", Kind: capa.ClusterRoleIdentityKind}
 				clusterRoleIdentity = &capa.AWSClusterRoleIdentity{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "default2",
@@ -301,7 +342,7 @@ var _ = Describe("ClusterClient", func() {
 			})
 
 			It("gets the identity used for this cluster", func() {
-				actualIdentity, err := clusterClient.GetIdentity(ctx, cluster)
+				actualIdentity, err := clusterClient.GetIdentity(ctx, identityRef)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(actualIdentity).To(Equal(clusterRoleIdentity))
@@ -310,25 +351,11 @@ var _ = Describe("ClusterClient", func() {
 
 		When("the identity is not set", func() {
 			BeforeEach(func() {
-				cluster = &capi.Cluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-cluster2",
-						Namespace: namespace,
-					},
-				}
-				Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
-				awsCluster := &capa.AWSCluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-cluster2",
-						Namespace: namespace,
-					},
-					Spec: capa.AWSClusterSpec{},
-				}
-				Expect(k8sClient.Create(ctx, awsCluster)).To(Succeed())
+				identityRef = nil
 			})
 
 			It("returns nil", func() {
-				actualIdentity, err := clusterClient.GetIdentity(ctx, cluster)
+				actualIdentity, err := clusterClient.GetIdentity(ctx, identityRef)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(actualIdentity).To(BeNil())
 			})

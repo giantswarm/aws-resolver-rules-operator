@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
+	eks "sigs.k8s.io/cluster-api-provider-aws/controlplane/eks/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,6 +33,16 @@ func (a *ClusterClient) GetAWSCluster(ctx context.Context, namespacedName types.
 	return awsCluster, errors.WithStack(err)
 }
 
+func (a *ClusterClient) GetAWSManagedControlPlane(ctx context.Context, namespacedName types.NamespacedName) (*eks.AWSManagedControlPlane, error) {
+	awsManagedControlPlane := &eks.AWSManagedControlPlane{}
+	err := a.client.Get(ctx, namespacedName, awsManagedControlPlane)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return awsManagedControlPlane, errors.WithStack(err)
+}
+
 func (a *ClusterClient) GetCluster(ctx context.Context, namespacedName types.NamespacedName) (*capi.Cluster, error) {
 	cluster := &capi.Cluster{}
 	err := a.client.Get(ctx, namespacedName, cluster)
@@ -54,18 +65,12 @@ func (a *ClusterClient) RemoveFinalizer(ctx context.Context, cluster *capi.Clust
 	return a.client.Patch(ctx, cluster, client.MergeFrom(originalCluster))
 }
 
-func (a *ClusterClient) GetIdentity(ctx context.Context, cluster *capi.Cluster) (*capa.AWSClusterRoleIdentity, error) {
-	awsCluster, err := a.GetAWSCluster(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace})
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	if awsCluster.Spec.IdentityRef == nil {
+func (a *ClusterClient) GetIdentity(ctx context.Context, identityRef *capa.AWSIdentityReference) (*capa.AWSClusterRoleIdentity, error) {
+	if identityRef == nil {
 		return nil, nil
 	}
-
 	roleIdentity := &capa.AWSClusterRoleIdentity{}
-	err = a.client.Get(ctx, client.ObjectKey{Namespace: awsCluster.Namespace, Name: awsCluster.Spec.IdentityRef.Name}, roleIdentity)
+	err := a.client.Get(ctx, client.ObjectKey{Name: identityRef.Name}, roleIdentity)
 	if err != nil {
 		return &capa.AWSClusterRoleIdentity{}, errors.WithStack(err)
 	}

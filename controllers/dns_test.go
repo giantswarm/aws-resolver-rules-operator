@@ -10,9 +10,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
+	eks "sigs.k8s.io/cluster-api-provider-aws/controlplane/eks/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -29,8 +31,9 @@ var _ = Describe("Dns Zone reconciler", func() {
 		ctx                     context.Context
 		reconciler              *controllers.DnsReconciler
 		awsCluster              *capa.AWSCluster
+		awsManagedControlPlane  *eks.AWSManagedControlPlane
 		awsClusterRoleIdentity  *capa.AWSClusterRoleIdentity
-		cluster                 *capi.Cluster
+		cluster, eksCluster     *capi.Cluster
 		result                  ctrl.Result
 		reconcileErr            error
 		resolverClient          *resolverfakes.FakeResolverClient
@@ -73,6 +76,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 			},
 			Spec: capa.AWSClusterRoleIdentitySpec{},
 		}
+		// CAPA
 		awsCluster = &capa.AWSCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ClusterName,
@@ -96,6 +100,41 @@ var _ = Describe("Dns Zone reconciler", func() {
 				Name:      ClusterName,
 				Namespace: ClusterNamespace,
 			},
+			Spec: capi.ClusterSpec{
+				InfrastructureRef: &v1.ObjectReference{
+					Kind: "AWSCluster",
+				},
+			},
+		}
+		// EKS
+		awsManagedControlPlane = &eks.AWSManagedControlPlane{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ClusterName,
+				Namespace: ClusterNamespace,
+			},
+			Spec: eks.AWSManagedControlPlaneSpec{
+				IdentityRef: &capa.AWSIdentityReference{
+					Name: "default",
+					Kind: capa.ClusterRoleIdentityKind,
+				},
+				Region: "eu-central-1",
+				NetworkSpec: capa.NetworkSpec{
+					VPC: capa.VPCSpec{
+						ID: "vpc-12345678",
+					},
+				},
+			},
+		}
+		eksCluster = &capi.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ClusterName,
+				Namespace: ClusterNamespace,
+			},
+			Spec: capi.ClusterSpec{
+				InfrastructureRef: &v1.ObjectReference{
+					Kind: "AWSManagedCluster",
+				},
+			},
 		}
 	})
 
@@ -113,7 +152,23 @@ var _ = Describe("Dns Zone reconciler", func() {
 		expectedError := errors.New("failed fetching the AWSCluster")
 
 		BeforeEach(func() {
+			clusterClient.GetClusterReturns(cluster, nil)
 			clusterClient.GetAWSClusterReturns(awsCluster, expectedError)
+		})
+
+		It("returns the error", func() {
+			Expect(clusterClient.AddFinalizerCallCount()).To(BeZero())
+			Expect(reconcileErr).To(HaveOccurred())
+			Expect(reconcileErr).Should(MatchError(expectedError))
+		})
+	})
+
+	When("there is an error trying to get the AWSManagedControlPlane being reconciled", func() {
+		expectedError := errors.New("failed fetching the AWSManagedControlPlane")
+
+		BeforeEach(func() {
+			clusterClient.GetClusterReturns(eksCluster, nil)
+			clusterClient.GetAWSManagedControlPlaneReturns(awsManagedControlPlane, expectedError)
 		})
 
 		It("returns the error", func() {
@@ -286,7 +341,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 				})
 
 				When("the cluster is not being deleted", func() {
-					It("adds the finalizer to the AWSCluster", func() {
+					It("adds the finalizer to the Cluster", func() {
 						Expect(clusterClient.AddFinalizerCallCount()).To(Equal(1))
 						Expect(reconcileErr).NotTo(HaveOccurred())
 					})
@@ -328,8 +383,27 @@ var _ = Describe("Dns Zone reconciler", func() {
 							}))
 						})
 
-						When("the k8s API endpoint of the workload cluster is set", func() {
+						When("the k8s API endpoint of the EKS workload cluster is set", func() {
 							BeforeEach(func() {
+								clusterClient.GetClusterReturns(eksCluster, nil)
+								clusterClient.GetAWSManagedControlPlaneReturns(awsManagedControlPlane, nil)
+								awsManagedControlPlane.Spec.ControlPlaneEndpoint.Host = "control-plane-eks-load-balancer-hostname"
+							})
+
+							It("creates DNS records for workload cluster", func() {
+								_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+								Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
+									Kind:   resolver.DnsRecordTypeCname,
+									Name:   fmt.Sprintf("api.%s.%s", ClusterName, WorkloadClusterBaseDomain),
+									Value:  "control-plane-eks-load-balancer-hostname",
+									Region: awsCluster.Spec.Region,
+								}))
+							})
+						})
+
+						When("the k8s API endpoint of the CAPA workload cluster is set", func() {
+							BeforeEach(func() {
+								clusterClient.GetClusterReturns(cluster, nil)
 								awsCluster.Spec.ControlPlaneEndpoint.Host = "control-plane-load-balancer-hostname"
 							})
 
