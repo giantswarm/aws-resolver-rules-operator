@@ -13,7 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Migrate `dnsController` to reconcile `Cluster` CR as prepration for reconcilaion of EKS clusters.
+- Migrate `dnsController` to reconcile `Cluster` CR as preparation for reconciliation of EKS clusters.
+
+### Fixed
+
+- Delete all dns records from hosted zone when deleting a cluster.
 
 ## [0.8.0] - 2023-07-06
 
