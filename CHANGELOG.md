@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Migrate `dnsController` to reconcile `Cluster` CR as preparation for reconciliation of EKS clusters.
+- Custom errors no longer inherit from builtin `error` to make linter happy.
 
 ### Fixed
 

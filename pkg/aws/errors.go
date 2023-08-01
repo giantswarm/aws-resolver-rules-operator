@@ -5,7 +5,6 @@ import (
 )
 
 type SecurityGroupNotFoundError struct {
-	error
 }
 
 func (e *SecurityGroupNotFoundError) Error() string {
@@ -17,7 +16,6 @@ func (e *SecurityGroupNotFoundError) Is(target error) bool {
 }
 
 type ResolverEndpointNotFoundError struct {
-	error
 }
 
 func (e *ResolverEndpointNotFoundError) Error() string {
@@ -29,7 +27,6 @@ func (e *ResolverEndpointNotFoundError) Is(target error) bool {
 }
 
 type HostedZoneNotFoundError struct {
-	error
 }
 
 func (e *HostedZoneNotFoundError) Error() string {
@@ -41,7 +38,6 @@ func (e *HostedZoneNotFoundError) Is(target error) bool {
 }
 
 type DnsRecordNotSupportedError struct {
-	error
 }
 
 func (e *DnsRecordNotSupportedError) Error() string {
