@@ -2,6 +2,11 @@ module github.com/aws-resolver-rules-operator
 
 go 1.19
 
+replace (
+	github.com/spf13/cobra v1.2.1 => github.com/spf13/cobra v1.4.0
+	golang/google.golang.org/grpc => golang/google.golang.org/grpc v1.58.0
+)
+
 require (
 	github.com/aws/aws-sdk-go v1.44.80
 	github.com/giantswarm/aws-network-topology-operator v1.7.0
