@@ -63,13 +63,9 @@ func (r *ManagementClusterTransitGatewayReconciler) Reconcile(ctx context.Contex
 	logger.Info("Reconciling")
 	defer logger.Info("Done reconciling")
 
-	cluster, err := r.clusterClient.GetAWSCluster(ctx, req.NamespacedName)
-	if k8sErrors.IsNotFound(err) {
-		logger.Info("Cluster no longer exists")
-		return ctrl.Result{}, nil
-	}
+	awsCluster, err := r.clusterClient.GetAWSCluster(ctx, req.NamespacedName)
 	if err != nil {
-		return ctrl.Result{}, microerror.Mask(err)
+		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
 	}
 
 	defer func() {
