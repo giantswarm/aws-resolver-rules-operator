@@ -17,6 +17,8 @@ import (
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
 
+const defaultSessionKey = "default"
+
 type Clients struct {
 	// endpoint is the AWS API endpoint to use
 	endpoint string
@@ -37,7 +39,7 @@ var (
 	}()
 )
 
-func NewClients(endpoint string) resolver.AWSClients {
+func NewClients(endpoint string) *Clients {
 	return &Clients{endpoint: endpoint}
 }
 
@@ -147,6 +149,21 @@ func (c *Clients) NewRoute53Client(region, arn string) (resolver.Route53Client, 
 	return &Route53{client: client}, nil
 }
 
+func (c *Clients) NewTransitGateways(region, rolearn string) (resolver.TransitGatewayClient, error) {
+	session, err := c.sessionForRole(rolearn)
+	if err != nil {
+		return &TransitGateways{}, errors.WithStack(err)
+	}
+
+	ec2Client := ec2.New(session, &aws.Config{
+		Region: aws.String(region),
+	})
+
+	return &TransitGateways{
+		ec2: ec2Client,
+	}, nil
+}
+
 func (c *Clients) newRoute53Client(region, arn, externalId string) (*route53.Route53, error) {
 	session, err := c.sessionFromRegion(region)
 	if err != nil {
@@ -169,6 +186,50 @@ func configureExternalId(roleArn, externalId string) func(provider *stscreds.Ass
 			assumeRoleProvider.ExternalID = aws.String(externalId)
 		}
 	}
+}
+
+func (c *Clients) session() (*awssession.Session, error) {
+	if s, ok := sessionCache.Load(defaultSessionKey); ok {
+		entry := s.(*sessionCacheEntry)
+		return entry.session, nil
+	}
+
+	ns, err := awssession.NewSession(&aws.Config{
+		Endpoint: aws.String(c.endpoint),
+	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	sessionCache.Store(defaultSessionKey, &sessionCacheEntry{
+		session: ns,
+	})
+	return ns, nil
+}
+
+func (c *Clients) sessionForRole(roleArn string) (*awssession.Session, error) {
+	if s, ok := sessionCache.Load(roleArn); ok {
+		entry := s.(*sessionCacheEntry)
+		return entry.session, nil
+	}
+
+	defaultSession, err := c.session()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	ns, err := awssession.NewSession(&aws.Config{
+		Endpoint:    aws.String(c.endpoint),
+		Credentials: stscreds.NewCredentials(defaultSession, roleArn),
+	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	sessionCache.Store(roleArn, &sessionCacheEntry{
+		session: ns,
+	})
+	return ns, nil
 }
 
 func (c *Clients) sessionFromRegion(region string) (*awssession.Session, error) {

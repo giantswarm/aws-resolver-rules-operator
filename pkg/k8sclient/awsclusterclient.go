@@ -3,6 +3,7 @@ package k8sclient
 import (
 	"context"
 
+	"github.com/giantswarm/microerror"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
@@ -113,4 +114,16 @@ func (a *AWSClusterClient) Unpause(ctx context.Context, awsCluster *capa.AWSClus
 	originalAwsCluster := awsCluster.DeepCopy()
 	delete(awsCluster.Annotations, capi.PausedAnnotation)
 	return a.client.Patch(ctx, awsCluster, client.MergeFrom(originalAwsCluster))
+}
+
+func (a *AWSClusterClient) PatchCluster(ctx context.Context, cluster *capa.AWSCluster, patch client.Patch) (*capa.AWSCluster, error) {
+	err := a.client.Patch(ctx, cluster, patch, &client.PatchOptions{})
+	if err != nil {
+		return nil, microerror.Mask(err)
+	}
+	return cluster, microerror.Mask(err)
+}
+
+func (a *AWSClusterClient) UpdateStatus(ctx context.Context, obj client.Object) error {
+	return a.client.Status().Update(ctx, obj)
 }
