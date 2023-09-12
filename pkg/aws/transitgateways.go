@@ -21,45 +21,29 @@ type TransitGateways struct {
 }
 
 func (t *TransitGateways) Apply(ctx context.Context, cluster *capa.AWSCluster) (string, error) {
-	gateways, err := t.get(ctx, cluster)
+	gateway, err := t.get(ctx, cluster)
 	if err != nil {
 		return "", err
 	}
 
-	if len(gateways) == 1 {
-		return *gateways[0].TransitGatewayArn, nil
-	}
-
-	if len(gateways) > 1 {
-		return "", fmt.Errorf(
-			"found unexpected number: %d of transit gatways for cluster %s",
-			len(gateways),
-			cluster.Name,
-		)
+	if gateway != nil {
+		return *gateway.TransitGatewayArn, nil
 	}
 
 	return t.create(ctx, cluster)
 }
 
 func (t *TransitGateways) Delete(ctx context.Context, cluster *capa.AWSCluster) error {
-	gateways, err := t.get(ctx, cluster)
+	gateway, err := t.get(ctx, cluster)
 	if err != nil {
 		return err
 	}
 
-	if len(gateways) == 0 {
+	if gateway == nil {
 		return nil
 	}
 
-	if len(gateways) > 1 {
-		return fmt.Errorf(
-			"found unexpected number: %d of transit gatways for cluster %s",
-			len(gateways),
-			cluster.Name,
-		)
-	}
-
-	id := gateways[0].TransitGatewayId
+	id := gateway.TransitGatewayId
 	_, err = t.ec2.DeleteTransitGateway(&ec2.DeleteTransitGatewayInput{
 		TransitGatewayId: id,
 	})
@@ -67,7 +51,7 @@ func (t *TransitGateways) Delete(ctx context.Context, cluster *capa.AWSCluster) 
 	return err
 }
 
-func (t *TransitGateways) get(ctx context.Context, cluster *capa.AWSCluster) ([]*ec2.TransitGateway, error) {
+func (t *TransitGateways) get(ctx context.Context, cluster *capa.AWSCluster) (*ec2.TransitGateway, error) {
 	nameTag := "tag:" + clusterTag(cluster.Name)
 	input := &ec2.DescribeTransitGatewaysInput{
 		Filters: []*ec2.Filter{
@@ -82,8 +66,21 @@ func (t *TransitGateways) get(ctx context.Context, cluster *capa.AWSCluster) ([]
 	if err != nil {
 		return nil, err
 	}
+	gateways := out.TransitGateways
 
-	return out.TransitGateways, nil
+	if len(gateways) == 0 {
+		return nil, nil
+	}
+
+	if len(gateways) > 1 {
+		return nil, fmt.Errorf(
+			"found unexpected number: %d of transit gatways for cluster %s",
+			len(gateways),
+			cluster.Name,
+		)
+	}
+
+	return gateways[0], nil
 }
 
 func (t *TransitGateways) create(ctx context.Context, cluster *capa.AWSCluster) (string, error) {
