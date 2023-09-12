@@ -2,5 +2,3 @@
 sonatype-2022-6522
 CVE-2020-8561
 
-# pkg:golang/google.golang.org/grpc@v1.47.0
-CVE-2023-32731
