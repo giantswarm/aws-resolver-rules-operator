@@ -128,7 +128,7 @@ func (r *ManagementClusterTransitGatewayReconciler) reconcileDelete(ctx context.
 
 	err = r.clusterClient.RemoveFinalizer(ctx, cluster, FinalizerManagementCluster)
 	if err != nil {
-		logger.Error(err, "Failed to add finalizer")
+		logger.Error(err, "Failed to delete finalizer")
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 	return ctrl.Result{}, nil
