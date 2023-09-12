@@ -52,13 +52,20 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 
-		cluster = newRandomCluster("aa", "aa")
+		cluster = newRandomCluster(
+			annotation.NetworkTopologyModeAnnotation,
+			annotation.NetworkTopologyModeGiantSwarmManaged,
+		)
 		requestResourceName = cluster.Name
 		transitGatewayARN = fmt.Sprintf("arn:aws:iam::123456789012:transit-gateways/%s", uuid.NewString())
 
 		clusterClient := k8sclient.NewAWSClusterClient(k8sClient)
 		transitGatewayClient = new(resolverfakes.FakeTransitGatewayClient)
-		reconciler = controllers.NewManagementClusterTransitGateway(clusterClient, transitGatewayClient)
+		reconciler = controllers.NewManagementClusterTransitGateway(
+			k8sclient.ToNamespacedName(cluster),
+			clusterClient,
+			transitGatewayClient,
+		)
 	})
 
 	JustBeforeEach(func() {
@@ -105,6 +112,55 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 				patchedCluster := cluster.DeepCopy()
 				patchedCluster.Annotations = map[string]string{
 					capi.PausedAnnotation: "true",
+				}
+
+				err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("does not reconcile", func() {
+				Expect(reconcileErr).NotTo(HaveOccurred())
+				Expect(reconcileResult.Requeue).To(BeFalse())
+				Expect(transitGatewayClient.Invocations()).To(BeEmpty())
+			})
+		})
+
+		When("the cluster is not the management cluster", func() {
+			BeforeEach(func() {
+				otherCluster := newRandomCluster()
+				requestResourceName = otherCluster.Name
+			})
+
+			It("does not reconcile", func() {
+				Expect(reconcileErr).NotTo(HaveOccurred())
+				Expect(reconcileResult.Requeue).To(BeFalse())
+				Expect(transitGatewayClient.Invocations()).To(BeEmpty())
+			})
+		})
+
+		When("the cluster is in the None mode", func() {
+			BeforeEach(func() {
+				patchedCluster := cluster.DeepCopy()
+				patchedCluster.Annotations = map[string]string{
+					annotation.NetworkTopologyModeAnnotation: annotation.NetworkTopologyModeNone,
+				}
+
+				err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("does not reconcile", func() {
+				Expect(reconcileErr).NotTo(HaveOccurred())
+				Expect(reconcileResult.Requeue).To(BeFalse())
+				Expect(transitGatewayClient.Invocations()).To(BeEmpty())
+			})
+		})
+
+		When("the cluster is in the UserManaged mode", func() {
+			BeforeEach(func() {
+				patchedCluster := cluster.DeepCopy()
+				patchedCluster.Annotations = map[string]string{
+					annotation.NetworkTopologyModeAnnotation: annotation.NetworkTopologyModeUserManaged,
 				}
 
 				err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))

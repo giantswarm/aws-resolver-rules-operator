@@ -5,6 +5,7 @@ import (
 
 	"github.com/giantswarm/microerror"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
@@ -12,7 +13,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/aws-resolver-rules-operator/pkg/conditions"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
@@ -22,38 +22,26 @@ import (
 const FinalizerManagementCluster = "network-topology.finalizers.giantswarm.io/management-cluster"
 
 type ManagementClusterTransitGatewayReconciler struct {
-	clusterClient   AWSClusterClient
-	transitGateways resolver.TransitGatewayClient
+	managementCluster types.NamespacedName
+	clusterClient     AWSClusterClient
+	transitGateways   resolver.TransitGatewayClient
 }
 
-func NewManagementClusterTransitGateway(client AWSClusterClient, awsClient resolver.TransitGatewayClient) *ManagementClusterTransitGatewayReconciler {
+func NewManagementClusterTransitGateway(
+	managementCluster types.NamespacedName,
+	client AWSClusterClient,
+	awsClient resolver.TransitGatewayClient,
+) *ManagementClusterTransitGatewayReconciler {
 	return &ManagementClusterTransitGatewayReconciler{
-		clusterClient:   client,
-		transitGateways: awsClient,
+		managementCluster: managementCluster,
+		clusterClient:     client,
+		transitGateways:   awsClient,
 	}
-}
-
-// ManagementClusterPredicate constructs a Predicate that will filter out only
-// the management cluster
-func ManagementClusterPredicate() predicate.Predicate {
-	return predicate.NewPredicateFuncs(func(o client.Object) bool {
-		return annotations.IsNetworkTopologyModeGiantSwarmManaged(o)
-	})
-}
-
-// GiantSwarmManagedModePredicate constructs a Predicate for objects that
-// contain the GiantSwarmManaged network topology mode annotation
-func GiantSwarmManagedModePredicate() predicate.Predicate {
-	return predicate.NewPredicateFuncs(func(o client.Object) bool {
-		return annotations.IsNetworkTopologyModeGiantSwarmManaged(o)
-	})
 }
 
 func (r *ManagementClusterTransitGatewayReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&capi.Cluster{}).
-		WithEventFilter(GiantSwarmManagedModePredicate()).
-		WithEventFilter(ManagementClusterPredicate()).
+		For(&capa.AWSCluster{}).
 		Complete(r)
 }
 
@@ -68,14 +56,24 @@ func (r *ManagementClusterTransitGatewayReconciler) Reconcile(ctx context.Contex
 		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
 	}
 
-	defer func() {
-		_ = r.clusterClient.UpdateStatus(ctx, cluster)
-	}()
+	if !r.isManagementCluster(cluster) {
+		logger.Info("Cluster not management cluster. Skipping...")
+		return ctrl.Result{}, nil
+	}
+
+	if !annotations.IsNetworkTopologyModeGiantSwarmManaged(cluster) {
+		logger.Info("Cluster not management cluster. Skipping...")
+		return ctrl.Result{}, nil
+	}
 
 	if capiannotations.HasPaused(cluster) {
 		logger.Info("Cluster is marked as paused. Won't reconcile")
 		return ctrl.Result{}, nil
 	}
+
+	defer func() {
+		_ = r.clusterClient.UpdateStatus(ctx, cluster)
+	}()
 
 	if !capiconditions.Has(cluster, conditions.NetworkTopologyCondition) {
 		capiconditions.MarkFalse(
@@ -134,4 +132,9 @@ func (r *ManagementClusterTransitGatewayReconciler) reconcileDelete(ctx context.
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 	return ctrl.Result{}, nil
+}
+
+func (r *ManagementClusterTransitGatewayReconciler) isManagementCluster(cluster *capa.AWSCluster) bool {
+	return cluster.Name == r.managementCluster.Name &&
+		cluster.Namespace == r.managementCluster.Namespace
 }
