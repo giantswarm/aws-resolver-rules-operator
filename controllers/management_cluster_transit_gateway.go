@@ -42,6 +42,7 @@ func NewManagementClusterTransitGateway(
 func (r *ManagementClusterTransitGatewayReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capa.AWSCluster{}).
+		Named("mc-transit-gateway").
 		Complete(r)
 }
 
