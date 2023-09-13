@@ -3,7 +3,6 @@ package controllers
 import (
 	"context"
 
-	"github.com/giantswarm/microerror"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
@@ -98,20 +97,20 @@ func (r *ManagementClusterTransitGatewayReconciler) reconcileNormal(ctx context.
 	err := r.clusterClient.AddFinalizer(ctx, cluster, FinalizerManagementCluster)
 	if err != nil {
 		logger.Error(err, "Failed to add finalizer")
-		return ctrl.Result{}, microerror.Mask(err)
+		return ctrl.Result{}, errors.WithStack(err)
 	}
 
 	id, err := r.transitGateways.Apply(ctx, cluster)
 	if err != nil {
 		logger.Error(err, "Failed to create transit gateway")
-		return ctrl.Result{}, microerror.Mask(err)
+		return ctrl.Result{}, errors.WithStack(err)
 	}
 
 	baseCluster := cluster.DeepCopy()
 	annotations.SetNetworkTopologyTransitGateway(cluster, id)
 	if cluster, err = r.clusterClient.PatchCluster(ctx, cluster, client.MergeFrom(baseCluster)); err != nil {
 		logger.Error(err, "Failed to patch cluster resource with TGW ID")
-		return ctrl.Result{}, microerror.Mask(err)
+		return ctrl.Result{}, errors.WithStack(err)
 	}
 
 	conditions.MarkReady(cluster, conditions.TransitGatewayCreated)
@@ -124,13 +123,13 @@ func (r *ManagementClusterTransitGatewayReconciler) reconcileDelete(ctx context.
 	err := r.transitGateways.Delete(ctx, cluster)
 	if err != nil {
 		logger.Error(err, "Failed to delete transit gateway")
-		return ctrl.Result{}, microerror.Mask(err)
+		return ctrl.Result{}, errors.WithStack(err)
 	}
 
 	err = r.clusterClient.RemoveFinalizer(ctx, cluster, FinalizerManagementCluster)
 	if err != nil {
 		logger.Error(err, "Failed to delete finalizer")
-		return ctrl.Result{}, microerror.Mask(err)
+		return ctrl.Result{}, errors.WithStack(err)
 	}
 	return ctrl.Result{}, nil
 }
