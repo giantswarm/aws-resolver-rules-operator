@@ -67,7 +67,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 		dns, err := resolver.NewDnsZone(fakeAWSClients, WorkloadClusterBaseDomain)
 		Expect(err).NotTo(HaveOccurred())
 
-		reconciler = controllers.NewDnsReconciler(clusterClient, dns)
+		reconciler = controllers.NewDnsReconciler(clusterClient, dns, ClusterName, ClusterNamespace)
 
 		awsClusterRoleIdentity = &capa.AWSClusterRoleIdentity{
 			ObjectMeta: metav1.ObjectMeta{
@@ -168,6 +168,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 
 		BeforeEach(func() {
 			clusterClient.GetClusterReturns(eksCluster, nil)
+			clusterClient.GetAWSClusterReturns(awsCluster, expectedError)
 			clusterClient.GetAWSManagedControlPlaneReturns(awsManagedControlPlane, expectedError)
 		})
 
@@ -196,7 +197,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 				})
 
 				It("does not reconcile", func() {
-					Expect(clusterClient.GetIdentityCallCount()).To(BeZero())
+					Expect(clusterClient.GetIdentityCallCount()).To(Equal(1))
 					Expect(reconcileErr).NotTo(HaveOccurred())
 				})
 			})
@@ -210,7 +211,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 				})
 
 				It("does not reconcile", func() {
-					Expect(clusterClient.GetIdentityCallCount()).To(BeZero())
+					Expect(clusterClient.GetIdentityCallCount()).To(Equal(1))
 					Expect(reconcileErr).NotTo(HaveOccurred())
 				})
 			})
