@@ -62,7 +62,7 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 		clusterClient := k8sclient.NewAWSClusterClient(k8sClient)
 		transitGatewayClient = new(resolverfakes.FakeTransitGatewayClient)
 		reconciler = controllers.NewManagementClusterTransitGateway(
-			k8sclient.ToNamespacedName(cluster),
+			client.ObjectKeyFromObject(cluster),
 			clusterClient,
 			transitGatewayClient,
 		)
