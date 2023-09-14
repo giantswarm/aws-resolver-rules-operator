@@ -62,7 +62,7 @@ func (r *ManagementClusterTransitGatewayReconciler) Reconcile(ctx context.Contex
 	}
 
 	if !annotations.IsNetworkTopologyModeGiantSwarmManaged(cluster) {
-		logger.Info("Cluster not management cluster. Skipping...")
+		logger.Info("Cluster not using GiantSwarmManaged network topology mode. Skipping...")
 		return ctrl.Result{}, nil
 	}
 
