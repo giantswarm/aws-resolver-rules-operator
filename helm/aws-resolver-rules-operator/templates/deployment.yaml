@@ -44,6 +44,8 @@ spec:
             - --dns-server-iam-role-external-id={{ .Values.dnsServerIAMRoleExternalId }}
             - --dns-server-region={{ .Values.dnsServerRegion }}
             - --dns-server-vpc-id={{ .Values.dnsServerVpcId }}
+            - --management-cluster-namespace={{ .Values.managementClusterNamespace }}
+            - --management-cluster-name={{ .Values.managementClusterName  }}
             - --basedomain={{ .Values.baseDomain }}
           securityContext:
             {{- with .Values.securityContext }}
