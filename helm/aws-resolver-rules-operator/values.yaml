@@ -34,6 +34,9 @@ dnsServerIAMRoleExternalId: ""
 # Normally we prepend the workload cluster name to this, i.e. my-cluster.${baseDomain}
 baseDomain: ""
 
+managementClusterName: ""
+managementClusterNamespace: ""
+
 # Add seccomp to pod security context
 podSecurityContext:
   runAsNonRoot: true

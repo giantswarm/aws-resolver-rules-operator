@@ -12,7 +12,7 @@ import (
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
-func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity) resolver.Cluster {
+func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity, mcIdentity *capa.AWSClusterRoleIdentity) resolver.Cluster {
 	cluster := resolver.Cluster{
 		Name:                 awsCluster.Name,
 		ControlPlaneEndpoint: awsCluster.Spec.ControlPlaneEndpoint.Host,
@@ -30,11 +30,14 @@ func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSC
 	if ok {
 		cluster.VPCsToAssociateToHostedZone = strings.Split(additionalVpcsAnnotation, ",")
 	}
+	if mcIdentity != nil {
+		cluster.MCIAMRoleARN = mcIdentity.Spec.RoleArn
+	}
 
 	return cluster
 }
 
-func buildClusterFromAWSManagedControlPlane(awsManagedControlPlane *eks.AWSManagedControlPlane, identity *capa.AWSClusterRoleIdentity) resolver.Cluster {
+func buildClusterFromAWSManagedControlPlane(awsManagedControlPlane *eks.AWSManagedControlPlane, identity *capa.AWSClusterRoleIdentity, mcIdentity *capa.AWSClusterRoleIdentity) resolver.Cluster {
 	cluster := resolver.Cluster{
 		Name:                 awsManagedControlPlane.Name,
 		ControlPlaneEndpoint: awsManagedControlPlane.Spec.ControlPlaneEndpoint.Host,
@@ -45,12 +48,16 @@ func buildClusterFromAWSManagedControlPlane(awsManagedControlPlane *eks.AWSManag
 		VPCCidr:              awsManagedControlPlane.Spec.NetworkSpec.VPC.CidrBlock,
 		VPCId:                awsManagedControlPlane.Spec.NetworkSpec.VPC.ID,
 		IAMRoleARN:           identity.Spec.RoleArn,
+		MCIAMRoleARN:         mcIdentity.Spec.RoleArn,
 		Subnets:              getSubnetIds(awsManagedControlPlane.Spec.NetworkSpec.Subnets),
 	}
 
 	additionalVpcsAnnotation, ok := awsManagedControlPlane.Annotations[gsannotations.AWSDNSAdditionalVPC]
 	if ok {
 		cluster.VPCsToAssociateToHostedZone = strings.Split(additionalVpcsAnnotation, ",")
+	}
+	if mcIdentity != nil {
+		cluster.MCIAMRoleARN = mcIdentity.Spec.RoleArn
 	}
 
 	return cluster

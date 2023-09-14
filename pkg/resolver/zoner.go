@@ -48,13 +48,18 @@ func (d *Zoner) CreateHostedZone(ctx context.Context, logger logr.Logger, cluste
 		return errors.WithStack(err)
 	}
 
+	mcRoute53Client, err := d.awsClients.NewRoute53Client(cluster.Region, cluster.MCIAMRoleARN)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
 	if !cluster.IsDnsModePrivate {
-		parentHostedZoneId, err := route53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName())
+		parentHostedZoneId, err := mcRoute53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName())
 		if err != nil {
 			return errors.WithStack(err)
 		}
 
-		err = route53Client.AddDelegationToParentZone(ctx, logger, parentHostedZoneId, hostedZoneId)
+		err = mcRoute53Client.AddDelegationToParentZone(ctx, logger, parentHostedZoneId, hostedZoneId)
 		if err != nil {
 			return errors.WithStack(err)
 		}

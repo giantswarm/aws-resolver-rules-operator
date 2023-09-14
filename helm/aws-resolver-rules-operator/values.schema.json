@@ -33,6 +33,12 @@
                 }
             }
         },
+	"managementClusterName": {
+            "type": "string"
+        },
+        "managementClusterNamespace": {
+            "type": "string"
+        },
         "pod": {
             "type": "object",
             "properties": {

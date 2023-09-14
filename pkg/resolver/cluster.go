@@ -12,5 +12,6 @@ type Cluster struct {
 	VPCCidr                     string
 	VPCId                       string
 	IAMRoleARN                  string
+	MCIAMRoleARN                string
 	Subnets                     []string
 }

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Update `golang.org/x/net` package.
+- Use a management cluster ARN to create a delegation records for the DNS.
 
 ## [0.9.0] - 2023-08-01
 

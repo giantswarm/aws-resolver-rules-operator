@@ -53,12 +53,18 @@ type ClusterClient interface {
 type DnsReconciler struct {
 	clusterClient ClusterClient
 	dnsZone       resolver.Zoner
+	// managementClusterName is the name of the CR of the management cluster
+	managementClusterName string
+	// managementClusterNamespace is the namespace of the CR of the management cluster
+	managementClusterNamespace string
 }
 
-func NewDnsReconciler(clusterClient ClusterClient, dns resolver.Zoner) *DnsReconciler {
+func NewDnsReconciler(clusterClient ClusterClient, dns resolver.Zoner, managementClusterName string, managementClusterNamespace string) *DnsReconciler {
 	return &DnsReconciler{
-		clusterClient: clusterClient,
-		dnsZone:       dns,
+		clusterClient:              clusterClient,
+		dnsZone:                    dns,
+		managementClusterName:      managementClusterName,
+		managementClusterNamespace: managementClusterNamespace,
 	}
 }
 
@@ -69,6 +75,18 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 	capiCluster, err := r.clusterClient.GetCluster(ctx, req.NamespacedName)
 	if err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
+	mcAWSCluster, err := r.clusterClient.GetAWSCluster(ctx, client.ObjectKey{Name: r.managementClusterName, Namespace: r.managementClusterNamespace})
+	if err != nil {
+		logger.Error(err, "Cant find management AWSCluster CR")
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
+	mcIdentity, err := r.clusterClient.GetIdentity(ctx, mcAWSCluster.Spec.IdentityRef)
+	if err != nil {
+		logger.Error(err, "Cant find management AWSClusterRoleIdentity CR")
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
@@ -93,7 +111,7 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 			return ctrl.Result{}, nil
 		}
 
-		cluster = buildClusterFromAWSCluster(awsCluster, identity)
+		cluster = buildClusterFromAWSCluster(awsCluster, identity, mcIdentity)
 		// EKS
 	} else if isEKS(capiCluster) {
 		awsManagedControlPlane, err := r.clusterClient.GetAWSManagedControlPlane(ctx, req.NamespacedName)
@@ -116,7 +134,7 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 			return ctrl.Result{}, nil
 		}
 
-		cluster = buildClusterFromAWSManagedControlPlane(awsManagedControlPlane, identity)
+		cluster = buildClusterFromAWSManagedControlPlane(awsManagedControlPlane, identity, mcIdentity)
 	} else {
 		logger.Info(fmt.Sprintf("Unsupported infrastructure provider '%s'", capiCluster.Spec.InfrastructureRef.Kind))
 		return ctrl.Result{}, nil
