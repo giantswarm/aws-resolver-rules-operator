@@ -240,7 +240,7 @@ var _ = Describe("Route53 Resolver client", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 
-			err = route53Client.AddDelegationToParentZone(ctx, logger, *parentHostedZoneToFind.HostedZone.Id, *hostedZoneToFind.HostedZone.Id)
+			err = route53Client.AddDelegationToParentZone(ctx, logger, *parentHostedZoneToFind.HostedZone.Id, listRecordSets.ResourceRecordSets[0])
 			Expect(err).NotTo(HaveOccurred())
 
 			listParentRecordSets, err := rawRoute53Client.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
@@ -318,8 +318,14 @@ var _ = Describe("Route53 Resolver client", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 
+			listRecordSets, err := rawRoute53Client.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
+				HostedZoneId: hostedZoneToFind.HostedZone.Id,
+				MaxItems:     awssdk.String("1"), // First entry is always NS record
+			})
+			Expect(err).NotTo(HaveOccurred())
+
 			// We add the delegation so we can delete it later.
-			err = route53Client.AddDelegationToParentZone(ctx, logger, *parentHostedZoneToFind.HostedZone.Id, *hostedZoneToFind.HostedZone.Id)
+			err = route53Client.AddDelegationToParentZone(ctx, logger, *parentHostedZoneToFind.HostedZone.Id, listRecordSets.ResourceRecordSets[0])
 			Expect(err).NotTo(HaveOccurred())
 		})
 

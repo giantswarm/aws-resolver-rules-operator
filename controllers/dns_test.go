@@ -368,9 +368,9 @@ var _ = Describe("Dns Zone reconciler", func() {
 
 						It("adds delegation of ns records to parent hosted zone", func() {
 							Expect(route53Client.AddDelegationToParentZoneCallCount()).To(Equal(1))
-							_, _, parentHostedZoneId, hostedZoneId := route53Client.AddDelegationToParentZoneArgsForCall(0)
+							_, _, parentHostedZoneId, nsRecord := route53Client.AddDelegationToParentZoneArgsForCall(0)
 							Expect(parentHostedZoneId).To(Equal("parent-hosted-zone-id"))
-							Expect(hostedZoneId).To(Equal("hosted-zone-id"))
+							Expect(nsRecord).To(BeNil())
 						})
 
 						It("creates DNS records for workload cluster", func() {
