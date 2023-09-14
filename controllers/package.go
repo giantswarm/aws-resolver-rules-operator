@@ -48,7 +48,6 @@ func buildClusterFromAWSManagedControlPlane(awsManagedControlPlane *eks.AWSManag
 		VPCCidr:              awsManagedControlPlane.Spec.NetworkSpec.VPC.CidrBlock,
 		VPCId:                awsManagedControlPlane.Spec.NetworkSpec.VPC.ID,
 		IAMRoleARN:           identity.Spec.RoleArn,
-		MCIAMRoleARN:         mcIdentity.Spec.RoleArn,
 		Subnets:              getSubnetIds(awsManagedControlPlane.Spec.NetworkSpec.Subnets),
 	}
 
