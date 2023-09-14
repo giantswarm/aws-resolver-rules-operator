@@ -162,6 +162,17 @@ func (r *Route53) DeleteHostedZone(ctx context.Context, logger logr.Logger, zone
 	return nil
 }
 
+func (r *Route53) GetHostedZoneNSRecords(ctx context.Context, zoneId string) (*route53.ResourceRecordSet, error) {
+	listResourceRecordSetsOutput, err := r.client.ListResourceRecordSetsWithContext(ctx, &route53.ListResourceRecordSetsInput{
+		HostedZoneId: awssdk.String(zoneId),
+		MaxItems:     awssdk.String("1"), // First entry is always NS record
+	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return listResourceRecordSetsOutput.ResourceRecordSets[0], nil
+}
+
 func (r *Route53) GetHostedZoneIdByName(ctx context.Context, logger logr.Logger, zoneName string) (string, error) {
 	listResponse, err := r.client.ListHostedZonesByNameWithContext(ctx, &route53.ListHostedZonesByNameInput{
 		DNSName:  awssdk.String(zoneName),
@@ -183,27 +194,19 @@ func (r *Route53) GetHostedZoneIdByName(ctx context.Context, logger logr.Logger,
 }
 
 // AddDelegationToParentZone adds a NS record (or updates if it already exists) to the parent hosted zone with the NS records of the subdomain.
-func (r *Route53) AddDelegationToParentZone(ctx context.Context, logger logr.Logger, parentZoneId, zoneId string) error {
-	listResourceRecordSetsOutput, err := r.client.ListResourceRecordSetsWithContext(ctx, &route53.ListResourceRecordSetsInput{
-		HostedZoneId: awssdk.String(zoneId),
-		MaxItems:     awssdk.String("1"), // First entry is always NS record
-	})
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
+func (r *Route53) AddDelegationToParentZone(ctx context.Context, logger logr.Logger, parentZoneId string, resourceRecord *route53.ResourceRecordSet) error {
 	logger.Info("Adding delegation to parent hosted zone", "parentHostedZoneId", parentZoneId)
-	_, err = r.client.ChangeResourceRecordSetsWithContext(ctx, &route53.ChangeResourceRecordSetsInput{
+	_, err := r.client.ChangeResourceRecordSetsWithContext(ctx, &route53.ChangeResourceRecordSetsInput{
 		HostedZoneId: awssdk.String(parentZoneId),
 		ChangeBatch: &route53.ChangeBatch{
 			Changes: []*route53.Change{
 				{
 					Action: awssdk.String("UPSERT"),
 					ResourceRecordSet: &route53.ResourceRecordSet{
-						Name:            listResourceRecordSetsOutput.ResourceRecordSets[0].Name,
+						Name:            resourceRecord.Name,
 						Type:            awssdk.String("NS"),
 						TTL:             awssdk.Int64(300),
-						ResourceRecords: listResourceRecordSetsOutput.ResourceRecordSets[0].ResourceRecords,
+						ResourceRecords: resourceRecord.ResourceRecords,
 					},
 				},
 			},
@@ -212,7 +215,7 @@ func (r *Route53) AddDelegationToParentZone(ctx context.Context, logger logr.Log
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	logger.Info("Added delegation to parent hosted zone", "parentHostedZoneId", parentZoneId, "dnsRecordName", *listResourceRecordSetsOutput.ResourceRecordSets[0].Name)
+	logger.Info("Added delegation to parent hosted zone", "parentHostedZoneId", parentZoneId, "dnsRecordName", *resourceRecord.Name)
 
 	return nil
 }

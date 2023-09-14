@@ -59,7 +59,12 @@ func (d *Zoner) CreateHostedZone(ctx context.Context, logger logr.Logger, cluste
 			return errors.WithStack(err)
 		}
 
-		err = mcRoute53Client.AddDelegationToParentZone(ctx, logger, parentHostedZoneId, hostedZoneId)
+		nsRecord, err := route53Client.GetHostedZoneNSRecords(ctx, hostedZoneId)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		err = mcRoute53Client.AddDelegationToParentZone(ctx, logger, parentHostedZoneId, nsRecord)
 		if err != nil {
 			return errors.WithStack(err)
 		}
