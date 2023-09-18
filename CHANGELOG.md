@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added ManagementClusterTransitGateway reconciler. This reconciler is still disabled and is part of the merger of the aws-network-topology-operator.
+
 ### Changed
 
 - Update `golang.org/x/net` package.
