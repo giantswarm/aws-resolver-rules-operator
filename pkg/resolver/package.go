@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
-	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
@@ -17,7 +16,7 @@ type AWSClients interface {
 	NewRAMClient(region, arn string) (RAMClient, error)
 	NewRAMClientWithExternalId(region, arn, externalId string) (RAMClient, error)
 	NewRoute53Client(region, arn string) (Route53Client, error)
-	NewTransitGateways(region, arn string) (TransitGatewayClient, error)
+	NewTransitGatewayClient(region, arn string) (TransitGatewayClient, error)
 }
 
 //counterfeiter:generate . EC2Client
@@ -56,6 +55,6 @@ type ResolverClient interface {
 
 //counterfeiter:generate . TransitGatewayClient
 type TransitGatewayClient interface {
-	Apply(context.Context, *capa.AWSCluster) (string, error)
-	Delete(context.Context, *capa.AWSCluster) error
+	Apply(context.Context, string) (string, error)
+	Delete(context.Context, string) error
 }

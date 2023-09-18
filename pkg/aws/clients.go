@@ -149,7 +149,7 @@ func (c *Clients) NewRoute53Client(region, arn string) (resolver.Route53Client, 
 	return &Route53{client: client}, nil
 }
 
-func (c *Clients) NewTransitGateways(region, rolearn string) (resolver.TransitGatewayClient, error) {
+func (c *Clients) NewTransitGatewayClient(region, rolearn string) (resolver.TransitGatewayClient, error) {
 	session, err := c.sessionForRole(rolearn)
 	if err != nil {
 		return &TransitGateways{}, errors.WithStack(err)

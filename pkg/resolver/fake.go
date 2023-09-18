@@ -37,6 +37,6 @@ func (f *FakeClients) NewRoute53Client(region, arn string) (Route53Client, error
 	return f.Route53Client, nil
 }
 
-func (f *FakeClients) NewTransitGateways(region, arn string) (TransitGatewayClient, error) {
+func (f *FakeClients) NewTransitGatewayClient(region, arn string) (TransitGatewayClient, error) {
 	return f.TransitGatewayClient, nil
 }

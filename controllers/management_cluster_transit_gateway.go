@@ -100,7 +100,7 @@ func (r *ManagementClusterTransitGatewayReconciler) reconcileNormal(ctx context.
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	id, err := r.transitGateways.Apply(ctx, cluster)
+	id, err := r.transitGateways.Apply(ctx, cluster.Name)
 	if err != nil {
 		logger.Error(err, "Failed to create transit gateway")
 		return ctrl.Result{}, errors.WithStack(err)
@@ -120,7 +120,7 @@ func (r *ManagementClusterTransitGatewayReconciler) reconcileNormal(ctx context.
 func (r *ManagementClusterTransitGatewayReconciler) reconcileDelete(ctx context.Context, cluster *capa.AWSCluster) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	err := r.transitGateways.Delete(ctx, cluster)
+	err := r.transitGateways.Delete(ctx, cluster.Name)
 	if err != nil {
 		logger.Error(err, "Failed to delete transit gateway")
 		return ctrl.Result{}, errors.WithStack(err)

@@ -7,7 +7,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 )
 
 const clusterTagValue = "owned"
@@ -20,8 +19,8 @@ type TransitGateways struct {
 	ec2 *ec2.EC2
 }
 
-func (t *TransitGateways) Apply(ctx context.Context, cluster *capa.AWSCluster) (string, error) {
-	gateway, err := t.get(ctx, cluster)
+func (t *TransitGateways) Apply(ctx context.Context, name string) (string, error) {
+	gateway, err := t.get(ctx, name)
 	if err != nil {
 		return "", err
 	}
@@ -30,11 +29,11 @@ func (t *TransitGateways) Apply(ctx context.Context, cluster *capa.AWSCluster) (
 		return *gateway.TransitGatewayArn, nil
 	}
 
-	return t.create(ctx, cluster)
+	return t.create(ctx, name)
 }
 
-func (t *TransitGateways) Delete(ctx context.Context, cluster *capa.AWSCluster) error {
-	gateway, err := t.get(ctx, cluster)
+func (t *TransitGateways) Delete(ctx context.Context, name string) error {
+	gateway, err := t.get(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -51,8 +50,8 @@ func (t *TransitGateways) Delete(ctx context.Context, cluster *capa.AWSCluster) 
 	return err
 }
 
-func (t *TransitGateways) get(ctx context.Context, cluster *capa.AWSCluster) (*ec2.TransitGateway, error) {
-	nameTag := "tag:" + clusterTag(cluster.Name)
+func (t *TransitGateways) get(ctx context.Context, name string) (*ec2.TransitGateway, error) {
+	nameTag := "tag:" + clusterTag(name)
 	input := &ec2.DescribeTransitGatewaysInput{
 		Filters: []*ec2.Filter{
 			{
@@ -76,16 +75,16 @@ func (t *TransitGateways) get(ctx context.Context, cluster *capa.AWSCluster) (*e
 		return nil, fmt.Errorf(
 			"found unexpected number: %d of transit gatways for cluster %s",
 			len(gateways),
-			cluster.Name,
+			name,
 		)
 	}
 
 	return gateways[0], nil
 }
 
-func (t *TransitGateways) create(ctx context.Context, cluster *capa.AWSCluster) (string, error) {
+func (t *TransitGateways) create(ctx context.Context, name string) (string, error) {
 	input := &ec2.CreateTransitGatewayInput{
-		Description: awssdk.String(fmt.Sprintf("Transit Gateway for cluster %s", cluster.Name)),
+		Description: awssdk.String(fmt.Sprintf("Transit Gateway for cluster %s", name)),
 		Options: &ec2.TransitGatewayRequestOptions{
 			AutoAcceptSharedAttachments: aws.String(ec2.AutoAcceptSharedAttachmentsValueEnable),
 		},
@@ -94,7 +93,7 @@ func (t *TransitGateways) create(ctx context.Context, cluster *capa.AWSCluster) 
 				ResourceType: aws.String(ec2.ResourceTypeTransitGateway),
 				Tags: []*ec2.Tag{
 					{
-						Key:   awssdk.String(clusterTag(cluster.Name)),
+						Key:   awssdk.String(clusterTag(name)),
 						Value: awssdk.String(clusterTagValue),
 					},
 				},

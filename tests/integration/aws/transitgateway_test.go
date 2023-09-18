@@ -54,13 +54,13 @@ var _ = Describe("Transitgateway", func() {
 			},
 		}
 
-		transitGateways, err = awsClients.NewTransitGateways(Region, AwsIamArn)
+		transitGateways, err = awsClients.NewTransitGatewayClient(Region, AwsIamArn)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	Describe("Apply", func() {
 		It("creates a transit gateway", func() {
-			arn, err := transitGateways.Apply(ctx, cluster)
+			arn, err := transitGateways.Apply(ctx, cluster.Name)
 			Expect(err).NotTo(HaveOccurred())
 
 			transitGatewayID, err := aws.GetARNResourceID(arn)
@@ -77,7 +77,7 @@ var _ = Describe("Transitgateway", func() {
 			var originalID string
 
 			BeforeEach(func() {
-				arn, err := transitGateways.Apply(ctx, cluster)
+				arn, err := transitGateways.Apply(ctx, cluster.Name)
 				Expect(err).NotTo(HaveOccurred())
 
 				originalID, err = aws.GetARNResourceID(arn)
@@ -85,7 +85,7 @@ var _ = Describe("Transitgateway", func() {
 			})
 
 			It("does not return an error", func() {
-				arn, err := transitGateways.Apply(ctx, cluster)
+				arn, err := transitGateways.Apply(ctx, cluster.Name)
 				Expect(err).NotTo(HaveOccurred())
 
 				actualID, err := aws.GetARNResourceID(arn)
@@ -106,7 +106,7 @@ var _ = Describe("Transitgateway", func() {
 				})
 
 				It("returns an error", func() {
-					_, err := transitGateways.Apply(ctx, cluster)
+					_, err := transitGateways.Apply(ctx, cluster.Name)
 					Expect(err).To(MatchError(ContainSubstring(
 						"found unexpected number: 2 of transit gatways for cluster",
 					)))
@@ -123,7 +123,7 @@ var _ = Describe("Transitgateway", func() {
 		})
 
 		It("deletes the transit gateway", func() {
-			err := transitGateways.Delete(ctx, cluster)
+			err := transitGateways.Delete(ctx, cluster.Name)
 			Expect(err).NotTo(HaveOccurred())
 
 			out, err := rawEC2Client.DescribeTransitGateways(&ec2.DescribeTransitGatewaysInput{
@@ -142,7 +142,7 @@ var _ = Describe("Transitgateway", func() {
 			})
 
 			It("does not return an error", func() {
-				err := transitGateways.Delete(ctx, cluster)
+				err := transitGateways.Delete(ctx, cluster.Name)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -153,7 +153,7 @@ var _ = Describe("Transitgateway", func() {
 			})
 
 			It("returns an error", func() {
-				err := transitGateways.Delete(ctx, cluster)
+				err := transitGateways.Delete(ctx, cluster.Name)
 				Expect(err).To(MatchError(ContainSubstring(
 					"found unexpected number: 2 of transit gatways for cluster",
 				)))
