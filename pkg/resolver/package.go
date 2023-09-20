@@ -3,7 +3,6 @@ package resolver
 import (
 	"context"
 
-	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/go-logr/logr"
 )
 
@@ -36,8 +35,8 @@ type Route53Client interface {
 	CreateHostedZone(ctx context.Context, logger logr.Logger, dnsZone DnsZone) (string, error)
 	DeleteHostedZone(ctx context.Context, logger logr.Logger, zoneId string) error
 	GetHostedZoneIdByName(ctx context.Context, logger logr.Logger, zoneName string) (string, error)
-	GetHostedZoneNSRecords(ctx context.Context, zoneId string) (*route53.ResourceRecordSet, error)
-	AddDelegationToParentZone(ctx context.Context, logger logr.Logger, parentZoneId string, resourceRecord *route53.ResourceRecordSet) error
+	GetHostedZoneNSRecords(ctx context.Context, zoneId string) (*DNSRecord, error)
+	AddDelegationToParentZone(ctx context.Context, logger logr.Logger, parentZoneId string, resourceRecord *DNSRecord) error
 	DeleteDelegationFromParentZone(ctx context.Context, logger logr.Logger, parentZoneId, zoneId string) error
 	AddDnsRecordsToHostedZone(ctx context.Context, logger logr.Logger, hostedZoneId string, dnsRecords []DNSRecord) error
 	DeleteDnsRecordsFromHostedZone(ctx context.Context, logger logr.Logger, hostedZoneId string) error
