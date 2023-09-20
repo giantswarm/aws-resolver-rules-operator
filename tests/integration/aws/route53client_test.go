@@ -243,7 +243,6 @@ var _ = Describe("Route53 Resolver client", func() {
 			record := &resolver.DNSRecord{
 				Name:   *listRecordSets.ResourceRecordSets[0].Name,
 				Kind:   resolver.DnsRecordType(*listRecordSets.ResourceRecordSets[0].Type),
-				Region: *listRecordSets.ResourceRecordSets[0].Region,
 				Values: []string{},
 			}
 
@@ -338,7 +337,6 @@ var _ = Describe("Route53 Resolver client", func() {
 			record := &resolver.DNSRecord{
 				Name:   *listRecordSets.ResourceRecordSets[0].Name,
 				Kind:   resolver.DnsRecordType(*listRecordSets.ResourceRecordSets[0].Type),
-				Region: *listRecordSets.ResourceRecordSets[0].Region,
 				Values: []string{},
 			}
 

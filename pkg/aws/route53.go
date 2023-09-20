@@ -174,7 +174,6 @@ func (r *Route53) GetHostedZoneNSRecords(ctx context.Context, zoneId string) (*r
 	record := &resolver.DNSRecord{
 		Name:   *listResourceRecordSetsOutput.ResourceRecordSets[0].Name,
 		Kind:   resolver.DnsRecordType(*listResourceRecordSetsOutput.ResourceRecordSets[0].Type),
-		Region: *listResourceRecordSetsOutput.ResourceRecordSets[0].Region,
 		Values: []string{},
 	}
 
