@@ -49,6 +49,8 @@ type AWSClusterClient interface {
 	GetIdentity(context.Context, *capa.AWSCluster) (*capa.AWSClusterRoleIdentity, error)
 	MarkConditionTrue(context.Context, *capa.AWSCluster, capi.ConditionType) error
 	GetBastionMachine(ctx context.Context, clusterName string) (*capi.Machine, error)
+	PatchCluster(context.Context, *capa.AWSCluster, client.Patch) (*capa.AWSCluster, error)
+	UpdateStatus(context.Context, client.Object) error
 }
 
 // ResolverRulesReconciler reconciles AWSClusters.
