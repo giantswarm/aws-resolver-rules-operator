@@ -114,3 +114,15 @@ func (a *AWSClusterClient) Unpause(ctx context.Context, awsCluster *capa.AWSClus
 	delete(awsCluster.Annotations, capi.PausedAnnotation)
 	return a.client.Patch(ctx, awsCluster, client.MergeFrom(originalAwsCluster))
 }
+
+func (a *AWSClusterClient) PatchCluster(ctx context.Context, cluster *capa.AWSCluster, patch client.Patch) (*capa.AWSCluster, error) {
+	err := a.client.Patch(ctx, cluster, patch, &client.PatchOptions{})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return cluster, errors.WithStack(err)
+}
+
+func (a *AWSClusterClient) UpdateStatus(ctx context.Context, obj client.Object) error {
+	return a.client.Status().Update(ctx, obj)
+}
