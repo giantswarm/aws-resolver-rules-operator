@@ -67,7 +67,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 		dns, err := resolver.NewDnsZone(fakeAWSClients, WorkloadClusterBaseDomain)
 		Expect(err).NotTo(HaveOccurred())
 
-		reconciler = controllers.NewDnsReconciler(clusterClient, dns)
+		reconciler = controllers.NewDnsReconciler(clusterClient, dns, ClusterName, ClusterNamespace)
 
 		awsClusterRoleIdentity = &capa.AWSClusterRoleIdentity{
 			ObjectMeta: metav1.ObjectMeta{
@@ -168,6 +168,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 
 		BeforeEach(func() {
 			clusterClient.GetClusterReturns(eksCluster, nil)
+			clusterClient.GetAWSClusterReturns(awsCluster, expectedError)
 			clusterClient.GetAWSManagedControlPlaneReturns(awsManagedControlPlane, expectedError)
 		})
 
@@ -196,7 +197,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 				})
 
 				It("does not reconcile", func() {
-					Expect(clusterClient.GetIdentityCallCount()).To(BeZero())
+					Expect(clusterClient.GetIdentityCallCount()).To(Equal(1))
 					Expect(reconcileErr).NotTo(HaveOccurred())
 				})
 			})
@@ -210,7 +211,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 				})
 
 				It("does not reconcile", func() {
-					Expect(clusterClient.GetIdentityCallCount()).To(BeZero())
+					Expect(clusterClient.GetIdentityCallCount()).To(Equal(1))
 					Expect(reconcileErr).NotTo(HaveOccurred())
 				})
 			})
@@ -367,9 +368,9 @@ var _ = Describe("Dns Zone reconciler", func() {
 
 						It("adds delegation of ns records to parent hosted zone", func() {
 							Expect(route53Client.AddDelegationToParentZoneCallCount()).To(Equal(1))
-							_, _, parentHostedZoneId, hostedZoneId := route53Client.AddDelegationToParentZoneArgsForCall(0)
+							_, _, parentHostedZoneId, nsRecord := route53Client.AddDelegationToParentZoneArgsForCall(0)
 							Expect(parentHostedZoneId).To(Equal("parent-hosted-zone-id"))
-							Expect(hostedZoneId).To(Equal("hosted-zone-id"))
+							Expect(nsRecord).To(BeNil())
 						})
 
 						It("creates DNS records for workload cluster", func() {
@@ -377,9 +378,9 @@ var _ = Describe("Dns Zone reconciler", func() {
 							_, _, hostedZoneId, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
 							Expect(hostedZoneId).To(Equal("hosted-zone-id"))
 							Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
-								Kind:  resolver.DnsRecordTypeCname,
-								Name:  fmt.Sprintf("*.%s.%s", ClusterName, WorkloadClusterBaseDomain),
-								Value: fmt.Sprintf("ingress.%s.%s", ClusterName, WorkloadClusterBaseDomain),
+								Kind:   resolver.DnsRecordTypeCname,
+								Name:   fmt.Sprintf("*.%s.%s", ClusterName, WorkloadClusterBaseDomain),
+								Values: []string{fmt.Sprintf("ingress.%s.%s", ClusterName, WorkloadClusterBaseDomain)},
 							}))
 						})
 
@@ -395,7 +396,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 								Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
 									Kind:   resolver.DnsRecordTypeCname,
 									Name:   fmt.Sprintf("api.%s.%s", ClusterName, WorkloadClusterBaseDomain),
-									Value:  "control-plane-eks-load-balancer-hostname",
+									Values: []string{"control-plane-eks-load-balancer-hostname"},
 									Region: awsCluster.Spec.Region,
 								}))
 							})
@@ -412,7 +413,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 								Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
 									Kind:   resolver.DnsRecordTypeAlias,
 									Name:   fmt.Sprintf("api.%s.%s", ClusterName, WorkloadClusterBaseDomain),
-									Value:  "control-plane-load-balancer-hostname",
+									Values: []string{"control-plane-load-balancer-hostname"},
 									Region: awsCluster.Spec.Region,
 								}))
 							})
@@ -453,9 +454,9 @@ var _ = Describe("Dns Zone reconciler", func() {
 							It("it creates DNS record for the bastion", func() {
 								_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
 								Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
-									Kind:  resolver.DnsRecordTypeA,
-									Name:  fmt.Sprintf("bastion1.%s.%s", ClusterName, WorkloadClusterBaseDomain),
-									Value: "192.168.0.1",
+									Kind:   resolver.DnsRecordTypeA,
+									Name:   fmt.Sprintf("bastion1.%s.%s", ClusterName, WorkloadClusterBaseDomain),
+									Values: []string{"192.168.0.1"},
 								}))
 							})
 						})
@@ -580,9 +581,9 @@ var _ = Describe("Dns Zone reconciler", func() {
 							_, _, hostedZoneId, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
 							Expect(hostedZoneId).To(Equal("hosted-zone-id"))
 							Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
-								Kind:  "CNAME",
-								Name:  fmt.Sprintf("*.%s.%s", ClusterName, WorkloadClusterBaseDomain),
-								Value: fmt.Sprintf("ingress.%s.%s", ClusterName, WorkloadClusterBaseDomain),
+								Kind:   "CNAME",
+								Name:   fmt.Sprintf("*.%s.%s", ClusterName, WorkloadClusterBaseDomain),
+								Values: []string{fmt.Sprintf("ingress.%s.%s", ClusterName, WorkloadClusterBaseDomain)},
 							}))
 						})
 
@@ -611,7 +612,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 								Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
 									Kind:   "ALIAS",
 									Name:   fmt.Sprintf("api.%s.%s", ClusterName, WorkloadClusterBaseDomain),
-									Value:  "control-plane-load-balancer-hostname",
+									Values: []string{"control-plane-load-balancer-hostname"},
 									Region: awsCluster.Spec.Region,
 								}))
 							})
@@ -652,9 +653,9 @@ var _ = Describe("Dns Zone reconciler", func() {
 							It("it creates DNS record for the bastion", func() {
 								_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
 								Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
-									Kind:  "A",
-									Name:  fmt.Sprintf("bastion1.%s.%s", ClusterName, WorkloadClusterBaseDomain),
-									Value: "192.168.0.1",
+									Kind:   "A",
+									Name:   fmt.Sprintf("bastion1.%s.%s", ClusterName, WorkloadClusterBaseDomain),
+									Values: []string{"192.168.0.1"},
 								}))
 							})
 						})

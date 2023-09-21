@@ -162,6 +162,28 @@ func (r *Route53) DeleteHostedZone(ctx context.Context, logger logr.Logger, zone
 	return nil
 }
 
+func (r *Route53) GetHostedZoneNSRecords(ctx context.Context, zoneId string) (*resolver.DNSRecord, error) {
+	listResourceRecordSetsOutput, err := r.client.ListResourceRecordSetsWithContext(ctx, &route53.ListResourceRecordSetsInput{
+		HostedZoneId: awssdk.String(zoneId),
+		MaxItems:     awssdk.String("1"), // First entry is always NS record
+	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	record := &resolver.DNSRecord{
+		Name:   *listResourceRecordSetsOutput.ResourceRecordSets[0].Name,
+		Kind:   resolver.DnsRecordType(*listResourceRecordSetsOutput.ResourceRecordSets[0].Type),
+		Values: []string{},
+	}
+
+	for _, resourceRecord := range listResourceRecordSetsOutput.ResourceRecordSets[0].ResourceRecords {
+		record.Values = append(record.Values, *resourceRecord.Value)
+	}
+
+	return record, nil
+}
+
 func (r *Route53) GetHostedZoneIdByName(ctx context.Context, logger logr.Logger, zoneName string) (string, error) {
 	listResponse, err := r.client.ListHostedZonesByNameWithContext(ctx, &route53.ListHostedZonesByNameInput{
 		DNSName:  awssdk.String(zoneName),
@@ -183,27 +205,26 @@ func (r *Route53) GetHostedZoneIdByName(ctx context.Context, logger logr.Logger,
 }
 
 // AddDelegationToParentZone adds a NS record (or updates if it already exists) to the parent hosted zone with the NS records of the subdomain.
-func (r *Route53) AddDelegationToParentZone(ctx context.Context, logger logr.Logger, parentZoneId, zoneId string) error {
-	listResourceRecordSetsOutput, err := r.client.ListResourceRecordSetsWithContext(ctx, &route53.ListResourceRecordSetsInput{
-		HostedZoneId: awssdk.String(zoneId),
-		MaxItems:     awssdk.String("1"), // First entry is always NS record
-	})
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
+func (r *Route53) AddDelegationToParentZone(ctx context.Context, logger logr.Logger, parentZoneId string, resourceRecord *resolver.DNSRecord) error {
 	logger.Info("Adding delegation to parent hosted zone", "parentHostedZoneId", parentZoneId)
-	_, err = r.client.ChangeResourceRecordSetsWithContext(ctx, &route53.ChangeResourceRecordSetsInput{
+
+	var awsResourceRecords []*route53.ResourceRecord
+	for _, value := range resourceRecord.Values {
+		awsResourceRecords = append(awsResourceRecords, &route53.ResourceRecord{
+			Value: awssdk.String(value),
+		})
+	}
+	_, err := r.client.ChangeResourceRecordSetsWithContext(ctx, &route53.ChangeResourceRecordSetsInput{
 		HostedZoneId: awssdk.String(parentZoneId),
 		ChangeBatch: &route53.ChangeBatch{
 			Changes: []*route53.Change{
 				{
 					Action: awssdk.String("UPSERT"),
 					ResourceRecordSet: &route53.ResourceRecordSet{
-						Name:            listResourceRecordSetsOutput.ResourceRecordSets[0].Name,
+						Name:            awssdk.String(resourceRecord.Name),
 						Type:            awssdk.String("NS"),
 						TTL:             awssdk.Int64(300),
-						ResourceRecords: listResourceRecordSetsOutput.ResourceRecordSets[0].ResourceRecords,
+						ResourceRecords: awsResourceRecords,
 					},
 				},
 			},
@@ -212,7 +233,7 @@ func (r *Route53) AddDelegationToParentZone(ctx context.Context, logger logr.Log
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	logger.Info("Added delegation to parent hosted zone", "parentHostedZoneId", parentZoneId, "dnsRecordName", *listResourceRecordSetsOutput.ResourceRecordSets[0].Name)
+	logger.Info("Added delegation to parent hosted zone", "parentHostedZoneId", parentZoneId, "dnsRecordName", resourceRecord.Name)
 
 	return nil
 }
@@ -283,7 +304,7 @@ func getAWSSdkChangesFromDnsRecords(logger logr.Logger, dnsRecords []resolver.DN
 					TTL:  awssdk.Int64(300),
 					ResourceRecords: []*route53.ResourceRecord{
 						{
-							Value: awssdk.String(record.Value),
+							Value: awssdk.String(record.Values[0]),
 						},
 					},
 				}})
@@ -294,7 +315,7 @@ func getAWSSdkChangesFromDnsRecords(logger logr.Logger, dnsRecords []resolver.DN
 					Name: awssdk.String(record.Name),
 					Type: awssdk.String("A"),
 					AliasTarget: &route53.AliasTarget{
-						DNSName:              awssdk.String(record.Value),
+						DNSName:              awssdk.String(record.Values[0]),
 						EvaluateTargetHealth: awssdk.Bool(false),
 						HostedZoneId:         awssdk.String(canonicalHostedZones[record.Region]),
 					},

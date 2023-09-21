@@ -240,7 +240,17 @@ var _ = Describe("Route53 Resolver client", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 
-			err = route53Client.AddDelegationToParentZone(ctx, logger, *parentHostedZoneToFind.HostedZone.Id, *hostedZoneToFind.HostedZone.Id)
+			record := &resolver.DNSRecord{
+				Name:   *listRecordSets.ResourceRecordSets[0].Name,
+				Kind:   resolver.DnsRecordType(*listRecordSets.ResourceRecordSets[0].Type),
+				Values: []string{},
+			}
+
+			for _, resourceRecord := range listRecordSets.ResourceRecordSets[0].ResourceRecords {
+				record.Values = append(record.Values, *resourceRecord.Value)
+			}
+
+			err = route53Client.AddDelegationToParentZone(ctx, logger, *parentHostedZoneToFind.HostedZone.Id, record)
 			Expect(err).NotTo(HaveOccurred())
 
 			listParentRecordSets, err := rawRoute53Client.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
@@ -318,8 +328,24 @@ var _ = Describe("Route53 Resolver client", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 
+			listRecordSets, err := rawRoute53Client.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
+				HostedZoneId: hostedZoneToFind.HostedZone.Id,
+				MaxItems:     awssdk.String("1"), // First entry is always NS record
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			record := &resolver.DNSRecord{
+				Name:   *listRecordSets.ResourceRecordSets[0].Name,
+				Kind:   resolver.DnsRecordType(*listRecordSets.ResourceRecordSets[0].Type),
+				Values: []string{},
+			}
+
+			for _, resourceRecord := range listRecordSets.ResourceRecordSets[0].ResourceRecords {
+				record.Values = append(record.Values, *resourceRecord.Value)
+			}
+
 			// We add the delegation so we can delete it later.
-			err = route53Client.AddDelegationToParentZone(ctx, logger, *parentHostedZoneToFind.HostedZone.Id, *hostedZoneToFind.HostedZone.Id)
+			err = route53Client.AddDelegationToParentZone(ctx, logger, *parentHostedZoneToFind.HostedZone.Id, record)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -425,14 +451,14 @@ var _ = Describe("Route53 Resolver client", func() {
 		It("creates the records", func() {
 			dnsRecordsToCreate := []resolver.DNSRecord{
 				{
-					Kind:  "CNAME",
-					Name:  "a.dnsrecords.example.com",
-					Value: "something",
+					Kind:   "CNAME",
+					Name:   "a.dnsrecords.example.com",
+					Values: []string{"something"},
 				},
 				{
 					Kind:   "ALIAS",
 					Name:   "z.dnsrecords.example.com",
-					Value:  "alias-value",
+					Values: []string{"alias-value"},
 					Region: "eu-central-1",
 				},
 			}
@@ -460,14 +486,14 @@ var _ = Describe("Route53 Resolver client", func() {
 			By("creating the exact same records again, it doesn't fail", func() {
 				dnsRecordsToCreate := []resolver.DNSRecord{
 					{
-						Kind:  "CNAME",
-						Name:  "a.dnsrecords.example.com",
-						Value: "something",
+						Kind:   "CNAME",
+						Name:   "a.dnsrecords.example.com",
+						Values: []string{"something"},
 					},
 					{
 						Kind:   "ALIAS",
 						Name:   "z.dnsrecords.example.com",
-						Value:  "alias-value",
+						Values: []string{"alias-value"},
 						Region: "eu-central-1",
 					},
 				}
@@ -490,14 +516,14 @@ var _ = Describe("Route53 Resolver client", func() {
 
 			dnsRecordsToCreate := []resolver.DNSRecord{
 				{
-					Kind:  "CNAME",
-					Name:  "a.dnsrecordstodelete.example.com",
-					Value: "something",
+					Kind:   "CNAME",
+					Name:   "a.dnsrecordstodelete.example.com",
+					Values: []string{"something"},
 				},
 				{
 					Kind:   "ALIAS",
 					Name:   "z.dnsrecordstodelete.example.com",
-					Value:  "alias-value",
+					Values: []string{"alias-value"},
 					Region: "eu-central-1",
 				},
 			}

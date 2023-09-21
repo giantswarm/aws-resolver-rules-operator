@@ -13,6 +13,6 @@ const (
 type DNSRecord struct {
 	Kind   DnsRecordType
 	Name   string
-	Value  string
+	Values []string
 	Region string
 }

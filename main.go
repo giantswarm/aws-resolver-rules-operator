@@ -65,6 +65,8 @@ func main() {
 	var dnsServerIAMRoleExternalId string
 	var dnsServerRegion string
 	var dnsServerVpcId string
+	var managementClusterName string
+	var managementClusterNamespace string
 	var workloadClusterBaseDomain string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -76,6 +78,8 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&managementClusterName, "management-cluster-name", "", "Management cluster CR name.")
+	flag.StringVar(&managementClusterNamespace, "management-cluster-namespace", "", "Management cluster CR namespace.")
 	flag.StringVar(&workloadClusterBaseDomain, "basedomain", "", "Domain for workload cluster, e.g. installation.eu-west-1.aws.domain.tld")
 
 	opts := zap.Options{
@@ -133,7 +137,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (controllers.NewDnsReconciler(k8sClusterClient, dns)).SetupWithManager(mgr); err != nil {
+	if err = (controllers.NewDnsReconciler(k8sClusterClient, dns, managementClusterName, managementClusterNamespace)).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller")
 		os.Exit(1)
 	}

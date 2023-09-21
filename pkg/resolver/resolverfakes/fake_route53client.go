@@ -10,13 +10,13 @@ import (
 )
 
 type FakeRoute53Client struct {
-	AddDelegationToParentZoneStub        func(context.Context, logr.Logger, string, string) error
+	AddDelegationToParentZoneStub        func(context.Context, logr.Logger, string, *resolver.DNSRecord) error
 	addDelegationToParentZoneMutex       sync.RWMutex
 	addDelegationToParentZoneArgsForCall []struct {
 		arg1 context.Context
 		arg2 logr.Logger
 		arg3 string
-		arg4 string
+		arg4 *resolver.DNSRecord
 	}
 	addDelegationToParentZoneReturns struct {
 		result1 error
@@ -108,18 +108,32 @@ type FakeRoute53Client struct {
 		result1 string
 		result2 error
 	}
+	GetHostedZoneNSRecordsStub        func(context.Context, string) (*resolver.DNSRecord, error)
+	getHostedZoneNSRecordsMutex       sync.RWMutex
+	getHostedZoneNSRecordsArgsForCall []struct {
+		arg1 context.Context
+		arg2 string
+	}
+	getHostedZoneNSRecordsReturns struct {
+		result1 *resolver.DNSRecord
+		result2 error
+	}
+	getHostedZoneNSRecordsReturnsOnCall map[int]struct {
+		result1 *resolver.DNSRecord
+		result2 error
+	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeRoute53Client) AddDelegationToParentZone(arg1 context.Context, arg2 logr.Logger, arg3 string, arg4 string) error {
+func (fake *FakeRoute53Client) AddDelegationToParentZone(arg1 context.Context, arg2 logr.Logger, arg3 string, arg4 *resolver.DNSRecord) error {
 	fake.addDelegationToParentZoneMutex.Lock()
 	ret, specificReturn := fake.addDelegationToParentZoneReturnsOnCall[len(fake.addDelegationToParentZoneArgsForCall)]
 	fake.addDelegationToParentZoneArgsForCall = append(fake.addDelegationToParentZoneArgsForCall, struct {
 		arg1 context.Context
 		arg2 logr.Logger
 		arg3 string
-		arg4 string
+		arg4 *resolver.DNSRecord
 	}{arg1, arg2, arg3, arg4})
 	stub := fake.AddDelegationToParentZoneStub
 	fakeReturns := fake.addDelegationToParentZoneReturns
@@ -140,13 +154,13 @@ func (fake *FakeRoute53Client) AddDelegationToParentZoneCallCount() int {
 	return len(fake.addDelegationToParentZoneArgsForCall)
 }
 
-func (fake *FakeRoute53Client) AddDelegationToParentZoneCalls(stub func(context.Context, logr.Logger, string, string) error) {
+func (fake *FakeRoute53Client) AddDelegationToParentZoneCalls(stub func(context.Context, logr.Logger, string, *resolver.DNSRecord) error) {
 	fake.addDelegationToParentZoneMutex.Lock()
 	defer fake.addDelegationToParentZoneMutex.Unlock()
 	fake.AddDelegationToParentZoneStub = stub
 }
 
-func (fake *FakeRoute53Client) AddDelegationToParentZoneArgsForCall(i int) (context.Context, logr.Logger, string, string) {
+func (fake *FakeRoute53Client) AddDelegationToParentZoneArgsForCall(i int) (context.Context, logr.Logger, string, *resolver.DNSRecord) {
 	fake.addDelegationToParentZoneMutex.RLock()
 	defer fake.addDelegationToParentZoneMutex.RUnlock()
 	argsForCall := fake.addDelegationToParentZoneArgsForCall[i]
@@ -567,6 +581,71 @@ func (fake *FakeRoute53Client) GetHostedZoneIdByNameReturnsOnCall(i int, result1
 	}{result1, result2}
 }
 
+func (fake *FakeRoute53Client) GetHostedZoneNSRecords(arg1 context.Context, arg2 string) (*resolver.DNSRecord, error) {
+	fake.getHostedZoneNSRecordsMutex.Lock()
+	ret, specificReturn := fake.getHostedZoneNSRecordsReturnsOnCall[len(fake.getHostedZoneNSRecordsArgsForCall)]
+	fake.getHostedZoneNSRecordsArgsForCall = append(fake.getHostedZoneNSRecordsArgsForCall, struct {
+		arg1 context.Context
+		arg2 string
+	}{arg1, arg2})
+	stub := fake.GetHostedZoneNSRecordsStub
+	fakeReturns := fake.getHostedZoneNSRecordsReturns
+	fake.recordInvocation("GetHostedZoneNSRecords", []interface{}{arg1, arg2})
+	fake.getHostedZoneNSRecordsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeRoute53Client) GetHostedZoneNSRecordsCallCount() int {
+	fake.getHostedZoneNSRecordsMutex.RLock()
+	defer fake.getHostedZoneNSRecordsMutex.RUnlock()
+	return len(fake.getHostedZoneNSRecordsArgsForCall)
+}
+
+func (fake *FakeRoute53Client) GetHostedZoneNSRecordsCalls(stub func(context.Context, string) (*resolver.DNSRecord, error)) {
+	fake.getHostedZoneNSRecordsMutex.Lock()
+	defer fake.getHostedZoneNSRecordsMutex.Unlock()
+	fake.GetHostedZoneNSRecordsStub = stub
+}
+
+func (fake *FakeRoute53Client) GetHostedZoneNSRecordsArgsForCall(i int) (context.Context, string) {
+	fake.getHostedZoneNSRecordsMutex.RLock()
+	defer fake.getHostedZoneNSRecordsMutex.RUnlock()
+	argsForCall := fake.getHostedZoneNSRecordsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeRoute53Client) GetHostedZoneNSRecordsReturns(result1 *resolver.DNSRecord, result2 error) {
+	fake.getHostedZoneNSRecordsMutex.Lock()
+	defer fake.getHostedZoneNSRecordsMutex.Unlock()
+	fake.GetHostedZoneNSRecordsStub = nil
+	fake.getHostedZoneNSRecordsReturns = struct {
+		result1 *resolver.DNSRecord
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeRoute53Client) GetHostedZoneNSRecordsReturnsOnCall(i int, result1 *resolver.DNSRecord, result2 error) {
+	fake.getHostedZoneNSRecordsMutex.Lock()
+	defer fake.getHostedZoneNSRecordsMutex.Unlock()
+	fake.GetHostedZoneNSRecordsStub = nil
+	if fake.getHostedZoneNSRecordsReturnsOnCall == nil {
+		fake.getHostedZoneNSRecordsReturnsOnCall = make(map[int]struct {
+			result1 *resolver.DNSRecord
+			result2 error
+		})
+	}
+	fake.getHostedZoneNSRecordsReturnsOnCall[i] = struct {
+		result1 *resolver.DNSRecord
+		result2 error
+	}{result1, result2}
+}
+
 func (fake *FakeRoute53Client) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
@@ -584,6 +663,8 @@ func (fake *FakeRoute53Client) Invocations() map[string][][]interface{} {
 	defer fake.deleteHostedZoneMutex.RUnlock()
 	fake.getHostedZoneIdByNameMutex.RLock()
 	defer fake.getHostedZoneIdByNameMutex.RUnlock()
+	fake.getHostedZoneNSRecordsMutex.RLock()
+	defer fake.getHostedZoneNSRecordsMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value
