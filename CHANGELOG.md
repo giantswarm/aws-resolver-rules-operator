@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Fix Deletion of delegations DNS records from parent zone in case its in different AWS Account.
+
 ## [0.10.0] - 2023-09-21
 
 ### Added

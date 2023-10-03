@@ -91,13 +91,22 @@ func (d *Zoner) DeleteHostedZone(ctx context.Context, logger logr.Logger, cluste
 	logger = logger.WithValues("hostedZoneId", hostedZoneId)
 
 	if !cluster.IsDnsModePrivate {
-		parentHostedZoneId, err := route53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName())
+		mcRoute53Client, err := d.awsClients.NewRoute53Client(cluster.Region, cluster.MCIAMRoleARN)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		parentHostedZoneId, err := mcRoute53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName())
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		nsRecord, err := route53Client.GetHostedZoneNSRecords(ctx, hostedZoneId)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 
 		logger.Info("Deleting delegation from parent hosted zone", "parentHostedZoneId", parentHostedZoneId)
-		err = route53Client.DeleteDelegationFromParentZone(ctx, logger, parentHostedZoneId, hostedZoneId)
+		err = mcRoute53Client.DeleteDelegationFromParentZone(ctx, logger, parentHostedZoneId, nsRecord)
 		if err != nil {
 			return errors.WithStack(err)
 		}
