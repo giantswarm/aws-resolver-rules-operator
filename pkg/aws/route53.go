@@ -329,26 +329,25 @@ func getAWSSdkChangesFromDnsRecords(logger logr.Logger, dnsRecords []resolver.DN
 	return changes
 }
 
-func (r *Route53) DeleteDelegationFromParentZone(ctx context.Context, logger logr.Logger, parentZoneId, zoneId string) error {
-	listResourceRecordSetsOutput, err := r.client.ListResourceRecordSetsWithContext(ctx, &route53.ListResourceRecordSetsInput{
-		HostedZoneId: awssdk.String(zoneId),
-		MaxItems:     awssdk.String("1"), // First entry is always NS record
-	})
-	if err != nil {
-		return errors.WithStack(err)
+func (r *Route53) DeleteDelegationFromParentZone(ctx context.Context, logger logr.Logger, parentZoneId string, resourceRecord *resolver.DNSRecord) error {
+	var awsResourceRecords []*route53.ResourceRecord
+	for _, value := range resourceRecord.Values {
+		awsResourceRecords = append(awsResourceRecords, &route53.ResourceRecord{
+			Value: awssdk.String(value),
+		})
 	}
 
-	_, err = r.client.ChangeResourceRecordSetsWithContext(ctx, &route53.ChangeResourceRecordSetsInput{
+	_, err := r.client.ChangeResourceRecordSetsWithContext(ctx, &route53.ChangeResourceRecordSetsInput{
 		HostedZoneId: awssdk.String(parentZoneId),
 		ChangeBatch: &route53.ChangeBatch{
 			Changes: []*route53.Change{
 				{
 					Action: awssdk.String("DELETE"),
 					ResourceRecordSet: &route53.ResourceRecordSet{
-						Name:            listResourceRecordSetsOutput.ResourceRecordSets[0].Name,
+						Name:            awssdk.String(resourceRecord.Name),
 						Type:            awssdk.String("NS"),
 						TTL:             awssdk.Int64(300),
-						ResourceRecords: listResourceRecordSetsOutput.ResourceRecordSets[0].ResourceRecords,
+						ResourceRecords: awsResourceRecords,
 					},
 				},
 			},

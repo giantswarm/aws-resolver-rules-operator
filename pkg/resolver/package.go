@@ -38,7 +38,7 @@ type Route53Client interface {
 	GetHostedZoneIdByName(ctx context.Context, logger logr.Logger, zoneName string) (string, error)
 	GetHostedZoneNSRecords(ctx context.Context, zoneId string) (*DNSRecord, error)
 	AddDelegationToParentZone(ctx context.Context, logger logr.Logger, parentZoneId string, resourceRecord *DNSRecord) error
-	DeleteDelegationFromParentZone(ctx context.Context, logger logr.Logger, parentZoneId, zoneId string) error
+	DeleteDelegationFromParentZone(ctx context.Context, logger logr.Logger, parentZoneId string, resourceRecord *DNSRecord) error
 	AddDnsRecordsToHostedZone(ctx context.Context, logger logr.Logger, hostedZoneId string, dnsRecords []DNSRecord) error
 	DeleteDnsRecordsFromHostedZone(ctx context.Context, logger logr.Logger, hostedZoneId string) error
 }
