@@ -357,7 +357,22 @@ var _ = Describe("Route53 Resolver client", func() {
 		})
 
 		It("deletes the delegation from the parent zone", func() {
-			err = route53Client.DeleteDelegationFromParentZone(ctx, logger, *parentHostedZoneToFind.HostedZone.Id, *hostedZoneToFind.HostedZone.Id)
+			listRecordSets, err := rawRoute53Client.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
+				HostedZoneId: hostedZoneToFind.HostedZone.Id,
+				MaxItems:     awssdk.String("1"), // First entry is always NS record
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			record := &resolver.DNSRecord{
+				Name:   *listRecordSets.ResourceRecordSets[0].Name,
+				Kind:   resolver.DnsRecordType(*listRecordSets.ResourceRecordSets[0].Type),
+				Values: []string{},
+			}
+
+			for _, resourceRecord := range listRecordSets.ResourceRecordSets[0].ResourceRecords {
+				record.Values = append(record.Values, *resourceRecord.Value)
+			}
+			err = route53Client.DeleteDelegationFromParentZone(ctx, logger, *parentHostedZoneToFind.HostedZone.Id, record)
 			Expect(err).NotTo(HaveOccurred())
 
 			listParentRecordSets, err := rawRoute53Client.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{

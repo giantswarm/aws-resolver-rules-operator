@@ -53,13 +53,13 @@ type FakeRoute53Client struct {
 		result1 string
 		result2 error
 	}
-	DeleteDelegationFromParentZoneStub        func(context.Context, logr.Logger, string, string) error
+	DeleteDelegationFromParentZoneStub        func(context.Context, logr.Logger, string, *resolver.DNSRecord) error
 	deleteDelegationFromParentZoneMutex       sync.RWMutex
 	deleteDelegationFromParentZoneArgsForCall []struct {
 		arg1 context.Context
 		arg2 logr.Logger
 		arg3 string
-		arg4 string
+		arg4 *resolver.DNSRecord
 	}
 	deleteDelegationFromParentZoneReturns struct {
 		result1 error
@@ -325,14 +325,14 @@ func (fake *FakeRoute53Client) CreateHostedZoneReturnsOnCall(i int, result1 stri
 	}{result1, result2}
 }
 
-func (fake *FakeRoute53Client) DeleteDelegationFromParentZone(arg1 context.Context, arg2 logr.Logger, arg3 string, arg4 string) error {
+func (fake *FakeRoute53Client) DeleteDelegationFromParentZone(arg1 context.Context, arg2 logr.Logger, arg3 string, arg4 *resolver.DNSRecord) error {
 	fake.deleteDelegationFromParentZoneMutex.Lock()
 	ret, specificReturn := fake.deleteDelegationFromParentZoneReturnsOnCall[len(fake.deleteDelegationFromParentZoneArgsForCall)]
 	fake.deleteDelegationFromParentZoneArgsForCall = append(fake.deleteDelegationFromParentZoneArgsForCall, struct {
 		arg1 context.Context
 		arg2 logr.Logger
 		arg3 string
-		arg4 string
+		arg4 *resolver.DNSRecord
 	}{arg1, arg2, arg3, arg4})
 	stub := fake.DeleteDelegationFromParentZoneStub
 	fakeReturns := fake.deleteDelegationFromParentZoneReturns
@@ -353,13 +353,13 @@ func (fake *FakeRoute53Client) DeleteDelegationFromParentZoneCallCount() int {
 	return len(fake.deleteDelegationFromParentZoneArgsForCall)
 }
 
-func (fake *FakeRoute53Client) DeleteDelegationFromParentZoneCalls(stub func(context.Context, logr.Logger, string, string) error) {
+func (fake *FakeRoute53Client) DeleteDelegationFromParentZoneCalls(stub func(context.Context, logr.Logger, string, *resolver.DNSRecord) error) {
 	fake.deleteDelegationFromParentZoneMutex.Lock()
 	defer fake.deleteDelegationFromParentZoneMutex.Unlock()
 	fake.DeleteDelegationFromParentZoneStub = stub
 }
 
-func (fake *FakeRoute53Client) DeleteDelegationFromParentZoneArgsForCall(i int) (context.Context, logr.Logger, string, string) {
+func (fake *FakeRoute53Client) DeleteDelegationFromParentZoneArgsForCall(i int) (context.Context, logr.Logger, string, *resolver.DNSRecord) {
 	fake.deleteDelegationFromParentZoneMutex.RLock()
 	defer fake.deleteDelegationFromParentZoneMutex.RUnlock()
 	argsForCall := fake.deleteDelegationFromParentZoneArgsForCall[i]
