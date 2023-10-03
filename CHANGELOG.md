@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2023-10-03
+
 ### Changed
 
 - Fix Deletion of delegations DNS records from parent zone in case its in different AWS Account.
@@ -130,7 +132,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
 
-[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.7.1...v0.8.0
