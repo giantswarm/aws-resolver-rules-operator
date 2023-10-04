@@ -2,21 +2,18 @@ package controllers
 
 import (
 	"context"
-	"time"
 
 	"github.com/pkg/errors"
-	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	eks "sigs.k8s.io/cluster-api-provider-aws/controlplane/eks/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/annotations"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
 
-// DnsReconciler reconciles AWSClusters.
+// EKSDnsReconciler reconciles AWSClusters.
 // It creates a hosted zone that could be a private or a public one depending on the DNS mode of the workload cluster.
 // The mode is selected using the `aws.giantswarm.io/dns-mode` annotation on the `AWSCluster` CR.
 // It also creates three DNS records in the hosted zone
@@ -30,7 +27,7 @@ import (
 // the `aws.giantswarm.io/dns-assign-additional-vpc` annotation on the `AWSCluster` CR.
 //
 // When a workload cluster is deleted, the hosted zone is deleted, together with the delegation on the parent zone.
-type DnsReconciler struct {
+type EKSDnsReconciler struct {
 	clusterClient ClusterClient
 	dnsZone       resolver.Zoner
 	// managementClusterName is the name of the CR of the management cluster
@@ -39,8 +36,8 @@ type DnsReconciler struct {
 	managementClusterNamespace string
 }
 
-func NewDnsReconciler(clusterClient ClusterClient, dns resolver.Zoner, managementClusterName string, managementClusterNamespace string) *DnsReconciler {
-	return &DnsReconciler{
+func NewEKSDnsReconciler(clusterClient ClusterClient, dns resolver.Zoner, managementClusterName string, managementClusterNamespace string) *EKSDnsReconciler {
+	return &EKSDnsReconciler{
 		clusterClient:              clusterClient,
 		dnsZone:                    dns,
 		managementClusterName:      managementClusterName,
@@ -48,7 +45,7 @@ func NewDnsReconciler(clusterClient ClusterClient, dns resolver.Zoner, managemen
 	}
 }
 
-func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *EKSDnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	logger.Info("Reconciling")
 	defer logger.Info("Done reconciling")
@@ -65,7 +62,7 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	awsCluster, err := r.clusterClient.GetAWSCluster(ctx, req.NamespacedName)
+	awsManagedControlPlane, err := r.clusterClient.GetAWSManagedControlPlane(ctx, req.NamespacedName)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
 	}
@@ -75,50 +72,38 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	if annotations.IsPaused(capiCluster, awsCluster) {
+	if annotations.IsPaused(capiCluster, awsManagedControlPlane) {
 		logger.Info("Infrastructure or core cluster is marked as paused, skipping")
 		return ctrl.Result{}, nil
 	}
 
-	identity, err := r.clusterClient.GetIdentity(ctx, awsCluster.Spec.IdentityRef)
+	identity, err := r.clusterClient.GetIdentity(ctx, awsManagedControlPlane.Spec.IdentityRef)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
 	if identity == nil {
-		logger.Info("AWSCluster has no identityRef set, skipping")
+		logger.Info("AWSManagedControlPlane has no identityRef set, skipping")
 		return ctrl.Result{}, nil
 	}
 
-	cluster := buildClusterFromAWSCluster(awsCluster, identity, mcIdentity)
+	cluster := buildClusterFromAWSManagedControlPlane(awsManagedControlPlane, identity, mcIdentity)
 
 	if !capiCluster.DeletionTimestamp.IsZero() {
-		return r.reconcileDelete(ctx, awsCluster, cluster)
+		return r.reconcileDelete(ctx, awsManagedControlPlane, cluster)
 	}
 
-	return r.reconcileNormal(ctx, awsCluster, cluster)
+	return r.reconcileNormal(ctx, awsManagedControlPlane, cluster)
 }
 
 // reconcileNormal creates the hosted zone and the DNS records for the workload cluster.
 // It will take care of dns delegation in the parent hosted zone when using public dns mode.
-func (r *DnsReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AWSCluster, cluster resolver.Cluster) (ctrl.Result, error) {
+func (r *EKSDnsReconciler) reconcileNormal(ctx context.Context, awsManagedControlPlane *eks.AWSManagedControlPlane, cluster resolver.Cluster) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	err := r.clusterClient.AddAWSClusterFinalizer(ctx, awsCluster, DnsFinalizer)
+	err := r.clusterClient.AddAWSManagedControlPlaneFinalizer(ctx, awsManagedControlPlane, DnsFinalizer)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
-	}
-
-	bastionIp, err := r.getBastionIp(ctx, cluster)
-	if err != nil && !errors.Is(err, &k8sclient.BastionNotFoundError{}) {
-		return ctrl.Result{}, errors.WithStack(err)
-	}
-	cluster.BastionIp = bastionIp
-
-	requeueAfter := 0 * time.Minute
-	// If there is a bastion machine, but it has no IP address just yet, we want to reconcile again soonish
-	if !errors.Is(err, &k8sclient.BastionNotFoundError{}) && bastionIp == "" {
-		requeueAfter = 1 * time.Minute
 	}
 
 	err = r.dnsZone.CreateHostedZone(ctx, logger, cluster)
@@ -126,36 +111,12 @@ func (r *DnsReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AW
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{
-		RequeueAfter: requeueAfter,
-	}, nil
-}
-
-// getBastionIp tries to find a bastion machine in this cluster and fetch its IP address from the status field.
-// It will return the internal IP address when using private VPC mode, or an external IP address otherwise.
-func (r *DnsReconciler) getBastionIp(ctx context.Context, cluster resolver.Cluster) (string, error) {
-	bastionMachine, err := r.clusterClient.GetBastionMachine(ctx, cluster.Name)
-	if err != nil {
-		return "", errors.WithStack(err)
-	}
-
-	addressType := capi.MachineExternalIP
-	if cluster.IsVpcModePrivate {
-		addressType = capi.MachineInternalIP
-	}
-
-	for _, addr := range bastionMachine.Status.Addresses {
-		if addr.Type == addressType {
-			return addr.Address, nil
-		}
-	}
-
-	return "", nil
+	return ctrl.Result{}, nil
 }
 
 // reconcileDelete deletes the hosted zone and the DNS records for the workload cluster.
 // It will delete the delegation records in the parent hosted zone when using public dns mode.
-func (r *DnsReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AWSCluster, cluster resolver.Cluster) (ctrl.Result, error) {
+func (r *EKSDnsReconciler) reconcileDelete(ctx context.Context, awsManagedControlPlane *eks.AWSManagedControlPlane, cluster resolver.Cluster) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	err := r.dnsZone.DeleteHostedZone(ctx, logger, cluster)
@@ -163,7 +124,7 @@ func (r *DnsReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AW
 		return ctrl.Result{}, err
 	}
 
-	err = r.clusterClient.RemoveAWSClusterFinalizer(ctx, awsCluster, DnsFinalizer)
+	err = r.clusterClient.RemoveAWSManagedControlPlaneFinalizer(ctx, awsManagedControlPlane, DnsFinalizer)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
@@ -172,9 +133,9 @@ func (r *DnsReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AW
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *DnsReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *EKSDnsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		Named("dnszone").
-		For(&capa.AWSCluster{}).
+		Named("eks_dnszone").
+		For(&eks.AWSManagedControlPlane{}).
 		Complete(r)
 }

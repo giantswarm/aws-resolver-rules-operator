@@ -195,25 +195,25 @@ var _ = Describe("ClusterClient", func() {
 		})
 	})
 
-	Describe("AddFinalizer", func() {
-		var cluster *capi.Cluster
+	Describe("AddAWSClusterFinalizer", func() {
+		var awsCluster *capa.AWSCluster
 
 		BeforeEach(func() {
-			cluster = &capi.Cluster{
+			awsCluster = &capa.AWSCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster2",
 					Namespace: namespace,
 				},
 			}
-			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
+			Expect(k8sClient.Create(ctx, awsCluster)).To(Succeed())
 		})
 
 		It("adds the finalizer to the cluster", func() {
-			err := clusterClient.AddFinalizer(ctx, cluster, controllers.ResolverRulesFinalizer)
+			err := clusterClient.AddAWSClusterFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
 			Expect(err).NotTo(HaveOccurred())
 
-			actualCluster := &capi.Cluster{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, actualCluster)
+			actualCluster := &capa.AWSCluster{}
+			err = k8sClient.Get(ctx, types.NamespacedName{Name: awsCluster.Name, Namespace: awsCluster.Namespace}, actualCluster)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(actualCluster.Finalizers).To(ContainElement(controllers.ResolverRulesFinalizer))
@@ -221,25 +221,25 @@ var _ = Describe("ClusterClient", func() {
 
 		When("the finalizer already exists", func() {
 			BeforeEach(func() {
-				err := clusterClient.AddFinalizer(ctx, cluster, controllers.ResolverRulesFinalizer)
+				err := clusterClient.AddAWSClusterFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("does not return an error", func() {
-				err := clusterClient.AddFinalizer(ctx, cluster, controllers.ResolverRulesFinalizer)
+				err := clusterClient.AddAWSClusterFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 
 		When("the cluster does not exist", func() {
 			It("returns an error", func() {
-				cluster = &capi.Cluster{
+				nonExistingAWSCluster := &capa.AWSCluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "does-not-exist",
 						Namespace: namespace,
 					},
 				}
-				err := clusterClient.AddFinalizer(ctx, cluster, controllers.ResolverRulesFinalizer)
+				err := clusterClient.AddAWSClusterFinalizer(ctx, nonExistingAWSCluster, controllers.ResolverRulesFinalizer)
 				Expect(k8serrors.IsNotFound(err)).To(BeTrue())
 			})
 		})
@@ -252,17 +252,17 @@ var _ = Describe("ClusterClient", func() {
 			})
 
 			It("returns an error", func() {
-				err := clusterClient.AddFinalizer(ctx, cluster, controllers.ResolverRulesFinalizer)
+				err := clusterClient.AddAWSClusterFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
 				Expect(err).To(MatchError(ContainSubstring("context canceled")))
 			})
 		})
 	})
 
 	Describe("RemoveFinalizer", func() {
-		var cluster *capi.Cluster
+		var awsCluster *capa.AWSCluster
 
 		BeforeEach(func() {
-			cluster = &capi.Cluster{
+			awsCluster = &capa.AWSCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster2",
 					Namespace: namespace,
@@ -271,15 +271,15 @@ var _ = Describe("ClusterClient", func() {
 					},
 				},
 			}
-			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
+			Expect(k8sClient.Create(ctx, awsCluster)).To(Succeed())
 		})
 
 		It("removes the finalizer to the cluster", func() {
-			err := clusterClient.RemoveFinalizer(ctx, cluster, controllers.ResolverRulesFinalizer)
+			err := clusterClient.RemoveAWSClusterFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
 			Expect(err).NotTo(HaveOccurred())
 
-			actualCluster := &capi.Cluster{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, actualCluster)
+			actualCluster := &capa.AWSCluster{}
+			err = k8sClient.Get(ctx, types.NamespacedName{Name: awsCluster.Name, Namespace: awsCluster.Namespace}, actualCluster)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(actualCluster.Finalizers).NotTo(ContainElement(controllers.ResolverRulesFinalizer))
@@ -287,25 +287,25 @@ var _ = Describe("ClusterClient", func() {
 
 		When("the finalizer doesn't exists", func() {
 			BeforeEach(func() {
-				err := clusterClient.RemoveFinalizer(ctx, cluster, controllers.ResolverRulesFinalizer)
+				err := clusterClient.RemoveAWSClusterFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("does not return an error", func() {
-				err := clusterClient.RemoveFinalizer(ctx, cluster, controllers.ResolverRulesFinalizer)
+				err := clusterClient.RemoveAWSClusterFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 
 		When("the cluster does not exist", func() {
 			It("returns an error", func() {
-				cluster = &capi.Cluster{
+				awsCluster = &capa.AWSCluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "does-not-exist",
 						Namespace: namespace,
 					},
 				}
-				err := clusterClient.RemoveFinalizer(ctx, cluster, controllers.ResolverRulesFinalizer)
+				err := clusterClient.RemoveAWSClusterFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
 				Expect(k8serrors.IsNotFound(err)).To(BeTrue())
 			})
 		})
@@ -318,7 +318,7 @@ var _ = Describe("ClusterClient", func() {
 			})
 
 			It("returns an error", func() {
-				err := clusterClient.RemoveFinalizer(ctx, cluster, controllers.ResolverRulesFinalizer)
+				err := clusterClient.RemoveAWSClusterFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
 				Expect(err).To(MatchError(ContainSubstring("context canceled")))
 			})
 		})

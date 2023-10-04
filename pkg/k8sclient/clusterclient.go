@@ -53,16 +53,35 @@ func (a *ClusterClient) GetCluster(ctx context.Context, namespacedName types.Nam
 	return cluster, errors.WithStack(err)
 }
 
-func (a *ClusterClient) AddFinalizer(ctx context.Context, cluster *capi.Cluster, finalizer string) error {
-	originalCluster := cluster.DeepCopy()
-	controllerutil.AddFinalizer(cluster, finalizer)
-	return a.client.Patch(ctx, cluster, client.MergeFrom(originalCluster))
+func (a *ClusterClient) AddAWSClusterFinalizer(ctx context.Context, awsCluster *capa.AWSCluster, finalizer string) error {
+	originalCluster := awsCluster.DeepCopy()
+	updated := controllerutil.AddFinalizer(awsCluster, finalizer)
+	if updated {
+		return a.client.Patch(ctx, awsCluster, client.MergeFrom(originalCluster))
+	}
+
+	return nil
+}
+func (a *ClusterClient) AddAWSManagedControlPlaneFinalizer(ctx context.Context, awsManagedControlPlane *eks.AWSManagedControlPlane, finalizer string) error {
+	originalCluster := awsManagedControlPlane.DeepCopy()
+	updated := controllerutil.AddFinalizer(awsManagedControlPlane, finalizer)
+	if updated {
+		return a.client.Patch(ctx, awsManagedControlPlane, client.MergeFrom(originalCluster))
+	}
+
+	return nil
 }
 
-func (a *ClusterClient) RemoveFinalizer(ctx context.Context, cluster *capi.Cluster, finalizer string) error {
-	originalCluster := cluster.DeepCopy()
-	controllerutil.RemoveFinalizer(cluster, finalizer)
-	return a.client.Patch(ctx, cluster, client.MergeFrom(originalCluster))
+func (a *ClusterClient) RemoveAWSClusterFinalizer(ctx context.Context, awsCluster *capa.AWSCluster, finalizer string) error {
+	originalCluster := awsCluster.DeepCopy()
+	controllerutil.RemoveFinalizer(awsCluster, finalizer)
+	return a.client.Patch(ctx, awsCluster, client.MergeFrom(originalCluster))
+}
+
+func (a *ClusterClient) RemoveAWSManagedControlPlaneFinalizer(ctx context.Context, awsManagedControlPlane *eks.AWSManagedControlPlane, finalizer string) error {
+	originalCluster := awsManagedControlPlane.DeepCopy()
+	controllerutil.RemoveFinalizer(awsManagedControlPlane, finalizer)
+	return a.client.Patch(ctx, awsManagedControlPlane, client.MergeFrom(originalCluster))
 }
 
 func (a *ClusterClient) GetIdentity(ctx context.Context, identityRef *capa.AWSIdentityReference) (*capa.AWSClusterRoleIdentity, error) {

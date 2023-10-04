@@ -1,16 +1,23 @@
 package controllers
 
 import (
+	"context"
 	"strings"
 
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
+	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	eks "sigs.k8s.io/cluster-api-provider-aws/controlplane/eks/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
+
+const (
+	DnsFinalizer = "capa-operator.finalizers.giantswarm.io/dns-controller"
+)
 
 func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity, mcIdentity *capa.AWSClusterRoleIdentity) resolver.Cluster {
 	cluster := resolver.Cluster{
@@ -73,4 +80,19 @@ func getSubnetIds(subnets capa.Subnets) []string {
 	}
 
 	return subnetIds
+}
+
+//counterfeiter:generate . ClusterClient
+type ClusterClient interface {
+	GetAWSCluster(context.Context, types.NamespacedName) (*capa.AWSCluster, error)
+	GetAWSManagedControlPlane(context.Context, types.NamespacedName) (*eks.AWSManagedControlPlane, error)
+	GetCluster(context.Context, types.NamespacedName) (*capi.Cluster, error)
+	AddAWSClusterFinalizer(ctx context.Context, cluster *capa.AWSCluster, finalizer string) error
+	AddAWSManagedControlPlaneFinalizer(ctx context.Context, awsManagedControlPlane *eks.AWSManagedControlPlane, finalizer string) error
+	Unpause(context.Context, *capa.AWSCluster, *capi.Cluster) error
+	RemoveAWSClusterFinalizer(ctx context.Context, awsCluster *capa.AWSCluster, finalizer string) error
+	RemoveAWSManagedControlPlaneFinalizer(ctx context.Context, awsManagedControlPlane *eks.AWSManagedControlPlane, finalizer string) error
+	GetIdentity(context.Context, *capa.AWSIdentityReference) (*capa.AWSClusterRoleIdentity, error)
+	MarkConditionTrue(context.Context, *capi.Cluster, capi.ConditionType) error
+	GetBastionMachine(ctx context.Context, clusterName string) (*capi.Machine, error)
 }
