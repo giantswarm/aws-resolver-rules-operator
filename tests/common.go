@@ -1,10 +1,16 @@
 package tests
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	"github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func GetEnvOrSkip(env string) string {
@@ -14,4 +20,19 @@ func GetEnvOrSkip(env string) string {
 	}
 
 	return value
+}
+
+func PatchAWSClusterStatus(k8sClient client.Client, cluster *capa.AWSCluster, status capa.AWSClusterStatus) {
+	patchedCluster := cluster.DeepCopy()
+	patchedCluster.Status = status
+	err := k8sClient.Status().Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
+	if k8serrors.IsNotFound(err) {
+		return
+	}
+
+	nsName := types.NamespacedName{
+		Name:      cluster.Name,
+		Namespace: cluster.Namespace,
+	}
+	Expect(k8sClient.Get(context.Background(), nsName, cluster)).To(Succeed())
 }
