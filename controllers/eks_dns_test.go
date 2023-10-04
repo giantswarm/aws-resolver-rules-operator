@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
 	. "github.com/onsi/ginkgo/v2"
@@ -20,7 +19,6 @@ import (
 
 	"github.com/aws-resolver-rules-operator/controllers"
 	"github.com/aws-resolver-rules-operator/controllers/controllersfakes"
-	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 	"github.com/aws-resolver-rules-operator/pkg/resolver/resolverfakes"
 )
@@ -187,7 +185,6 @@ var _ = Describe("Dns Zone reconciler", func() {
 			clusterClient.GetAWSClusterReturns(managementClusterAWSCluster, nil)
 			clusterClient.GetIdentityReturns(awsClusterRoleIdentity, nil)
 			clusterClient.GetAWSManagedControlPlaneReturns(awsManagedControlPlane, nil)
-			clusterClient.GetBastionMachineReturns(nil, &k8sclient.BastionNotFoundError{})
 		})
 
 		When("the aws cluster already has an owner", func() {
@@ -439,77 +436,6 @@ var _ = Describe("Dns Zone reconciler", func() {
 							})
 						})
 
-						When("there is a bastion server deployed", func() {
-							bastionMachine := &capi.Machine{
-								ObjectMeta: metav1.ObjectMeta{
-									Name: "",
-									Labels: map[string]string{
-										capi.ClusterLabelName:   ClusterName,
-										"cluster.x-k8s.io/role": "bastion",
-									},
-								},
-								Status: capi.MachineStatus{
-									Addresses: []capi.MachineAddress{
-										{
-											Type:    capi.MachineExternalIP,
-											Address: "192.168.0.1",
-										},
-									},
-								},
-							}
-							BeforeEach(func() {
-								clusterClient.GetBastionMachineReturns(bastionMachine, nil)
-							})
-
-							It("it creates DNS record for the bastion", func() {
-								_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
-								Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
-									Kind:   resolver.DnsRecordTypeA,
-									Name:   fmt.Sprintf("bastion1.%s.%s", ClusterName, WorkloadClusterBaseDomain),
-									Values: []string{"192.168.0.1"},
-								}))
-							})
-						})
-
-						When("there is bastion server deployed but it has no IP set yet", func() {
-							bastionMachine := &capi.Machine{
-								ObjectMeta: metav1.ObjectMeta{
-									Name: "",
-									Labels: map[string]string{
-										capi.ClusterLabelName:   ClusterName,
-										"cluster.x-k8s.io/role": "bastion",
-									},
-								},
-							}
-							BeforeEach(func() {
-								clusterClient.GetBastionMachineReturns(bastionMachine, nil)
-							})
-
-							It("it doesn't create DNS record for the bastion but requeues", func() {
-								_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
-								Expect(dnsRecords).ToNot(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-									"Kind": Equal("A"),
-									"Name": Equal(fmt.Sprintf("bastion1.%s.%s", ClusterName, WorkloadClusterBaseDomain)),
-								})))
-								Expect(result.RequeueAfter).Should(Equal(1 * time.Minute))
-							})
-						})
-
-						When("there is no bastion server deployed", func() {
-							BeforeEach(func() {
-								clusterClient.GetBastionMachineReturns(nil, &k8sclient.BastionNotFoundError{})
-							})
-
-							It("it doesn't create DNS record for the bastion", func() {
-								_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
-								Expect(dnsRecords).ToNot(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-									"Kind": Equal("A"),
-									"Name": Equal(fmt.Sprintf("bastion1.%s.%s", ClusterName, WorkloadClusterBaseDomain)),
-								})))
-								Expect(result.RequeueAfter).Should(Equal(0 * time.Minute))
-							})
-						})
-
 						When("creating hosted zone fails", func() {
 							expectedError := errors.New("failed to find parent hosted zone")
 							BeforeEach(func() {
@@ -634,61 +560,6 @@ var _ = Describe("Dns Zone reconciler", func() {
 								Expect(dnsRecords).ToNot(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 									"Kind": Equal("ALIAS"),
 									"Name": Equal(fmt.Sprintf("api.%s.%s", ClusterName, WorkloadClusterBaseDomain)),
-								})))
-							})
-						})
-
-						When("there is a bastion server deployed", func() {
-							bastionMachine := &capi.Machine{
-								ObjectMeta: metav1.ObjectMeta{
-									Name: "",
-									Labels: map[string]string{
-										capi.ClusterLabelName:   ClusterName,
-										"cluster.x-k8s.io/role": "bastion",
-									},
-								},
-								Status: capi.MachineStatus{
-									Addresses: []capi.MachineAddress{
-										{
-											Type:    capi.MachineExternalIP,
-											Address: "192.168.0.1",
-										},
-									},
-								},
-							}
-							BeforeEach(func() {
-								clusterClient.GetBastionMachineReturns(bastionMachine, nil)
-							})
-
-							It("it creates DNS record for the bastion", func() {
-								_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
-								Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
-									Kind:   "A",
-									Name:   fmt.Sprintf("bastion1.%s.%s", ClusterName, WorkloadClusterBaseDomain),
-									Values: []string{"192.168.0.1"},
-								}))
-							})
-						})
-
-						When("there is a bastion server deployed but it has no IP set yet", func() {
-							bastionMachine := &capi.Machine{
-								ObjectMeta: metav1.ObjectMeta{
-									Name: "",
-									Labels: map[string]string{
-										capi.ClusterLabelName:   ClusterName,
-										"cluster.x-k8s.io/role": "bastion",
-									},
-								},
-							}
-							BeforeEach(func() {
-								clusterClient.GetBastionMachineReturns(bastionMachine, nil)
-							})
-
-							It("it creates DNS record for the bastion", func() {
-								_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
-								Expect(dnsRecords).ToNot(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-									"Kind": Equal("A"),
-									"Name": Equal(fmt.Sprintf("bastion1.%s.%s", ClusterName, WorkloadClusterBaseDomain)),
 								})))
 							})
 						})

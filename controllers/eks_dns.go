@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"time"
 
 	"github.com/pkg/errors"
 	eks "sigs.k8s.io/cluster-api-provider-aws/controlplane/eks/api/v1beta1"
@@ -11,7 +10,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
 
@@ -108,31 +106,17 @@ func (r *EKSDnsReconciler) reconcileNormal(ctx context.Context, awsManagedContro
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	bastionIp, err := getBastionIp(ctx, r.clusterClient, cluster)
-	if err != nil && !errors.Is(err, &k8sclient.BastionNotFoundError{}) {
-		return ctrl.Result{}, errors.WithStack(err)
-	}
-	cluster.BastionIp = bastionIp
-
-	requeueAfter := 0 * time.Minute
-	// If there is a bastion machine, but it has no IP address just yet, we want to reconcile again soonish
-	if !errors.Is(err, &k8sclient.BastionNotFoundError{}) && bastionIp == "" {
-		requeueAfter = 1 * time.Minute
-	}
-
 	err = r.dnsZone.CreateHostedZone(ctx, logger, cluster)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{
-		RequeueAfter: requeueAfter,
-	}, nil
+	return ctrl.Result{}, nil
 }
 
 // reconcileDelete deletes the hosted zone and the DNS records for the workload cluster.
 // It will delete the delegation records in the parent hosted zone when using public dns mode.
-func (r *EKSDnsReconciler) reconcileDelete(ctx context.Context, aWSManagedControlPlane *eks.AWSManagedControlPlane, cluster resolver.Cluster) (ctrl.Result, error) {
+func (r *EKSDnsReconciler) reconcileDelete(ctx context.Context, awsManagedControlPlane *eks.AWSManagedControlPlane, cluster resolver.Cluster) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	err := r.dnsZone.DeleteHostedZone(ctx, logger, cluster)
@@ -140,7 +124,7 @@ func (r *EKSDnsReconciler) reconcileDelete(ctx context.Context, aWSManagedContro
 		return ctrl.Result{}, err
 	}
 
-	err = r.clusterClient.RemoveAWSManagedControlPlaneFinalizer(ctx, aWSManagedControlPlane, DnsFinalizer)
+	err = r.clusterClient.RemoveAWSManagedControlPlaneFinalizer(ctx, awsManagedControlPlane, DnsFinalizer)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}

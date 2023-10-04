@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
-	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	eks "sigs.k8s.io/cluster-api-provider-aws/controlplane/eks/api/v1beta1"
@@ -81,28 +80,6 @@ func getSubnetIds(subnets capa.Subnets) []string {
 	}
 
 	return subnetIds
-}
-
-// getBastionIp tries to find a bastion machine in this cluster and fetch its IP address from the status field.
-// It will return the internal IP address when using private VPC mode, or an external IP address otherwise.
-func getBastionIp(ctx context.Context, clusterClient ClusterClient, cluster resolver.Cluster) (string, error) {
-	bastionMachine, err := clusterClient.GetBastionMachine(ctx, cluster.Name)
-	if err != nil {
-		return "", errors.WithStack(err)
-	}
-
-	addressType := capi.MachineExternalIP
-	if cluster.IsVpcModePrivate {
-		addressType = capi.MachineInternalIP
-	}
-
-	for _, addr := range bastionMachine.Status.Addresses {
-		if addr.Type == addressType {
-			return addr.Address, nil
-		}
-	}
-
-	return "", nil
 }
 
 //counterfeiter:generate . ClusterClient
