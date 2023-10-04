@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Reconcile `AWSClusters` and `AWSManagedControlPlane` instead of `Cluster` CR when reconciling dns records.
+- Only apply finalizer if it was not there.
 
 ## [0.10.1] - 2023-10-03
 

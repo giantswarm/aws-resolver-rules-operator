@@ -55,13 +55,21 @@ func (a *ClusterClient) GetCluster(ctx context.Context, namespacedName types.Nam
 
 func (a *ClusterClient) AddAWSClusterFinalizer(ctx context.Context, awsCluster *capa.AWSCluster, finalizer string) error {
 	originalCluster := awsCluster.DeepCopy()
-	controllerutil.AddFinalizer(awsCluster, finalizer)
-	return a.client.Patch(ctx, awsCluster, client.MergeFrom(originalCluster))
+	updated := controllerutil.AddFinalizer(awsCluster, finalizer)
+	if updated {
+		return a.client.Patch(ctx, awsCluster, client.MergeFrom(originalCluster))
+	}
+
+	return nil
 }
 func (a *ClusterClient) AddAWSManagedControlPlaneFinalizer(ctx context.Context, awsManagedControlPlane *eks.AWSManagedControlPlane, finalizer string) error {
 	originalCluster := awsManagedControlPlane.DeepCopy()
-	controllerutil.AddFinalizer(awsManagedControlPlane, finalizer)
-	return a.client.Patch(ctx, awsManagedControlPlane, client.MergeFrom(originalCluster))
+	updated := controllerutil.AddFinalizer(awsManagedControlPlane, finalizer)
+	if updated {
+		return a.client.Patch(ctx, awsManagedControlPlane, client.MergeFrom(originalCluster))
+	}
+
+	return nil
 }
 
 func (a *ClusterClient) RemoveAWSClusterFinalizer(ctx context.Context, awsCluster *capa.AWSCluster, finalizer string) error {
