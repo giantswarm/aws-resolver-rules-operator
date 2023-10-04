@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/giantswarm/aws-network-topology-operator/tests"
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
@@ -37,7 +36,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
 	// +kubebuilder:scaffold:imports
+
+	"github.com/aws-resolver-rules-operator/tests"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -85,7 +87,7 @@ var _ = BeforeSuite(func() {
 
 	err = capi.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())

@@ -847,8 +847,6 @@ github.com/fsnotify/fsnotify v1.6.0/go.mod h1:sl3t1tCWJFWoRz9R8WJCbQihKKwmorjAbS
 github.com/fvbommel/sortorder v1.0.1/go.mod h1:uk88iVf1ovNn1iLfgUVU2F9o5eO30ui720w+kxuqRs0=
 github.com/getkin/kin-openapi v0.76.0/go.mod h1:660oXbgy5JFMKreazJaQTw7o+X00qeSyhcnluiMv+Xg=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
-github.com/giantswarm/aws-network-topology-operator v1.7.0 h1:fe28sDcCr/XZfGc7+f94+sWVq8ZYCBQxYQRkXYoeUAw=
-github.com/giantswarm/aws-network-topology-operator v1.7.0/go.mod h1:Bi/309Za/gyuVPV3nJjYugBBo60AB9KAb8Eag5T4E7U=
 github.com/giantswarm/k8smetadata v0.19.0 h1:wLzAwpuEW0FaOmR3EqaIpGpoRTg80aHFm5/cQKdn+DY=
 github.com/giantswarm/k8smetadata v0.19.0/go.mod h1:QiQAyaZnwco1U0lENLF0Kp4bSN4dIPwIlHWEvUo3ES8=
 github.com/go-errors/errors v1.0.1/go.mod h1:f4zRHt4oKfwPJE5k8C9vpYG+aDHdBFUsgrm6/TyX73Q=
