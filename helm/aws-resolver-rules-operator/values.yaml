@@ -54,6 +54,6 @@ securityContext:
     - ALL
 
 global:
-  rodSecurityStandards:
+  podSecurityStandards:
     enforced: false
 
