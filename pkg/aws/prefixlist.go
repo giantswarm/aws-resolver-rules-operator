@@ -19,7 +19,7 @@ const (
 )
 
 type PrefixLists struct {
-	ec2 *ec2.EC2
+	client *ec2.EC2
 }
 
 func (t *PrefixLists) Apply(ctx context.Context, name string) (string, error) {
@@ -62,7 +62,7 @@ func (t *PrefixLists) Delete(ctx context.Context, name string) error {
 	}
 
 	id := prefixLists[0].PrefixListId
-	_, err = t.ec2.DeleteManagedPrefixList(&ec2.DeleteManagedPrefixListInput{
+	_, err = t.client.DeleteManagedPrefixList(&ec2.DeleteManagedPrefixListInput{
 		PrefixListId: id,
 	})
 
@@ -79,7 +79,7 @@ func (t *PrefixLists) get(ctx context.Context, name string) ([]*ec2.ManagedPrefi
 		},
 	}
 
-	out, err := t.ec2.DescribeManagedPrefixListsWithContext(ctx, input)
+	out, err := t.client.DescribeManagedPrefixListsWithContext(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func (t *PrefixLists) create(ctx context.Context, name string) (string, error) {
 		MaxEntries:     awssdk.Int64(prefixListMaxEntries),
 		PrefixListName: awssdk.String(GetPrefixListName(name)),
 	}
-	out, err := t.ec2.CreateManagedPrefixListWithContext(ctx, input)
+	out, err := t.client.CreateManagedPrefixListWithContext(ctx, input)
 	if err != nil {
 		return "", err
 	}
@@ -102,5 +102,5 @@ func (t *PrefixLists) create(ctx context.Context, name string) (string, error) {
 }
 
 func GetPrefixListName(name string) string {
-	return fmt.Sprintf("%s-%s-tgw-prefixlist", name)
+	return fmt.Sprintf("%s-tgw-prefixlist", name)
 }

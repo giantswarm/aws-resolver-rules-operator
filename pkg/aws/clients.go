@@ -174,8 +174,8 @@ func (c *Clients) NewPrefixListClient(region, rolearn string) (resolver.PrefixLi
 		Region: aws.String(region),
 	})
 
-	return &TransitGateways{
-		ec2: ec2Client,
+	return &PrefixLists{
+		client: ec2Client,
 	}, nil
 }
 

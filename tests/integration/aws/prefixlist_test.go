@@ -50,7 +50,7 @@ var _ = Describe("Prefix Lists", func() {
 	})
 
 	Describe("Apply", func() {
-		FIt("creates a prefix list", func() {
+		It("creates a prefix list", func() {
 			arn, err := prefixLists.Apply(ctx, cluster.Name)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -121,7 +121,9 @@ var _ = Describe("Prefix Lists", func() {
 				PrefixListIds: awssdk.StringSlice([]string{prefixListID}),
 			})
 			Expect(err).NotTo(HaveOccurred())
-			Expect(out.PrefixLists).To(HaveLen(0))
+			for _, prefixList := range out.PrefixLists {
+				Expect(*prefixList.State).To(Equal("delete-complete"))
+			}
 		})
 
 		When("the prefix list has already been deleted", func() {

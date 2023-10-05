@@ -6,15 +6,14 @@ import (
 	"sync"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
-	"sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 )
 
 type FakePrefixListClient struct {
-	ApplyStub        func(context.Context, *v1beta1.AWSCluster) (string, error)
+	ApplyStub        func(context.Context, string) (string, error)
 	applyMutex       sync.RWMutex
 	applyArgsForCall []struct {
 		arg1 context.Context
-		arg2 *v1beta1.AWSCluster
+		arg2 string
 	}
 	applyReturns struct {
 		result1 string
@@ -24,11 +23,11 @@ type FakePrefixListClient struct {
 		result1 string
 		result2 error
 	}
-	DeleteStub        func(context.Context, *v1beta1.AWSCluster) error
+	DeleteStub        func(context.Context, string) error
 	deleteMutex       sync.RWMutex
 	deleteArgsForCall []struct {
 		arg1 context.Context
-		arg2 *v1beta1.AWSCluster
+		arg2 string
 	}
 	deleteReturns struct {
 		result1 error
@@ -40,12 +39,12 @@ type FakePrefixListClient struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakePrefixListClient) Apply(arg1 context.Context, arg2 *v1beta1.AWSCluster) (string, error) {
+func (fake *FakePrefixListClient) Apply(arg1 context.Context, arg2 string) (string, error) {
 	fake.applyMutex.Lock()
 	ret, specificReturn := fake.applyReturnsOnCall[len(fake.applyArgsForCall)]
 	fake.applyArgsForCall = append(fake.applyArgsForCall, struct {
 		arg1 context.Context
-		arg2 *v1beta1.AWSCluster
+		arg2 string
 	}{arg1, arg2})
 	stub := fake.ApplyStub
 	fakeReturns := fake.applyReturns
@@ -66,13 +65,13 @@ func (fake *FakePrefixListClient) ApplyCallCount() int {
 	return len(fake.applyArgsForCall)
 }
 
-func (fake *FakePrefixListClient) ApplyCalls(stub func(context.Context, *v1beta1.AWSCluster) (string, error)) {
+func (fake *FakePrefixListClient) ApplyCalls(stub func(context.Context, string) (string, error)) {
 	fake.applyMutex.Lock()
 	defer fake.applyMutex.Unlock()
 	fake.ApplyStub = stub
 }
 
-func (fake *FakePrefixListClient) ApplyArgsForCall(i int) (context.Context, *v1beta1.AWSCluster) {
+func (fake *FakePrefixListClient) ApplyArgsForCall(i int) (context.Context, string) {
 	fake.applyMutex.RLock()
 	defer fake.applyMutex.RUnlock()
 	argsForCall := fake.applyArgsForCall[i]
@@ -105,12 +104,12 @@ func (fake *FakePrefixListClient) ApplyReturnsOnCall(i int, result1 string, resu
 	}{result1, result2}
 }
 
-func (fake *FakePrefixListClient) Delete(arg1 context.Context, arg2 *v1beta1.AWSCluster) error {
+func (fake *FakePrefixListClient) Delete(arg1 context.Context, arg2 string) error {
 	fake.deleteMutex.Lock()
 	ret, specificReturn := fake.deleteReturnsOnCall[len(fake.deleteArgsForCall)]
 	fake.deleteArgsForCall = append(fake.deleteArgsForCall, struct {
 		arg1 context.Context
-		arg2 *v1beta1.AWSCluster
+		arg2 string
 	}{arg1, arg2})
 	stub := fake.DeleteStub
 	fakeReturns := fake.deleteReturns
@@ -131,13 +130,13 @@ func (fake *FakePrefixListClient) DeleteCallCount() int {
 	return len(fake.deleteArgsForCall)
 }
 
-func (fake *FakePrefixListClient) DeleteCalls(stub func(context.Context, *v1beta1.AWSCluster) error) {
+func (fake *FakePrefixListClient) DeleteCalls(stub func(context.Context, string) error) {
 	fake.deleteMutex.Lock()
 	defer fake.deleteMutex.Unlock()
 	fake.DeleteStub = stub
 }
 
-func (fake *FakePrefixListClient) DeleteArgsForCall(i int) (context.Context, *v1beta1.AWSCluster) {
+func (fake *FakePrefixListClient) DeleteArgsForCall(i int) (context.Context, string) {
 	fake.deleteMutex.RLock()
 	defer fake.deleteMutex.RUnlock()
 	argsForCall := fake.deleteArgsForCall[i]
