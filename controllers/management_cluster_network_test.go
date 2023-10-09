@@ -31,9 +31,11 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 		ctx context.Context
 
 		transitGatewayClient *resolverfakes.FakeTransitGatewayClient
-		reconciler           *controllers.ManagementClusterTransitGatewayReconciler
+		prefixListClient     *resolverfakes.FakePrefixListClient
+		reconciler           *controllers.ManagementClusterNetworkReconciler
 
 		transitGatewayARN   string
+		prefixListARN       string
 		requestResourceName string
 		reconcileResult     ctrl.Result
 		reconcileErr        error
@@ -58,13 +60,16 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 		)
 		requestResourceName = cluster.Name
 		transitGatewayARN = fmt.Sprintf("arn:aws:iam::123456789012:transit-gateways/%s", uuid.NewString())
+		prefixListARN = fmt.Sprintf("arn:aws:iam::123456789012:managed-prefix-lists/%s", uuid.NewString())
 
 		clusterClient := k8sclient.NewAWSClusterClient(k8sClient)
 		transitGatewayClient = new(resolverfakes.FakeTransitGatewayClient)
+		prefixListClient = new(resolverfakes.FakePrefixListClient)
 		reconciler = controllers.NewManagementClusterTransitGateway(
 			client.ObjectKeyFromObject(cluster),
 			clusterClient,
 			transitGatewayClient,
+			prefixListClient,
 		)
 	})
 
@@ -184,6 +189,9 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 
 			err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
 			Expect(err).NotTo(HaveOccurred())
+
+			transitGatewayClient.ApplyReturns(transitGatewayARN, nil)
+			prefixListClient.ApplyReturns(prefixListARN, nil)
 		})
 
 		It("does not change the mode annotation value", func() {
@@ -199,22 +207,28 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 			Expect(reconcileResult.Requeue).To(BeFalse())
 		})
 
-		When("the transit gateway attachment does not exist yet", func() {
-			BeforeEach(func() {
-				transitGatewayClient.ApplyReturns(transitGatewayARN, nil)
-			})
+		It("creates a transit gateway", func() {
+			Expect(transitGatewayClient.ApplyCallCount()).To(Equal(1))
+		})
 
-			It("creates a transit gateway", func() {
-				Expect(transitGatewayClient.ApplyCallCount()).To(Equal(1))
-			})
+		It("sets the transit gateway id annotation", func() {
+			actualCluster := getActualCluster()
+			Expect(actualCluster.Annotations).To(HaveKeyWithValue(
+				annotation.NetworkTopologyTransitGatewayIDAnnotation,
+				transitGatewayARN,
+			))
+		})
 
-			It("sets the transit gateway id annotation", func() {
-				actualCluster := getActualCluster()
-				Expect(actualCluster.Annotations).To(HaveKeyWithValue(
-					annotation.NetworkTopologyTransitGatewayIDAnnotation,
-					transitGatewayARN,
-				))
-			})
+		It("creates a prefix list", func() {
+			Expect(prefixListClient.ApplyCallCount()).To(Equal(1))
+		})
+
+		It("sets the transit gateway id annotation", func() {
+			actualCluster := getActualCluster()
+			Expect(actualCluster.Annotations).To(HaveKeyWithValue(
+				annotation.NetworkTopologyPrefixListIDAnnotation,
+				prefixListARN,
+			))
 		})
 
 		When("creating the transit gateway fails", func() {
@@ -243,14 +257,28 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 				Expect(transitGatewayClient.DeleteCallCount()).To(Equal(1))
 			})
 
+			It("deletes the prefix list", func() {
+				Expect(prefixListClient.DeleteCallCount()).To(Equal(1))
+			})
+
 			It("removes the finalizer", func() {
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: cluster.Name, Namespace: namespace}, cluster)
 				Expect(k8serrors.IsNotFound(err)).To(BeTrue())
 			})
 
-			When("deleting the cluster fails", func() {
+			When("deleting the trnsit gateway fails", func() {
 				BeforeEach(func() {
 					transitGatewayClient.DeleteReturns(errors.New("boom"))
+				})
+
+				It("returns an error", func() {
+					Expect(reconcileErr).To(MatchError(ContainSubstring("boom")))
+				})
+			})
+
+			When("deleting the prefix list fails", func() {
+				BeforeEach(func() {
+					prefixListClient.DeleteReturns(errors.New("boom"))
 				})
 
 				It("returns an error", func() {

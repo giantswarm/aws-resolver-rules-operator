@@ -18,34 +18,37 @@ import (
 	"github.com/aws-resolver-rules-operator/pkg/util/annotations"
 )
 
-const FinalizerPrefixLists = "network-topology.finalizers.giantswarm.io/prefix-lists"
+const FinalizerManagementCluster = "network-topology.finalizers.giantswarm.io/management-cluster"
 
-type PrefixListsReconciler struct {
+type ManagementClusterNetworkReconciler struct {
 	managementCluster types.NamespacedName
 	clusterClient     AWSClusterClient
-	prefixListClient  resolver.PrefixListClient
+	transitGateways   resolver.TransitGatewayClient
+	prefixLists       resolver.PrefixListClient
 }
 
-func NewPrefixListsReconciler(
+func NewManagementClusterTransitGateway(
 	managementCluster types.NamespacedName,
 	client AWSClusterClient,
+	transitGatewayClient resolver.TransitGatewayClient,
 	prefixListClient resolver.PrefixListClient,
-) *PrefixListsReconciler {
-	return &PrefixListsReconciler{
+) *ManagementClusterNetworkReconciler {
+	return &ManagementClusterNetworkReconciler{
 		managementCluster: managementCluster,
 		clusterClient:     client,
-		prefixListClient:  prefixListClient,
+		transitGateways:   transitGatewayClient,
+		prefixLists:       prefixListClient,
 	}
 }
 
-func (r *PrefixListsReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ManagementClusterNetworkReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capa.AWSCluster{}).
-		Named("prefix-lists").
+		Named("mc-transit-gateway").
 		Complete(r)
 }
 
-func (r *PrefixListsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ManagementClusterNetworkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	logger.Info("Reconciling")
@@ -91,42 +94,84 @@ func (r *PrefixListsReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	return r.reconcileNormal(ctx, cluster)
 }
 
-func (r *PrefixListsReconciler) reconcileNormal(ctx context.Context, cluster *capa.AWSCluster) (ctrl.Result, error) {
+func (r *ManagementClusterNetworkReconciler) reconcileNormal(ctx context.Context, cluster *capa.AWSCluster) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	err := r.clusterClient.AddFinalizer(ctx, cluster, FinalizerPrefixLists)
+	err := r.clusterClient.AddFinalizer(ctx, cluster, FinalizerManagementCluster)
 	if err != nil {
 		logger.Error(err, "Failed to add finalizer")
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	id, err := r.prefixListClient.Apply(ctx, cluster.Name)
+	err = r.applyTransitGateway(ctx, cluster)
 	if err != nil {
-		logger.Error(err, "Failed to create prefix lists")
 		return ctrl.Result{}, errors.WithStack(err)
+	}
+
+	err = r.applyPrefixList(ctx, cluster)
+	if err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
+	return ctrl.Result{}, nil
+}
+
+func (r *ManagementClusterNetworkReconciler) applyTransitGateway(ctx context.Context, cluster *capa.AWSCluster) error {
+	logger := log.FromContext(ctx)
+
+	id, err := r.transitGateways.Apply(ctx, cluster.Name)
+	if err != nil {
+		logger.Error(err, "Failed to create transit gateway")
+		return errors.WithStack(err)
+	}
+
+	baseCluster := cluster.DeepCopy()
+	annotations.SetNetworkTopologyTransitGateway(cluster, id)
+	if cluster, err = r.clusterClient.PatchCluster(ctx, cluster, client.MergeFrom(baseCluster)); err != nil {
+		logger.Error(err, "Failed to patch cluster resource with TGW ID")
+		return errors.WithStack(err)
+	}
+
+	conditions.MarkReady(cluster, conditions.TransitGatewayCreated)
+	return nil
+}
+
+func (r *ManagementClusterNetworkReconciler) applyPrefixList(ctx context.Context, cluster *capa.AWSCluster) error {
+	logger := log.FromContext(ctx)
+
+	id, err := r.prefixLists.Apply(ctx, cluster.Name)
+	if err != nil {
+		logger.Error(err, "Failed to create prefix list")
+		return errors.WithStack(err)
 	}
 
 	baseCluster := cluster.DeepCopy()
 	annotations.SetNetworkTopologyPrefixList(cluster, id)
 	if cluster, err = r.clusterClient.PatchCluster(ctx, cluster, client.MergeFrom(baseCluster)); err != nil {
 		logger.Error(err, "Failed to patch cluster resource with prefix list ID")
-		return ctrl.Result{}, errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 
-	// conditions.MarkReady(cluster, conditions.TransitGatewayCreated)
-	return ctrl.Result{}, nil
+	conditions.MarkReady(cluster, conditions.TransitGatewayCreated)
+	return nil
 }
 
-func (r *PrefixListsReconciler) reconcileDelete(ctx context.Context, cluster *capa.AWSCluster) (ctrl.Result, error) {
+func (r *ManagementClusterNetworkReconciler) reconcileDelete(ctx context.Context, cluster *capa.AWSCluster) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	err := r.prefixListClient.Delete(ctx, cluster.Name)
+	err := r.transitGateways.Delete(ctx, cluster.Name)
 	if err != nil {
-		logger.Error(err, "Failed to delete prefix lists")
+		logger.Error(err, "Failed to delete transit gateway")
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	err = r.clusterClient.RemoveFinalizer(ctx, cluster, FinalizerPrefixLists)
+	err = r.prefixLists.Delete(ctx, cluster.Name)
+	if err != nil {
+		logger.Error(err, "Failed to delete transit gateway")
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
+	err = r.clusterClient.RemoveFinalizer(ctx, cluster, FinalizerManagementCluster)
 	if err != nil {
 		logger.Error(err, "Failed to delete finalizer")
 		return ctrl.Result{}, errors.WithStack(err)
@@ -134,7 +179,7 @@ func (r *PrefixListsReconciler) reconcileDelete(ctx context.Context, cluster *ca
 	return ctrl.Result{}, nil
 }
 
-func (r *PrefixListsReconciler) isManagementCluster(cluster *capa.AWSCluster) bool {
+func (r *ManagementClusterNetworkReconciler) isManagementCluster(cluster *capa.AWSCluster) bool {
 	return cluster.Name == r.managementCluster.Name &&
 		cluster.Namespace == r.managementCluster.Namespace
 }
