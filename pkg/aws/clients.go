@@ -46,7 +46,7 @@ func NewClients(endpoint string) *Clients {
 func (c *Clients) NewResolverClient(region, roleToAssume string) (resolver.ResolverClient, error) {
 	session, err := c.sessionFromRegion(region)
 	if err != nil {
-		return &AWSResolver{}, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
 	client := route53resolver.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, roleToAssume)})
@@ -59,7 +59,7 @@ func (c *Clients) NewResolverClient(region, roleToAssume string) (resolver.Resol
 func (c *Clients) NewResolverClientWithExternalId(region, roleToAssume, externalRoleToAssume, externalId string) (resolver.ResolverClient, error) {
 	session, err := c.sessionFromRegion(region)
 	if err != nil {
-		return &AWSResolver{}, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
 	assumedRoleSession, err := awssession.NewSession(&aws.Config{
@@ -81,7 +81,7 @@ func (c *Clients) NewResolverClientWithExternalId(region, roleToAssume, external
 func (c *Clients) NewEC2Client(region, arn string) (resolver.EC2Client, error) {
 	client, err := c.newEC2Client(region, arn, "")
 	if err != nil {
-		return &AWSEC2{}, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
 	return &AWSEC2{client: client}, nil
@@ -90,7 +90,7 @@ func (c *Clients) NewEC2Client(region, arn string) (resolver.EC2Client, error) {
 func (c *Clients) NewEC2ClientWithExternalId(region, arn, externalId string) (resolver.EC2Client, error) {
 	client, err := c.newEC2Client(region, arn, externalId)
 	if err != nil {
-		return &AWSEC2{}, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
 	return &AWSEC2{client: client}, nil
@@ -99,7 +99,7 @@ func (c *Clients) NewEC2ClientWithExternalId(region, arn, externalId string) (re
 func (c *Clients) newEC2Client(region, arn, externalId string) (*ec2.EC2, error) {
 	session, err := c.sessionFromRegion(region)
 	if err != nil {
-		return &ec2.EC2{}, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
 	ec2Client := ec2.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn, configureExternalId(arn, externalId))})
@@ -112,7 +112,7 @@ func (c *Clients) newEC2Client(region, arn, externalId string) (*ec2.EC2, error)
 func (c *Clients) NewRAMClient(region, arn string) (resolver.RAMClient, error) {
 	client, err := c.newRAMClient(region, arn, "")
 	if err != nil {
-		return &RAM{}, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
 	return &RAM{client: client}, nil
@@ -121,7 +121,7 @@ func (c *Clients) NewRAMClient(region, arn string) (resolver.RAMClient, error) {
 func (c *Clients) NewRAMClientWithExternalId(region, arn, externalId string) (resolver.RAMClient, error) {
 	client, err := c.newRAMClient(region, arn, externalId)
 	if err != nil {
-		return &RAM{}, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
 	return &RAM{client: client}, nil
@@ -130,7 +130,7 @@ func (c *Clients) NewRAMClientWithExternalId(region, arn, externalId string) (re
 func (c *Clients) newRAMClient(region, arn, externalId string) (*ram.RAM, error) {
 	session, err := c.sessionFromRegion(region)
 	if err != nil {
-		return &ram.RAM{}, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
 	ramClient := ram.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn, configureExternalId(arn, externalId))})
@@ -143,7 +143,7 @@ func (c *Clients) newRAMClient(region, arn, externalId string) (*ram.RAM, error)
 func (c *Clients) NewRoute53Client(region, arn string) (resolver.Route53Client, error) {
 	client, err := c.newRoute53Client(region, arn, "")
 	if err != nil {
-		return &Route53{}, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
 	return &Route53{client: client}, nil
@@ -152,7 +152,7 @@ func (c *Clients) NewRoute53Client(region, arn string) (resolver.Route53Client, 
 func (c *Clients) NewTransitGatewayClient(region, rolearn string) (resolver.TransitGatewayClient, error) {
 	session, err := c.sessionForRole(rolearn)
 	if err != nil {
-		return &TransitGateways{}, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
 	ec2Client := ec2.New(session, &aws.Config{
@@ -164,10 +164,25 @@ func (c *Clients) NewTransitGatewayClient(region, rolearn string) (resolver.Tran
 	}, nil
 }
 
+func (c *Clients) NewPrefixListClient(region, rolearn string) (resolver.PrefixListClient, error) {
+	session, err := c.sessionForRole(rolearn)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	ec2Client := ec2.New(session, &aws.Config{
+		Region: aws.String(region),
+	})
+
+	return &PrefixLists{
+		client: ec2Client,
+	}, nil
+}
+
 func (c *Clients) newRoute53Client(region, arn, externalId string) (*route53.Route53, error) {
 	session, err := c.sessionFromRegion(region)
 	if err != nil {
-		return &route53.Route53{}, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
 	route53Client := route53.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn, configureExternalId(arn, externalId))})

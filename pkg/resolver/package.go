@@ -17,6 +17,7 @@ type AWSClients interface {
 	NewRAMClientWithExternalId(region, arn, externalId string) (RAMClient, error)
 	NewRoute53Client(region, arn string) (Route53Client, error)
 	NewTransitGatewayClient(region, arn string) (TransitGatewayClient, error)
+	NewPrefixListClient(region, arn string) (PrefixListClient, error)
 }
 
 //counterfeiter:generate . EC2Client
@@ -56,6 +57,12 @@ type ResolverClient interface {
 
 //counterfeiter:generate . TransitGatewayClient
 type TransitGatewayClient interface {
+	Apply(context.Context, string) (string, error)
+	Delete(context.Context, string) error
+}
+
+//counterfeiter:generate . PrefixListClient
+type PrefixListClient interface {
 	Apply(context.Context, string) (string, error)
 	Delete(context.Context, string) error
 }

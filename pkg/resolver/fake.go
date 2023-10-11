@@ -6,6 +6,7 @@ type FakeClients struct {
 	ResolverClient         ResolverClient
 	ExternalResolverClient ResolverClient
 	Route53Client          Route53Client
+	PrefixListClient       PrefixListClient
 	TransitGatewayClient   TransitGatewayClient
 }
 
@@ -39,4 +40,8 @@ func (f *FakeClients) NewRoute53Client(region, arn string) (Route53Client, error
 
 func (f *FakeClients) NewTransitGatewayClient(region, arn string) (TransitGatewayClient, error) {
 	return f.TransitGatewayClient, nil
+}
+
+func (f *FakeClients) NewPrefixListClient(region, arn string) (PrefixListClient, error) {
+	return f.PrefixListClient, nil
 }
