@@ -341,11 +341,10 @@ var _ = Describe("Resolver rules reconciler", func() {
 								It("does not add Condition to AWSCluster to mark that rules got associated", func() {
 									Expect(awsClusterClient.MarkConditionTrueCallCount()).To(BeZero())
 								})
-
 							})
 
 							When("finding resolver rules on AWS account succeeds", func() {
-								var existingResolverRules = []resolver.ResolverRule{
+								existingResolverRules := []resolver.ResolverRule{
 									{Id: "a1", Arn: "a1", Name: "resolver-rule-a1"},
 									{Id: "b2", Arn: "b2", Name: "resolver-rule-b2"},
 									{Id: "c3", Arn: "c3", Name: "resolver-rule-c3"},
@@ -564,7 +563,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 						})
 
 						When("finding resolver rule associations succeeds", func() {
-							var existingResolverRuleAssociations = []string{"a1", "b2"}
+							existingResolverRuleAssociations := []string{"a1", "b2"}
 							BeforeEach(func() {
 								resolverClient.FindResolverRuleIdsAssociatedWithVPCIdReturns(existingResolverRuleAssociations, nil)
 								resolverClient.DisassociateResolverRuleWithContextReturnsOnCall(1, errors.New("failed trying to disassociate resolver rule"))
