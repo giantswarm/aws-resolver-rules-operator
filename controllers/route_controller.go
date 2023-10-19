@@ -18,17 +18,35 @@ package controllers
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/pkg/errors"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/aws-resolver-rules-operator/pkg/util/annotations"
+	gsannotation "github.com/giantswarm/k8smetadata/pkg/annotation"
 )
 
 // RouteReconciler reconciles a Route object
 type RouteReconciler struct {
-	awsClusterClient AWSClusterClient
+	clusterClient ClusterClient
+	routeClient   RouteClient
+}
+
+type RouteClient interface {
+	AddRoutes(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string) error
+	RemoveRoutes(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string) error
+}
+
+func NewRouteReconciler(clusterClient ClusterClient, route RouteClient) *RouteReconciler {
+	return &RouteReconciler{
+		clusterClient: clusterClient,
+		routeClient:   route,
+	}
 }
 
 //+kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
@@ -38,34 +56,75 @@ type RouteReconciler struct {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
-	awsCluster, err := r.awsClusterClient.GetAWSCluster(ctx, req.NamespacedName)
+	logger := log.FromContext(ctx)
+
+	cluster, err := r.clusterClient.GetCluster(ctx, req.NamespacedName)
 	if err != nil {
-		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
+		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	if awsCluster.DeletionTimestamp.IsZero() {
-		return r.reconcileDelete(ctx, awsCluster)
+	switch val := annotations.GetAnnotation(cluster, gsannotation.NetworkTopologyModeAnnotation); val {
+	case "":
+		return ctrl.Result{}, nil
+	case gsannotation.NetworkTopologyModeNone:
+		logger.Info("Mode currently not handled", "mode", gsannotation.NetworkTopologyModeNone)
+		return ctrl.Result{}, nil
+	case gsannotation.NetworkTopologyModeUserManaged, gsannotation.NetworkTopologyModeGiantSwarmManaged:
+	default:
+		err := fmt.Errorf("invalid NetworkTopologyMode value")
+		logger.Error(err, "Unexpected NetworkTopologyMode annotation value found on cluster", "value", val)
+		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	return r.reconcileNormal(ctx, awsCluster)
+	awsCluster, err := r.clusterClient.GetAWSCluster(ctx, req.NamespacedName)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	identity, err := r.clusterClient.GetIdentity(ctx, awsCluster.Spec.IdentityRef)
+	if err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
+	transitGatewayID := annotations.GetNetworkTopologyTransitGateway(cluster)
+	if transitGatewayID == "" {
+		logger.Info("transitGatewayID is not set yet, skipping")
+		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
+	}
+
+	prefixListID := annotations.GetNetworkTopologyPrefixList(cluster)
+	if err != nil {
+		logger.Info("prefixListID is not set yet, skipping")
+		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
+	}
+
+	roleARN := identity.Spec.RoleArn
+
+	if cluster.DeletionTimestamp.IsZero() {
+		return r.reconcileDelete(ctx, &transitGatewayID, &prefixListID, awsCluster, roleARN)
+	}
+
+	return r.reconcileNormal(ctx, &transitGatewayID, &prefixListID, awsCluster, roleARN)
 }
 
-func (r *RouteReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AWSCluster) (ctrl.Result, error) {
+func (r *RouteReconciler) reconcileNormal(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
-
+	if err := r.routeClient.AddRoutes(ctx, transitGatewayID, prefixListID, awsCluster, roleArn); err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	}
 	return ctrl.Result{}, nil
 }
 
-func (r *RouteReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AWSCluster) (ctrl.Result, error) {
+func (r *RouteReconciler) reconcileDelete(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
-
+	if err := r.routeClient.RemoveRoutes(ctx, transitGatewayID, prefixListID, awsCluster, roleArn); err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	}
 	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *RouteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&capa.AWSCluster{}).
+		For(&capi.Cluster{}).
 		Complete(r)
 }

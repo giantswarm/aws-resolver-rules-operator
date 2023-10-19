@@ -40,6 +40,7 @@ import (
 	"github.com/aws-resolver-rules-operator/pkg/aws"
 	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
+	"github.com/aws-resolver-rules-operator/pkg/route"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -127,6 +128,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	route, err := route.NewRoute(awsClients)
+	if err != nil {
+		setupLog.Error(err, "unable to create Route client")
+		os.Exit(1)
+	}
+
 	if err = (controllers.NewResolverRulesReconciler(k8sAwsClusterClient, awsResolver)).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller")
 		os.Exit(1)
@@ -147,10 +154,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.RouteReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	if err = (controllers.NewRouteReconciler(k8sClusterClient, &route)).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Route")
 		os.Exit(1)
 	}

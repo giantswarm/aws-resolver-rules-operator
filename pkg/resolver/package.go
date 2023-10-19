@@ -3,6 +3,7 @@ package resolver
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/go-logr/logr"
 )
 
@@ -18,6 +19,7 @@ type AWSClients interface {
 	NewRoute53Client(region, arn string) (Route53Client, error)
 	NewTransitGatewayClient(region, arn string) (TransitGatewayClient, error)
 	NewPrefixListClient(region, arn string) (PrefixListClient, error)
+	NewRouteTablesClient(region, arn string) (RouteTablesClient, error)
 }
 
 //counterfeiter:generate . EC2Client
@@ -65,4 +67,11 @@ type TransitGatewayClient interface {
 type PrefixListClient interface {
 	Apply(context.Context, string) (string, error)
 	Delete(context.Context, string) error
+}
+
+//counterfeiter:generate . RouteTablesClient
+type RouteTablesClient interface {
+	CreateRoute(ctx context.Context, routeTableId, prefixListID, transitGatewayID *string) error
+	DeleteRoute(ctx context.Context, routeTableId, prefixListID *string) error
+	GetRouteTables(ctx context.Context, subnets []*string) ([]*ec2.RouteTable, error)
 }
