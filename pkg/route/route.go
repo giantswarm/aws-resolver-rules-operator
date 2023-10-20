@@ -32,12 +32,12 @@ func (r *Route) AddRoutes(ctx context.Context, transitGatewayID, prefixListID *s
 
 	routeTablesClient, err := r.awsClients.NewRouteTablesClient(awsCluster.Spec.Region, roleArn)
 	if err != nil {
-		errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 
 	routeTables, err := routeTablesClient.GetRouteTables(ctx, subnets)
 	if err != nil {
-		errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 
 	for _, rt := range routeTables {
@@ -63,10 +63,12 @@ func (r *Route) RemoveRoutes(ctx context.Context, transitGatewayID, prefixListID
 	}
 
 	routeTablesClient, err := r.awsClients.NewRouteTablesClient(awsCluster.Spec.Region, roleArn)
+	if err != nil {
+		return errors.WithStack(err)
+	}
 
 	routeTables, err := routeTablesClient.GetRouteTables(ctx, subnets)
 	if err != nil {
-		logger.Error(err, "Failed to get route tables")
 		return errors.WithStack(err)
 	}
 
