@@ -27,6 +27,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/aws-resolver-rules-operator/pkg/aws"
 	"github.com/aws-resolver-rules-operator/pkg/util/annotations"
 	gsannotation "github.com/giantswarm/k8smetadata/pkg/annotation"
 )
@@ -85,21 +86,25 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	transitGatewayID := annotations.GetNetworkTopologyTransitGateway(cluster)
-	if transitGatewayID == "" {
+	transitGatewayID, err := aws.GetARNResourceID(annotations.GetNetworkTopologyTransitGateway(cluster))
+	if err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	} else if transitGatewayID == "" {
 		logger.Info("transitGatewayID is not set yet, skipping")
 		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 	}
 
-	prefixListID := annotations.GetNetworkTopologyPrefixList(cluster)
+	prefixListID, err := aws.GetARNResourceID(annotations.GetNetworkTopologyPrefixList(cluster))
 	if err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	} else if prefixListID == "" {
 		logger.Info("prefixListID is not set yet, skipping")
 		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 	}
 
 	roleARN := identity.Spec.RoleArn
 
-	if cluster.DeletionTimestamp.IsZero() {
+	if !cluster.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, &transitGatewayID, &prefixListID, awsCluster, roleARN)
 	}
 
