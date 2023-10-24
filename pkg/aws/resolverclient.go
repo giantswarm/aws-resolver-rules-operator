@@ -136,7 +136,6 @@ func (a *AWSResolver) createResolverEndpointWithContext(ctx context.Context, log
 		SecurityGroupIds: aws.StringSlice(securityGroupIds),
 		Tags:             getRoute53ResolverTags(tags),
 	})
-
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {

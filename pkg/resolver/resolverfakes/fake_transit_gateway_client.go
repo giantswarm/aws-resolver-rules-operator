@@ -24,6 +24,18 @@ type FakeTransitGatewayClient struct {
 		result1 string
 		result2 error
 	}
+	ApplyAttachmentStub        func(context.Context, resolver.TransitGatewayAttachment) error
+	applyAttachmentMutex       sync.RWMutex
+	applyAttachmentArgsForCall []struct {
+		arg1 context.Context
+		arg2 resolver.TransitGatewayAttachment
+	}
+	applyAttachmentReturns struct {
+		result1 error
+	}
+	applyAttachmentReturnsOnCall map[int]struct {
+		result1 error
+	}
 	DeleteStub        func(context.Context, string) error
 	deleteMutex       sync.RWMutex
 	deleteArgsForCall []struct {
@@ -34,6 +46,18 @@ type FakeTransitGatewayClient struct {
 		result1 error
 	}
 	deleteReturnsOnCall map[int]struct {
+		result1 error
+	}
+	DetachStub        func(context.Context, resolver.TransitGatewayAttachment) error
+	detachMutex       sync.RWMutex
+	detachArgsForCall []struct {
+		arg1 context.Context
+		arg2 resolver.TransitGatewayAttachment
+	}
+	detachReturns struct {
+		result1 error
+	}
+	detachReturnsOnCall map[int]struct {
 		result1 error
 	}
 	invocations      map[string][][]interface{}
@@ -106,6 +130,68 @@ func (fake *FakeTransitGatewayClient) ApplyReturnsOnCall(i int, result1 string, 
 	}{result1, result2}
 }
 
+func (fake *FakeTransitGatewayClient) ApplyAttachment(arg1 context.Context, arg2 resolver.TransitGatewayAttachment) error {
+	fake.applyAttachmentMutex.Lock()
+	ret, specificReturn := fake.applyAttachmentReturnsOnCall[len(fake.applyAttachmentArgsForCall)]
+	fake.applyAttachmentArgsForCall = append(fake.applyAttachmentArgsForCall, struct {
+		arg1 context.Context
+		arg2 resolver.TransitGatewayAttachment
+	}{arg1, arg2})
+	stub := fake.ApplyAttachmentStub
+	fakeReturns := fake.applyAttachmentReturns
+	fake.recordInvocation("ApplyAttachment", []interface{}{arg1, arg2})
+	fake.applyAttachmentMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeTransitGatewayClient) ApplyAttachmentCallCount() int {
+	fake.applyAttachmentMutex.RLock()
+	defer fake.applyAttachmentMutex.RUnlock()
+	return len(fake.applyAttachmentArgsForCall)
+}
+
+func (fake *FakeTransitGatewayClient) ApplyAttachmentCalls(stub func(context.Context, resolver.TransitGatewayAttachment) error) {
+	fake.applyAttachmentMutex.Lock()
+	defer fake.applyAttachmentMutex.Unlock()
+	fake.ApplyAttachmentStub = stub
+}
+
+func (fake *FakeTransitGatewayClient) ApplyAttachmentArgsForCall(i int) (context.Context, resolver.TransitGatewayAttachment) {
+	fake.applyAttachmentMutex.RLock()
+	defer fake.applyAttachmentMutex.RUnlock()
+	argsForCall := fake.applyAttachmentArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeTransitGatewayClient) ApplyAttachmentReturns(result1 error) {
+	fake.applyAttachmentMutex.Lock()
+	defer fake.applyAttachmentMutex.Unlock()
+	fake.ApplyAttachmentStub = nil
+	fake.applyAttachmentReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeTransitGatewayClient) ApplyAttachmentReturnsOnCall(i int, result1 error) {
+	fake.applyAttachmentMutex.Lock()
+	defer fake.applyAttachmentMutex.Unlock()
+	fake.ApplyAttachmentStub = nil
+	if fake.applyAttachmentReturnsOnCall == nil {
+		fake.applyAttachmentReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.applyAttachmentReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakeTransitGatewayClient) Delete(arg1 context.Context, arg2 string) error {
 	fake.deleteMutex.Lock()
 	ret, specificReturn := fake.deleteReturnsOnCall[len(fake.deleteArgsForCall)]
@@ -168,13 +254,79 @@ func (fake *FakeTransitGatewayClient) DeleteReturnsOnCall(i int, result1 error) 
 	}{result1}
 }
 
+func (fake *FakeTransitGatewayClient) Detach(arg1 context.Context, arg2 resolver.TransitGatewayAttachment) error {
+	fake.detachMutex.Lock()
+	ret, specificReturn := fake.detachReturnsOnCall[len(fake.detachArgsForCall)]
+	fake.detachArgsForCall = append(fake.detachArgsForCall, struct {
+		arg1 context.Context
+		arg2 resolver.TransitGatewayAttachment
+	}{arg1, arg2})
+	stub := fake.DetachStub
+	fakeReturns := fake.detachReturns
+	fake.recordInvocation("Detach", []interface{}{arg1, arg2})
+	fake.detachMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeTransitGatewayClient) DetachCallCount() int {
+	fake.detachMutex.RLock()
+	defer fake.detachMutex.RUnlock()
+	return len(fake.detachArgsForCall)
+}
+
+func (fake *FakeTransitGatewayClient) DetachCalls(stub func(context.Context, resolver.TransitGatewayAttachment) error) {
+	fake.detachMutex.Lock()
+	defer fake.detachMutex.Unlock()
+	fake.DetachStub = stub
+}
+
+func (fake *FakeTransitGatewayClient) DetachArgsForCall(i int) (context.Context, resolver.TransitGatewayAttachment) {
+	fake.detachMutex.RLock()
+	defer fake.detachMutex.RUnlock()
+	argsForCall := fake.detachArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeTransitGatewayClient) DetachReturns(result1 error) {
+	fake.detachMutex.Lock()
+	defer fake.detachMutex.Unlock()
+	fake.DetachStub = nil
+	fake.detachReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeTransitGatewayClient) DetachReturnsOnCall(i int, result1 error) {
+	fake.detachMutex.Lock()
+	defer fake.detachMutex.Unlock()
+	fake.DetachStub = nil
+	if fake.detachReturnsOnCall == nil {
+		fake.detachReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.detachReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakeTransitGatewayClient) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
 	fake.applyMutex.RLock()
 	defer fake.applyMutex.RUnlock()
+	fake.applyAttachmentMutex.RLock()
+	defer fake.applyAttachmentMutex.RUnlock()
 	fake.deleteMutex.RLock()
 	defer fake.deleteMutex.RUnlock()
+	fake.detachMutex.RLock()
+	defer fake.detachMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

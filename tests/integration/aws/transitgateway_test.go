@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega/gstruct"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 
@@ -43,6 +44,15 @@ var _ = Describe("Transitgateway", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		return *out.TransitGateway.TransitGatewayId
+	}
+
+	attachTransitGateway := func(transitGatewayID, vpcID string) {
+		_, err = rawEC2Client.CreateTransitGatewayVpcAttachmentWithContext(ctx, &ec2.CreateTransitGatewayVpcAttachmentInput{
+			TransitGatewayId: awssdk.String(transitGatewayID),
+			VpcId:            awssdk.String(vpcID),
+			SubnetIds:        awssdk.StringSlice([]string{"sub-1"}),
+		})
+		Expect(err).NotTo(HaveOccurred())
 	}
 
 	BeforeEach(func() {
@@ -114,6 +124,186 @@ var _ = Describe("Transitgateway", func() {
 						"found unexpected number: 2 of transit gatways for cluster",
 					)))
 				})
+			})
+		})
+	})
+
+	Describe("ApplyAttachment", func() {
+		var (
+			name              string
+			transitGatewayID  string
+			transitGatewayARN string
+			vpcID             string
+
+			applyError error
+		)
+
+		BeforeEach(func() {
+			name = uuid.NewString()
+			transitGatewayID = fmt.Sprintf("tw-%s", name)
+			transitGatewayARN = fmt.Sprintf("arn:aws:iam::123456789012:transit-gateways/%s", transitGatewayID)
+			vpcID = fmt.Sprintf("vpc-%s", name)
+		})
+
+		JustBeforeEach(func() {
+			attachment := resolver.TransitGatewayAttachment{
+				Name:              name,
+				TransitGatewayARN: transitGatewayARN,
+				SubnetIDs:         []string{"sub-1", "sub-2"},
+				VPCID:             vpcID,
+			}
+			applyError = transitGateways.ApplyAttachment(ctx, attachment)
+		})
+
+		It("creates the attachment", func() {
+			Expect(applyError).NotTo(HaveOccurred())
+
+			describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
+				Filters: []*ec2.Filter{
+					{
+						Name:   awssdk.String("transit-gateway-id"),
+						Values: awssdk.StringSlice([]string{transitGatewayID}),
+					},
+					{
+						Name:   awssdk.String("vpc-id"),
+						Values: awssdk.StringSlice([]string{vpcID}),
+					},
+				},
+			}
+			attachments, err := rawEC2Client.DescribeTransitGatewayVpcAttachments(describeTGWattachmentInput)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(attachments.TransitGatewayVpcAttachments).To(HaveLen(1))
+
+			actualAttachment := attachments.TransitGatewayVpcAttachments[0]
+			Expect(actualAttachment.SubnetIds).To(ConsistOf(PointTo(Equal("sub-1")), PointTo(Equal("sub-2"))))
+		})
+
+		When("the transit gateway ARN is not valid", func() {
+			It("returns an error", func() {
+				attachment := resolver.TransitGatewayAttachment{
+					Name:              name,
+					TransitGatewayARN: "not-a-valid-arn",
+				}
+				err := transitGateways.ApplyAttachment(ctx, attachment)
+				Expect(err).To(HaveOccurred())
+			})
+		})
+
+		When("the attachment has already been created", func() {
+			BeforeEach(func() {
+				attachment := resolver.TransitGatewayAttachment{
+					Name:              name,
+					TransitGatewayARN: transitGatewayARN,
+					SubnetIDs:         []string{"sub-1", "sub-2"},
+					VPCID:             vpcID,
+				}
+				err := transitGateways.ApplyAttachment(ctx, attachment)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("does not create a new one", func() {
+				Expect(applyError).NotTo(HaveOccurred())
+
+				describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
+					Filters: []*ec2.Filter{
+						{
+							Name:   awssdk.String("transit-gateway-id"),
+							Values: awssdk.StringSlice([]string{transitGatewayID}),
+						},
+						{
+							Name:   awssdk.String("vpc-id"),
+							Values: awssdk.StringSlice([]string{vpcID}),
+						},
+					},
+				}
+				attachments, err := rawEC2Client.DescribeTransitGatewayVpcAttachments(describeTGWattachmentInput)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(attachments.TransitGatewayVpcAttachments).To(HaveLen(1))
+			})
+
+			When("more than one attachment exists for the transit gateway", func() {
+				BeforeEach(func() {
+					attachTransitGateway(transitGatewayID, vpcID)
+				})
+
+				It("returns an error", func() {
+					Expect(applyError).To(MatchError(ContainSubstring(
+						"wrong number of transit gateway attachments found. Expected 1, found 2",
+					)))
+				})
+			})
+		})
+	})
+
+	Describe("Detach", func() {
+		var (
+			transitGatewayID  string
+			transitGatewayARN string
+			vpcID             string
+			attachment        resolver.TransitGatewayAttachment
+		)
+
+		BeforeEach(func() {
+			name := uuid.NewString()
+			transitGatewayID = fmt.Sprintf("tw-%s", name)
+			transitGatewayARN = fmt.Sprintf("arn:aws:iam::123456789012:transit-gateways/%s", transitGatewayID)
+			vpcID = fmt.Sprintf("vpc-%s", name)
+
+			attachTransitGateway(transitGatewayID, vpcID)
+
+			attachment = resolver.TransitGatewayAttachment{
+				TransitGatewayARN: transitGatewayARN,
+				VPCID:             vpcID,
+			}
+		})
+
+		It("detaches the transit gateway", func() {
+			err := transitGateways.Detach(ctx, attachment)
+			Expect(err).NotTo(HaveOccurred())
+
+			out, err := rawEC2Client.DescribeTransitGatewayVpcAttachments(&ec2.DescribeTransitGatewayVpcAttachmentsInput{
+				Filters: []*ec2.Filter{
+					{
+						Name:   awssdk.String("transit-gateway-id"),
+						Values: awssdk.StringSlice([]string{transitGatewayID}),
+					},
+					{
+						Name:   awssdk.String("vpc-id"),
+						Values: awssdk.StringSlice([]string{vpcID}),
+					},
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(out.TransitGatewayVpcAttachments).To(HaveLen(1))
+			Expect(out.TransitGatewayVpcAttachments[0].State).To(PointTo(Equal("deleted")))
+		})
+
+		When("the gateway has already been detached", func() {
+			BeforeEach(func() {
+				attachment = resolver.TransitGatewayAttachment{
+					TransitGatewayARN: transitGatewayARN,
+					VPCID:             vpcID,
+				}
+				err := transitGateways.Detach(ctx, attachment)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("does not return an error", func() {
+				err := transitGateways.Detach(ctx, attachment)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
+		When("there are multiple gateways for the same cluster", func() {
+			BeforeEach(func() {
+				attachTransitGateway(transitGatewayID, vpcID)
+			})
+
+			It("returns an error", func() {
+				err := transitGateways.Detach(ctx, attachment)
+				Expect(err).To(MatchError(ContainSubstring(
+					"wrong number of transit gateway attachments found. Expected 1, found 2",
+				)))
 			})
 		})
 	})
