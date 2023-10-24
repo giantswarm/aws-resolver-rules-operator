@@ -173,15 +173,6 @@ func getTransitGatewayARN(cluster, managementCluster *capa.AWSCluster) string {
 	return annotations.GetNetworkTopologyTransitGateway(managementCluster)
 }
 
-func getPrefixListARN(cluster, managementCluster *capa.AWSCluster) string {
-	prefixListARN := annotations.GetNetworkTopologyPrefixList(cluster)
-	if prefixListARN != "" {
-		return prefixListARN
-	}
-
-	return annotations.GetNetworkTopologyPrefixList(managementCluster)
-}
-
 func getSubnets(cluster *capa.AWSCluster) ([]string, error) {
 	subnets := cluster.Spec.NetworkSpec.Subnets
 	subnets = filterTGWSubnets(subnets)

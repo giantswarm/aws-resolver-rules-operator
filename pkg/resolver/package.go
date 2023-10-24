@@ -58,7 +58,6 @@ type ResolverClient interface {
 type TransitGatewayAttachment struct {
 	Name              string
 	TransitGatewayARN string
-	PrefixListARN     string
 	SubnetIDs         []string
 	VPCID             string
 }
