@@ -6,7 +6,7 @@ replace (
 	// Fixes CVE-2022-29153 in hashicorp/consul and hashicorp/api
 	github.com/spf13/cobra v1.2.1 => github.com/spf13/cobra v1.4.0
 	// Fixes CVE-2023-32731 in google.golang.org/grpc
-	google.golang.org/grpc => google.golang.org/grpc v1.58.0
+	google.golang.org/grpc => google.golang.org/grpc v1.59.0
 )
 
 require (
@@ -30,7 +30,7 @@ require (
 )
 
 require (
-	cloud.google.com/go/compute v1.21.0 // indirect
+	cloud.google.com/go/compute v1.23.0 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.27 // indirect
@@ -77,7 +77,7 @@ require (
 	golang.org/x/crypto v0.14.0 // indirect
 	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
-	golang.org/x/oauth2 v0.10.0 // indirect
+	golang.org/x/oauth2 v0.11.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/term v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
