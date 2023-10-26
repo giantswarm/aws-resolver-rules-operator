@@ -166,10 +166,10 @@ func createRandomCluster(annotationsKeyValues ...string) *capa.AWSCluster {
 func createRandomClusterWithIdentity(annotationsKeyValues ...string) (*capa.AWSClusterRoleIdentity, *capa.AWSCluster) {
 	name := uuid.NewString()
 	awsCluster := newCluster(name, annotationsKeyValues...)
-	identity := newRoleIdentity(name)
+	identity := newRoleIdentity()
 
 	awsCluster.Spec.IdentityRef = &capa.AWSIdentityReference{
-		Name: name,
+		Name: identity.Name,
 		Kind: "AWSClusterRoleIdentity",
 	}
 
@@ -182,7 +182,8 @@ func createRandomClusterWithIdentity(annotationsKeyValues ...string) (*capa.AWSC
 	return identity, awsCluster
 }
 
-func newRoleIdentity(name string) *capa.AWSClusterRoleIdentity {
+func newRoleIdentity() *capa.AWSClusterRoleIdentity {
+	name := uuid.NewString()
 	return &capa.AWSClusterRoleIdentity{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,

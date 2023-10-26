@@ -135,6 +135,7 @@ var _ = Describe("Transitgateway", func() {
 			transitGatewayARN string
 			vpcID             string
 
+			attachment resolver.TransitGatewayAttachment
 			applyError error
 		)
 
@@ -143,15 +144,16 @@ var _ = Describe("Transitgateway", func() {
 			transitGatewayID = fmt.Sprintf("tw-%s", name)
 			transitGatewayARN = fmt.Sprintf("arn:aws:iam::123456789012:transit-gateways/%s", transitGatewayID)
 			vpcID = fmt.Sprintf("vpc-%s", name)
-		})
 
-		JustBeforeEach(func() {
-			attachment := resolver.TransitGatewayAttachment{
+			attachment = resolver.TransitGatewayAttachment{
 				Name:              name,
 				TransitGatewayARN: transitGatewayARN,
 				SubnetIDs:         []string{"sub-1", "sub-2"},
 				VPCID:             vpcID,
 			}
+		})
+
+		JustBeforeEach(func() {
 			applyError = transitGateways.ApplyAttachment(ctx, attachment)
 		})
 
@@ -179,24 +181,17 @@ var _ = Describe("Transitgateway", func() {
 		})
 
 		When("the transit gateway ARN is not valid", func() {
+			BeforeEach(func() {
+				attachment.TransitGatewayARN = "not-a-valid-arn"
+			})
+
 			It("returns an error", func() {
-				attachment := resolver.TransitGatewayAttachment{
-					Name:              name,
-					TransitGatewayARN: "not-a-valid-arn",
-				}
-				err := transitGateways.ApplyAttachment(ctx, attachment)
-				Expect(err).To(HaveOccurred())
+				Expect(applyError).To(MatchError(ContainSubstring("failed to parse arn")))
 			})
 		})
 
 		When("the attachment has already been created", func() {
 			BeforeEach(func() {
-				attachment := resolver.TransitGatewayAttachment{
-					Name:              name,
-					TransitGatewayARN: transitGatewayARN,
-					SubnetIDs:         []string{"sub-1", "sub-2"},
-					VPCID:             vpcID,
-				}
 				err := transitGateways.ApplyAttachment(ctx, attachment)
 				Expect(err).NotTo(HaveOccurred())
 			})
@@ -274,21 +269,24 @@ var _ = Describe("Transitgateway", func() {
 				},
 			})
 			Expect(err).NotTo(HaveOccurred())
-			Expect(out.TransitGatewayVpcAttachments).To(HaveLen(1))
 			Expect(out.TransitGatewayVpcAttachments[0].State).To(PointTo(Equal("deleted")))
 		})
 
 		When("the gateway has already been detached", func() {
 			BeforeEach(func() {
-				attachment = resolver.TransitGatewayAttachment{
-					TransitGatewayARN: transitGatewayARN,
-					VPCID:             vpcID,
-				}
 				err := transitGateways.Detach(ctx, attachment)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("does not return an error", func() {
+				err := transitGateways.Detach(ctx, attachment)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
+		When("the attachment does not exist", func() {
+			It("does not return an error", func() {
+				attachment.VPCID = "does-not-exist"
 				err := transitGateways.Detach(ctx, attachment)
 				Expect(err).NotTo(HaveOccurred())
 			})

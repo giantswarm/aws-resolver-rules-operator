@@ -53,7 +53,6 @@ func (t *TransitGateways) ApplyAttachment(ctx context.Context, attachment resolv
 }
 
 func (t *TransitGateways) Detach(ctx context.Context, attachment resolver.TransitGatewayAttachment) error {
-	fmt.Println(attachment)
 	gatewayID, err := GetARNResourceID(attachment.TransitGatewayARN)
 	if err != nil {
 		return err
@@ -62,6 +61,10 @@ func (t *TransitGateways) Detach(ctx context.Context, attachment resolver.Transi
 	vpcAttachment, err := t.getAttachment(ctx, gatewayID, attachment.VPCID)
 	if err != nil {
 		return err
+	}
+
+	if vpcAttachment == nil {
+		return nil
 	}
 
 	_, err = t.ec2.DeleteTransitGatewayVpcAttachmentWithContext(ctx, &ec2.DeleteTransitGatewayVpcAttachmentInput{
