@@ -202,6 +202,9 @@ var _ = Describe("TransitGatewayAttachment", func() {
 			_, attachment := transitGatewayClient.ApplyAttachmentArgsForCall(0)
 			Expect(attachment.TransitGatewayARN).To(Equal(transitGatewayARN))
 			Expect(attachment.VPCID).To(Equal(cluster.Spec.NetworkSpec.VPC.ID))
+			Expect(attachment.Tags).To(HaveLen(2))
+			Expect(attachment.Tags).To(HaveKeyWithValue("Name", cluster.Name))
+			Expect(attachment.Tags).To(HaveKeyWithValue(fmt.Sprintf("kubernetes.io/cluster/%s", cluster.Name), "owned"))
 
 			By("attaching only the tgw tagged subnets in each availability zone")
 			Expect(attachment.SubnetIDs).To(ConsistOf("subnet-1", "subnet-2"))

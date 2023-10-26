@@ -133,6 +133,7 @@ func (r *TransitGatewayAttachmentReconciler) reconcileNormal(ctx context.Context
 		TransitGatewayARN: scope.transitGatewayARN,
 		VPCID:             scope.cluster.Spec.NetworkSpec.VPC.ID,
 		SubnetIDs:         subnets,
+		Tags:              getAttachmentTags(scope.cluster),
 	}
 	err = scope.attacher.ApplyAttachment(ctx, attachment)
 	if err != nil {
@@ -207,4 +208,11 @@ func filterTGWSubnets(subnets []capa.SubnetSpec) []capa.SubnetSpec {
 	}
 
 	return filtered
+}
+
+func getAttachmentTags(cluster *capa.AWSCluster) map[string]string {
+	return map[string]string{
+		"Name": cluster.Name,
+		fmt.Sprintf("kubernetes.io/cluster/%s", cluster.Name): "owned",
+	}
 }

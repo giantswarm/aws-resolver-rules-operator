@@ -158,6 +158,15 @@ func (t *TransitGateways) create(ctx context.Context, name string, tags map[stri
 }
 
 func (t *TransitGateways) attach(ctx context.Context, transitGatewayID string, attachment resolver.TransitGatewayAttachment) error {
+	tags := []*ec2.Tag{}
+	for key, value := range attachment.Tags {
+		tag := ec2.Tag{
+			Key:   awssdk.String(key),
+			Value: awssdk.String(value),
+		}
+		tags = append(tags, &tag)
+	}
+
 	_, err := t.ec2.CreateTransitGatewayVpcAttachmentWithContext(ctx, &ec2.CreateTransitGatewayVpcAttachmentInput{
 		TransitGatewayId: awssdk.String(transitGatewayID),
 		VpcId:            awssdk.String(attachment.VPCID),
@@ -165,16 +174,7 @@ func (t *TransitGateways) attach(ctx context.Context, transitGatewayID string, a
 		TagSpecifications: []*ec2.TagSpecification{
 			{
 				ResourceType: awssdk.String(ec2.ResourceTypeTransitGatewayAttachment),
-				Tags: []*ec2.Tag{
-					{
-						Key:   awssdk.String("Name"),
-						Value: awssdk.String(attachment.Name),
-					},
-					{
-						Key:   awssdk.String(fmt.Sprintf("kubernetes.io/cluster/%s", attachment.Name)),
-						Value: awssdk.String("owned"),
-					},
-				},
+				Tags:         tags,
 			},
 		},
 	})

@@ -56,10 +56,10 @@ type ResolverClient interface {
 }
 
 type TransitGatewayAttachment struct {
-	Name              string
 	TransitGatewayARN string
 	SubnetIDs         []string
 	VPCID             string
+	Tags              map[string]string
 }
 
 //counterfeiter:generate . TransitGatewayClient
