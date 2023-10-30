@@ -12,7 +12,7 @@ replace (
 require (
 	github.com/aws/aws-sdk-go v1.46.6
 	github.com/giantswarm/k8smetadata v0.23.0
-	github.com/go-logr/logr v1.2.4
+	github.com/go-logr/logr v1.3.0
 	github.com/google/uuid v1.4.0
 	github.com/maxbrunsfeld/counterfeiter/v6 v6.7.0
 	github.com/onsi/ginkgo/v2 v2.13.0
