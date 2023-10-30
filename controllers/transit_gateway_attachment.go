@@ -185,6 +185,15 @@ func getSubnets(cluster *capa.AWSCluster) ([]string, error) {
 			return nil, fmt.Errorf("not all subnets have been created")
 		}
 
+		if !strings.HasPrefix(s.ID, "subnet-") {
+			// The meaning of the ID field changed in https://github.com/kubernetes-sigs/cluster-api-provider-aws/pull/4474 and a new
+			// field `ResourceID` was added to denote the AWS subnet identifier (`subnet-...`).
+			// After the change in CAPA, the `ID` field is supposed to not start with `subnet-` for
+			// CAPA-managed subnets.
+			// TODO: Implement this breaking change of meaning.
+			return nil, fmt.Errorf("support for newer CAPA versions' ResourceID field not implemented yet")
+		}
+
 		if !availabilityZones[s.AvailabilityZone] {
 			subnetIDs = append(subnetIDs, s.ID)
 			availabilityZones[s.AvailabilityZone] = true
