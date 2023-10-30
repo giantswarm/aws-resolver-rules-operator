@@ -153,7 +153,7 @@ func (r *TransitGatewayAttachmentReconciler) reconcileDelete(ctx context.Context
 	}
 	err := scope.attacher.Detach(ctx, attachment)
 	if err != nil {
-		logger.Error(err, "Failed to delete transit gateway")
+		logger.Error(err, "Failed to detach transit gateway")
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
