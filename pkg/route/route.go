@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
@@ -22,8 +22,7 @@ func NewRoute(awsClients resolver.AWSClients) (Route, error) {
 	}, nil
 }
 
-func (r *Route) AddRoutes(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string) error {
-	logger := log.FromContext(ctx)
+func (r *Route) AddRoutes(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string, logger logr.Logger) error {
 	subnets := []*string{}
 	for _, s := range awsCluster.Spec.NetworkSpec.Subnets {
 		temp := s.ID
@@ -40,6 +39,7 @@ func (r *Route) AddRoutes(ctx context.Context, transitGatewayID, prefixListID *s
 		return errors.WithStack(err)
 	}
 
+	logger.Info("Adding routes to route tables", "routeTables", routeTables)
 	for _, rt := range routeTables {
 		if routeExists(rt.Routes, prefixListID, transitGatewayID) {
 			err := routeTablesClient.CreateRoute(ctx, rt.RouteTableId, prefixListID, transitGatewayID)
@@ -54,8 +54,7 @@ func (r *Route) AddRoutes(ctx context.Context, transitGatewayID, prefixListID *s
 	return nil
 }
 
-func (r *Route) RemoveRoutes(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string) error {
-	logger := log.FromContext(ctx)
+func (r *Route) RemoveRoutes(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string, logger logr.Logger) error {
 	subnets := []*string{}
 	for _, s := range awsCluster.Spec.NetworkSpec.Subnets {
 		temp := s.ID

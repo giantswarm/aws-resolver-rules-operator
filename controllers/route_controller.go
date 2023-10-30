@@ -112,7 +112,8 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 }
 
 func (r *RouteReconciler) reconcileNormal(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	logger := log.FromContext(ctx)
+	logger.Info("Adding routes")
 	if err := r.routeClient.AddRoutes(ctx, transitGatewayID, prefixListID, awsCluster, roleArn); err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
@@ -120,7 +121,8 @@ func (r *RouteReconciler) reconcileNormal(ctx context.Context, transitGatewayID,
 }
 
 func (r *RouteReconciler) reconcileDelete(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	logger := log.FromContext(ctx)
+	logger.Info("Deletig routes")
 	if err := r.routeClient.RemoveRoutes(ctx, transitGatewayID, prefixListID, awsCluster, roleArn); err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
