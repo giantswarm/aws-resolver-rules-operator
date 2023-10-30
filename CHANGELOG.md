@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Set user-agent to `giantswarm-capa-operator` when making requests to the k8s API.
+- Most controllers will skip reconciliation events that only changed the `resourceVersion` field of the CR.
 
 ### Added
 
