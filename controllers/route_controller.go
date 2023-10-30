@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -39,8 +40,8 @@ type RouteReconciler struct {
 }
 
 type RouteClient interface {
-	AddRoutes(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string) error
-	RemoveRoutes(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string) error
+	AddRoutes(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string, logger logr.Logger) error
+	RemoveRoutes(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string, logger logr.Logger) error
 }
 
 func NewRouteReconciler(clusterClient ClusterClient, route RouteClient) *RouteReconciler {
@@ -114,7 +115,7 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 func (r *RouteReconciler) reconcileNormal(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	logger.Info("Adding routes")
-	if err := r.routeClient.AddRoutes(ctx, transitGatewayID, prefixListID, awsCluster, roleArn); err != nil {
+	if err := r.routeClient.AddRoutes(ctx, transitGatewayID, prefixListID, awsCluster, roleArn, logger); err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 	return ctrl.Result{}, nil
@@ -123,7 +124,7 @@ func (r *RouteReconciler) reconcileNormal(ctx context.Context, transitGatewayID,
 func (r *RouteReconciler) reconcileDelete(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	logger.Info("Deletig routes")
-	if err := r.routeClient.RemoveRoutes(ctx, transitGatewayID, prefixListID, awsCluster, roleArn); err != nil {
+	if err := r.routeClient.RemoveRoutes(ctx, transitGatewayID, prefixListID, awsCluster, roleArn, logger); err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 	return ctrl.Result{}, nil
