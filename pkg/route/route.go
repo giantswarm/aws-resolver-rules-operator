@@ -39,7 +39,6 @@ func (r *Route) AddRoutes(ctx context.Context, transitGatewayID, prefixListID *s
 		return errors.WithStack(err)
 	}
 
-	logger.Info("Adding routes to route tables", "routeTables", routeTables)
 	for _, rt := range routeTables {
 		if !routeExists(rt.Routes, prefixListID, transitGatewayID) {
 			err := routeTablesClient.CreateRoute(ctx, rt.RouteTableId, prefixListID, transitGatewayID)
