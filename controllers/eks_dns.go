@@ -9,6 +9,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
@@ -137,5 +138,10 @@ func (r *EKSDnsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("eks_dnszone").
 		For(&eks.AWSManagedControlPlane{}).
+		WithEventFilter(
+			predicate.Funcs{
+				UpdateFunc: predicateToFilterAWSManagedControlPlaneResourceVersionChanges,
+			},
+		).
 		Complete(r)
 }

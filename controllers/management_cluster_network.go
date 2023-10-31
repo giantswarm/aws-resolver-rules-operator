@@ -12,6 +12,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/aws-resolver-rules-operator/pkg/conditions"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
@@ -44,6 +45,11 @@ func NewManagementClusterTransitGateway(
 func (r *ManagementClusterNetworkReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capa.AWSCluster{}).
+		WithEventFilter(
+			predicate.Funcs{
+				UpdateFunc: predicateToFilterAWSClusterResourceVersionChanges,
+			},
+		).
 		Named("mc-transit-gateway").
 		Complete(r)
 }
