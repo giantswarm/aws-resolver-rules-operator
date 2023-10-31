@@ -55,6 +55,7 @@ const (
 )
 
 var (
+	additionalTags    map[string]string
 	awsClients        resolver.AWSClients
 	ctx               context.Context
 	ec2Client         resolver.EC2Client
@@ -74,6 +75,9 @@ var _ = BeforeSuite(func() {
 	logger = GinkgoLogr
 	logf.SetLogger(logger)
 	tests.GetEnvOrSkip("AWS_ENDPOINT")
+	additionalTags = map[string]string{
+		"test": "test-tag",
+	}
 
 	awsClients = aws.NewClients(os.Getenv("AWS_ENDPOINT"))
 

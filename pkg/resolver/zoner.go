@@ -149,11 +149,17 @@ func (d *Zoner) getParentHostedZoneName() string {
 }
 
 func (d *Zoner) getTagsForHostedZone(cluster Cluster) map[string]string {
-	return map[string]string{
+	var tags = map[string]string{
 		"Name": cluster.Name,
 		fmt.Sprintf("sigs.k8s.io/cluster-api-provider-aws/cluster/%s", cluster.Name): "owned",
 		"sigs.k8s.io/cluster-api-provider-aws/role":                                  "common",
 	}
+
+	for key, value := range cluster.AdditionalTags {
+		tags[key] = value
+	}
+
+	return tags
 }
 
 func (d *Zoner) getWorkloadClusterDnsRecords(workloadClusterHostedZoneName string, cluster Cluster) []DNSRecord {

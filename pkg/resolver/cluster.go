@@ -1,6 +1,7 @@
 package resolver
 
 type Cluster struct {
+	AdditionalTags              map[string]string
 	VPCsToAssociateToHostedZone []string
 	Name                        string
 	BastionIp                   string

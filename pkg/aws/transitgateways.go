@@ -19,7 +19,7 @@ type TransitGateways struct {
 	ec2 *ec2.EC2
 }
 
-func (t *TransitGateways) Apply(ctx context.Context, name string) (string, error) {
+func (t *TransitGateways) Apply(ctx context.Context, name string, tags map[string]string) (string, error) {
 	gateway, err := t.get(ctx, name)
 	if err != nil {
 		return "", err
@@ -29,7 +29,7 @@ func (t *TransitGateways) Apply(ctx context.Context, name string) (string, error
 		return *gateway.TransitGatewayArn, nil
 	}
 
-	return t.create(ctx, name)
+	return t.create(ctx, name, tags)
 }
 
 func (t *TransitGateways) Delete(ctx context.Context, name string) error {
@@ -82,7 +82,14 @@ func (t *TransitGateways) get(ctx context.Context, name string) (*ec2.TransitGat
 	return gateways[0], nil
 }
 
-func (t *TransitGateways) create(ctx context.Context, name string) (string, error) {
+func (t *TransitGateways) create(ctx context.Context, name string, tags map[string]string) (string, error) {
+	ec2tags := getEc2Tags(tags)
+	ec2tags = append(ec2tags, &ec2.Tag{
+
+		Key:   awssdk.String(clusterTag(name)),
+		Value: awssdk.String(clusterTagValue),
+	})
+
 	input := &ec2.CreateTransitGatewayInput{
 		Description: awssdk.String(fmt.Sprintf("Transit Gateway for cluster %s", name)),
 		Options: &ec2.TransitGatewayRequestOptions{
@@ -91,12 +98,7 @@ func (t *TransitGateways) create(ctx context.Context, name string) (string, erro
 		TagSpecifications: []*ec2.TagSpecification{
 			{
 				ResourceType: aws.String(ec2.ResourceTypeTransitGateway),
-				Tags: []*ec2.Tag{
-					{
-						Key:   awssdk.String(clusterTag(name)),
-						Value: awssdk.String(clusterTagValue),
-					},
-				},
+				Tags:         ec2tags,
 			},
 		},
 	}

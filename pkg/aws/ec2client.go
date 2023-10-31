@@ -22,18 +22,18 @@ const (
 // CreateSecurityGroupForResolverEndpoints creates a security group on EC2. It will NOT return error if the security group already exists.
 // The error returned by the AWS SDK when a security group already exists can be found here
 // https://docs.aws.amazon.com/AWSEC2/latest/APIReference/errors-overview.html#api-error-codes-table-client
-func (a *AWSEC2) CreateSecurityGroupForResolverEndpoints(ctx context.Context, vpcId, groupName string) (string, error) {
-	securityGroupId, err := a.createSecurityGroup(ctx, vpcId, groupName)
+func (a *AWSEC2) CreateSecurityGroupForResolverEndpoints(ctx context.Context, vpcId, groupName string, tags map[string]string) (string, error) {
+	securityGroupId, err := a.createSecurityGroup(ctx, vpcId, groupName, tags)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
-	err = a.authorizeSecurityGroupIngressWithContext(ctx, securityGroupId, "udp", "0.0.0.0/0", DNSPort)
+	err = a.authorizeSecurityGroupIngressWithContext(ctx, securityGroupId, "udp", "0.0.0.0/0", DNSPort, tags)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
-	err = a.authorizeSecurityGroupIngressWithContext(ctx, securityGroupId, "tcp", "0.0.0.0/0", DNSPort)
+	err = a.authorizeSecurityGroupIngressWithContext(ctx, securityGroupId, "tcp", "0.0.0.0/0", DNSPort, tags)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -94,11 +94,17 @@ func (a *AWSEC2) getSecurityGroupByName(ctx context.Context, vpcId, groupName st
 	return securityGroupResponse.SecurityGroups[0], nil
 }
 
-func (a *AWSEC2) createSecurityGroup(ctx context.Context, vpcId, groupName string) (string, error) {
+func (a *AWSEC2) createSecurityGroup(ctx context.Context, vpcId, groupName string, tags map[string]string) (string, error) {
 	response, err := a.client.CreateSecurityGroupWithContext(ctx, &ec2.CreateSecurityGroupInput{
 		Description: aws.String(SecurityGroupDescription),
 		GroupName:   aws.String(groupName),
 		VpcId:       aws.String(vpcId),
+		TagSpecifications: []*ec2.TagSpecification{
+			{
+				ResourceType: aws.String(ec2.ResourceTypeSecurityGroup),
+				Tags:         getEc2Tags(tags),
+			},
+		},
 	})
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
@@ -124,13 +130,19 @@ func (a *AWSEC2) createSecurityGroup(ctx context.Context, vpcId, groupName strin
 // authorizeSecurityGroupIngressWithContext adds the specified inbound (ingress) rules to a security group.
 // It won't return an error if the rule already exists for the security group. Errors can be found here
 // https://docs.aws.amazon.com/AWSEC2/latest/APIReference/errors-overview.html#CommonErrors
-func (a *AWSEC2) authorizeSecurityGroupIngressWithContext(ctx context.Context, securityGroupId, protocol, cidr string, port int) error {
+func (a *AWSEC2) authorizeSecurityGroupIngressWithContext(ctx context.Context, securityGroupId, protocol, cidr string, port int, tags map[string]string) error {
 	_, err := a.client.AuthorizeSecurityGroupIngressWithContext(ctx, &ec2.AuthorizeSecurityGroupIngressInput{
 		FromPort:   aws.Int64(int64(port)),
 		GroupId:    aws.String(securityGroupId),
 		IpProtocol: aws.String(protocol),
 		ToPort:     aws.Int64(int64(port)),
 		CidrIp:     aws.String(cidr),
+		TagSpecifications: []*ec2.TagSpecification{
+			{
+				ResourceType: aws.String(ec2.ResourceTypeSecurityGroupRule),
+				Tags:         getEc2Tags(tags),
+			},
+		},
 	})
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
@@ -146,4 +158,15 @@ func (a *AWSEC2) authorizeSecurityGroupIngressWithContext(ctx context.Context, s
 	}
 
 	return nil
+}
+
+func getEc2Tags(t map[string]string) []*ec2.Tag {
+	var tags []*ec2.Tag
+	for k, v := range t {
+		tags = append(tags, &ec2.Tag{
+			Key:   aws.String(k),
+			Value: aws.String(v),
+		})
+	}
+	return tags
 }
