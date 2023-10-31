@@ -3,6 +3,8 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	k8stypes "k8s.io/apimachinery/pkg/types"
@@ -41,9 +43,9 @@ func NewTransitGatewayAttachmentReconciler(
 }
 
 type attachmentScope struct {
-	cluster           *capa.AWSCluster
-	attacher          resolver.TransitGatewayClient
-	transitGatewayARN string
+	cluster              *capa.AWSCluster
+	transitGatewayClient resolver.TransitGatewayClient
+	transitGatewayARN    string
 }
 
 func (r *TransitGatewayAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -76,7 +78,7 @@ func (r *TransitGatewayAttachmentReconciler) Reconcile(ctx context.Context, req 
 
 	if transitGatewayARN == "" {
 		logger.Info("Transit gateway not created yet. Skipping...")
-		return ctrl.Result{}, nil
+		return ctrl.Result{RequeueAfter: time.Minute}, nil
 	}
 
 	identity, err := r.clusterClient.GetIdentity(ctx, cluster)
@@ -96,9 +98,9 @@ func (r *TransitGatewayAttachmentReconciler) Reconcile(ctx context.Context, req 
 	}()
 
 	scope := attachmentScope{
-		cluster:           cluster,
-		attacher:          attacher,
-		transitGatewayARN: transitGatewayARN,
+		cluster:              cluster,
+		transitGatewayClient: attacher,
+		transitGatewayARN:    transitGatewayARN,
 	}
 
 	if !cluster.DeletionTimestamp.IsZero() {
@@ -135,7 +137,7 @@ func (r *TransitGatewayAttachmentReconciler) reconcileNormal(ctx context.Context
 		SubnetIDs:         subnets,
 		Tags:              getAttachmentTags(scope.cluster),
 	}
-	err = scope.attacher.ApplyAttachment(ctx, attachment)
+	err = scope.transitGatewayClient.ApplyAttachment(ctx, attachment)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -151,7 +153,7 @@ func (r *TransitGatewayAttachmentReconciler) reconcileDelete(ctx context.Context
 		TransitGatewayARN: scope.transitGatewayARN,
 		VPCID:             scope.cluster.Spec.NetworkSpec.VPC.ID,
 	}
-	err := scope.attacher.Detach(ctx, attachment)
+	err := scope.transitGatewayClient.Detach(ctx, attachment)
 	if err != nil {
 		logger.Error(err, "Failed to detach transit gateway")
 		return ctrl.Result{}, errors.WithStack(err)
@@ -198,6 +200,10 @@ func getSubnets(cluster *capa.AWSCluster) ([]string, error) {
 			subnetIDs = append(subnetIDs, s.ID)
 			availabilityZones[s.AvailabilityZone] = true
 		}
+	}
+
+	if len(subnetIDs) == 0 {
+		return nil, fmt.Errorf("cluster has no subnets")
 	}
 
 	return subnetIDs, nil

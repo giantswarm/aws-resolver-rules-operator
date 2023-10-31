@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/giantswarm/k8smetadata/pkg/annotation"
 	"github.com/google/uuid"
@@ -154,9 +155,9 @@ var _ = Describe("TransitGatewayAttachment", func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			It("does not reconcile", func() {
+			It("requeues the event", func() {
 				Expect(reconcileErr).NotTo(HaveOccurred())
-				Expect(reconcileResult.Requeue).To(BeFalse())
+				Expect(reconcileResult.RequeueAfter).To(Equal(time.Minute))
 				Expect(transitGatewayClient.Invocations()).To(BeEmpty())
 			})
 		})
@@ -251,6 +252,20 @@ var _ = Describe("TransitGatewayAttachment", func() {
 			})
 		})
 
+		When("the cluster has no subnets", func() {
+			BeforeEach(func() {
+				patchedCluster := cluster.DeepCopy()
+				patchedCluster.Spec.NetworkSpec.Subnets = []capa.SubnetSpec{}
+				err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("returns an error", func() {
+				Expect(reconcileErr).To(MatchError(ContainSubstring("cluster has no subnets")))
+				Expect(transitGatewayClient.ApplyAttachmentCallCount()).To(Equal(0))
+			})
+		})
+
 		When("not all subnets are created yet", func() {
 			BeforeEach(func() {
 				patchedCluster := cluster.DeepCopy()
@@ -268,6 +283,27 @@ var _ = Describe("TransitGatewayAttachment", func() {
 
 			It("returns an error", func() {
 				Expect(reconcileErr).To(MatchError(ContainSubstring("not all subnets have been created")))
+				Expect(transitGatewayClient.ApplyAttachmentCallCount()).To(Equal(0))
+			})
+		})
+
+		When("the subnet ID does not hold the aws subnet ID", func() {
+			BeforeEach(func() {
+				patchedCluster := cluster.DeepCopy()
+				patchedCluster.Spec.NetworkSpec.Subnets = []capa.SubnetSpec{
+					newSubnetSpec("subnet-1", "av-zone-1", false),
+					newSubnetSpec("subnet-2", "av-zone-2", false),
+					newSubnetSpec("subnet-3", "av-zone-2", false),
+					newSubnetSpec("12346", "av-zone-3", false),
+					newSubnetSpec("subnet-4", "av-zone-4", false),
+				}
+
+				err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("returns an error", func() {
+				Expect(reconcileErr).To(MatchError(ContainSubstring("support for newer CAPA versions' ResourceID field not implemented yet")))
 				Expect(transitGatewayClient.ApplyAttachmentCallCount()).To(Equal(0))
 			})
 		})
