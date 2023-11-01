@@ -11,6 +11,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
@@ -176,5 +177,10 @@ func (r *DnsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("dnszone").
 		For(&capa.AWSCluster{}).
+		WithEventFilter(
+			predicate.Funcs{
+				UpdateFunc: predicateToFilterAWSClusterResourceVersionChanges,
+			},
+		).
 		Complete(r)
 }
