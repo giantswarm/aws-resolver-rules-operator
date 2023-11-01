@@ -84,11 +84,13 @@ func (t *TransitGateways) get(ctx context.Context, name string) (*ec2.TransitGat
 
 func (t *TransitGateways) create(ctx context.Context, name string, tags map[string]string) (string, error) {
 	ec2tags := getEc2Tags(tags)
-	ec2tags = append(ec2tags, &ec2.Tag{
-
-		Key:   awssdk.String(clusterTag(name)),
-		Value: awssdk.String(clusterTagValue),
-	})
+	// Add cluster tag if not already present
+	if _, ok := tags[clusterTag(name)]; !ok {
+		ec2tags = append(ec2tags, &ec2.Tag{
+			Key:   awssdk.String(clusterTag(name)),
+			Value: awssdk.String(clusterTagValue),
+		})
+	}
 
 	input := &ec2.CreateTransitGatewayInput{
 		Description: awssdk.String(fmt.Sprintf("Transit Gateway for cluster %s", name)),
