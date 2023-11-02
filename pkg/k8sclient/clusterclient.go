@@ -72,6 +72,16 @@ func (a *ClusterClient) AddAWSManagedControlPlaneFinalizer(ctx context.Context, 
 	return nil
 }
 
+func (a *ClusterClient) AddClusterFinalizer(ctx context.Context, cluster *capi.Cluster, finalizer string) error {
+	originalCluster := cluster.DeepCopy()
+	updated := controllerutil.AddFinalizer(cluster, finalizer)
+	if updated {
+		return a.client.Patch(ctx, cluster, client.MergeFrom(originalCluster))
+	}
+
+	return nil
+}
+
 func (a *ClusterClient) RemoveAWSClusterFinalizer(ctx context.Context, awsCluster *capa.AWSCluster, finalizer string) error {
 	originalCluster := awsCluster.DeepCopy()
 	controllerutil.RemoveFinalizer(awsCluster, finalizer)
@@ -82,6 +92,12 @@ func (a *ClusterClient) RemoveAWSManagedControlPlaneFinalizer(ctx context.Contex
 	originalCluster := awsManagedControlPlane.DeepCopy()
 	controllerutil.RemoveFinalizer(awsManagedControlPlane, finalizer)
 	return a.client.Patch(ctx, awsManagedControlPlane, client.MergeFrom(originalCluster))
+}
+
+func (a *ClusterClient) RemoveClusterFinalizer(ctx context.Context, cluster *capi.Cluster, finalizer string) error {
+	originalCluster := cluster.DeepCopy()
+	controllerutil.RemoveFinalizer(cluster, finalizer)
+	return a.client.Patch(ctx, cluster, client.MergeFrom(originalCluster))
 }
 
 func (a *ClusterClient) GetIdentity(ctx context.Context, identityRef *capa.AWSIdentityReference) (*capa.AWSClusterRoleIdentity, error) {

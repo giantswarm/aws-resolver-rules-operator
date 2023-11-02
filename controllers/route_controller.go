@@ -33,12 +33,17 @@ import (
 	gsannotation "github.com/giantswarm/k8smetadata/pkg/annotation"
 )
 
+const (
+	RouteFinalizer = "capa-operator.finalizers.giantswarm.io/route-controller"
+)
+
 // RouteReconciler reconciles a Route object
 type RouteReconciler struct {
 	clusterClient ClusterClient
 	routeClient   RouteClient
 }
 
+//counterfeiter:generate . RouteClient
 type RouteClient interface {
 	AddRoutes(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string, logger logr.Logger) error
 	RemoveRoutes(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string, logger logr.Logger) error
@@ -82,49 +87,70 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+
 	identity, err := r.clusterClient.GetIdentity(ctx, awsCluster.Spec.IdentityRef)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	transitGatewayID, err := aws.GetARNResourceID(annotations.GetNetworkTopologyTransitGateway(cluster))
-	if err != nil {
-		return ctrl.Result{}, errors.WithStack(err)
-	} else if transitGatewayID == "" {
-		logger.Info("transitGatewayID is not set yet, skipping")
+	if identity == nil {
+		logger.Info("AWSCluster has no identityRef set, skipping")
+		return ctrl.Result{}, nil
+	}
+
+	transitGatewayARN := annotations.GetNetworkTopologyTransitGateway(cluster)
+	if transitGatewayARN == "" {
+		logger.Info("transitGatewayARN is not set yet, skipping")
 		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 	}
 
-	prefixListID, err := aws.GetARNResourceID(annotations.GetNetworkTopologyPrefixList(cluster))
+	transitGatewayID, err := aws.GetARNResourceID(transitGatewayARN)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
-	} else if prefixListID == "" {
-		logger.Info("prefixListID is not set yet, skipping")
+	}
+
+	prefixListARN := annotations.GetNetworkTopologyPrefixList(cluster)
+
+	if prefixListARN == "" {
+		logger.Info("prefixListARN is not set yet, skipping")
 		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
+	}
+
+	prefixListID, err := aws.GetARNResourceID(prefixListARN)
+	if err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
 	}
 
 	roleARN := identity.Spec.RoleArn
 
 	if !cluster.DeletionTimestamp.IsZero() {
-		return r.reconcileDelete(ctx, &transitGatewayID, &prefixListID, awsCluster, roleARN)
+		return r.reconcileDelete(ctx, &transitGatewayID, &prefixListID, cluster, awsCluster, roleARN, logger)
 	}
 
-	return r.reconcileNormal(ctx, &transitGatewayID, &prefixListID, awsCluster, roleARN)
+	return r.reconcileNormal(ctx, &transitGatewayID, &prefixListID, cluster, awsCluster, roleARN, logger)
 }
 
-func (r *RouteReconciler) reconcileNormal(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
+func (r *RouteReconciler) reconcileNormal(ctx context.Context, transitGatewayID, prefixListID *string, cluster *capi.Cluster, awsCluster *capa.AWSCluster, roleArn string, logger logr.Logger) (ctrl.Result, error) {
 	logger.Info("Adding routes")
+
+	if err := r.clusterClient.AddClusterFinalizer(ctx, cluster, RouteFinalizer); err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
 	if err := r.routeClient.AddRoutes(ctx, transitGatewayID, prefixListID, awsCluster, roleArn, logger); err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 	return ctrl.Result{}, nil
 }
 
-func (r *RouteReconciler) reconcileDelete(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
+func (r *RouteReconciler) reconcileDelete(ctx context.Context, transitGatewayID, prefixListID *string, cluster *capi.Cluster, awsCluster *capa.AWSCluster, roleArn string, logger logr.Logger) (ctrl.Result, error) {
 	logger.Info("Deletig routes")
+
 	if err := r.routeClient.RemoveRoutes(ctx, transitGatewayID, prefixListID, awsCluster, roleArn, logger); err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
+	if err := r.clusterClient.RemoveClusterFinalizer(ctx, cluster, RouteFinalizer); err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 	return ctrl.Result{}, nil

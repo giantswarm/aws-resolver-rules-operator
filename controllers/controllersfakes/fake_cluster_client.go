@@ -39,6 +39,19 @@ type FakeClusterClient struct {
 	addAWSManagedControlPlaneFinalizerReturnsOnCall map[int]struct {
 		result1 error
 	}
+	AddClusterFinalizerStub        func(context.Context, *v1beta1b.Cluster, string) error
+	addClusterFinalizerMutex       sync.RWMutex
+	addClusterFinalizerArgsForCall []struct {
+		arg1 context.Context
+		arg2 *v1beta1b.Cluster
+		arg3 string
+	}
+	addClusterFinalizerReturns struct {
+		result1 error
+	}
+	addClusterFinalizerReturnsOnCall map[int]struct {
+		result1 error
+	}
 	GetAWSClusterStub        func(context.Context, types.NamespacedName) (*v1beta1.AWSCluster, error)
 	getAWSClusterMutex       sync.RWMutex
 	getAWSClusterArgsForCall []struct {
@@ -146,6 +159,19 @@ type FakeClusterClient struct {
 		result1 error
 	}
 	removeAWSManagedControlPlaneFinalizerReturnsOnCall map[int]struct {
+		result1 error
+	}
+	RemoveClusterFinalizerStub        func(context.Context, *v1beta1b.Cluster, string) error
+	removeClusterFinalizerMutex       sync.RWMutex
+	removeClusterFinalizerArgsForCall []struct {
+		arg1 context.Context
+		arg2 *v1beta1b.Cluster
+		arg3 string
+	}
+	removeClusterFinalizerReturns struct {
+		result1 error
+	}
+	removeClusterFinalizerReturnsOnCall map[int]struct {
 		result1 error
 	}
 	UnpauseStub        func(context.Context, *v1beta1.AWSCluster, *v1beta1b.Cluster) error
@@ -287,6 +313,69 @@ func (fake *FakeClusterClient) AddAWSManagedControlPlaneFinalizerReturnsOnCall(i
 		})
 	}
 	fake.addAWSManagedControlPlaneFinalizerReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeClusterClient) AddClusterFinalizer(arg1 context.Context, arg2 *v1beta1b.Cluster, arg3 string) error {
+	fake.addClusterFinalizerMutex.Lock()
+	ret, specificReturn := fake.addClusterFinalizerReturnsOnCall[len(fake.addClusterFinalizerArgsForCall)]
+	fake.addClusterFinalizerArgsForCall = append(fake.addClusterFinalizerArgsForCall, struct {
+		arg1 context.Context
+		arg2 *v1beta1b.Cluster
+		arg3 string
+	}{arg1, arg2, arg3})
+	stub := fake.AddClusterFinalizerStub
+	fakeReturns := fake.addClusterFinalizerReturns
+	fake.recordInvocation("AddClusterFinalizer", []interface{}{arg1, arg2, arg3})
+	fake.addClusterFinalizerMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeClusterClient) AddClusterFinalizerCallCount() int {
+	fake.addClusterFinalizerMutex.RLock()
+	defer fake.addClusterFinalizerMutex.RUnlock()
+	return len(fake.addClusterFinalizerArgsForCall)
+}
+
+func (fake *FakeClusterClient) AddClusterFinalizerCalls(stub func(context.Context, *v1beta1b.Cluster, string) error) {
+	fake.addClusterFinalizerMutex.Lock()
+	defer fake.addClusterFinalizerMutex.Unlock()
+	fake.AddClusterFinalizerStub = stub
+}
+
+func (fake *FakeClusterClient) AddClusterFinalizerArgsForCall(i int) (context.Context, *v1beta1b.Cluster, string) {
+	fake.addClusterFinalizerMutex.RLock()
+	defer fake.addClusterFinalizerMutex.RUnlock()
+	argsForCall := fake.addClusterFinalizerArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeClusterClient) AddClusterFinalizerReturns(result1 error) {
+	fake.addClusterFinalizerMutex.Lock()
+	defer fake.addClusterFinalizerMutex.Unlock()
+	fake.AddClusterFinalizerStub = nil
+	fake.addClusterFinalizerReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeClusterClient) AddClusterFinalizerReturnsOnCall(i int, result1 error) {
+	fake.addClusterFinalizerMutex.Lock()
+	defer fake.addClusterFinalizerMutex.Unlock()
+	fake.AddClusterFinalizerStub = nil
+	if fake.addClusterFinalizerReturnsOnCall == nil {
+		fake.addClusterFinalizerReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.addClusterFinalizerReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }
@@ -805,6 +894,69 @@ func (fake *FakeClusterClient) RemoveAWSManagedControlPlaneFinalizerReturnsOnCal
 	}{result1}
 }
 
+func (fake *FakeClusterClient) RemoveClusterFinalizer(arg1 context.Context, arg2 *v1beta1b.Cluster, arg3 string) error {
+	fake.removeClusterFinalizerMutex.Lock()
+	ret, specificReturn := fake.removeClusterFinalizerReturnsOnCall[len(fake.removeClusterFinalizerArgsForCall)]
+	fake.removeClusterFinalizerArgsForCall = append(fake.removeClusterFinalizerArgsForCall, struct {
+		arg1 context.Context
+		arg2 *v1beta1b.Cluster
+		arg3 string
+	}{arg1, arg2, arg3})
+	stub := fake.RemoveClusterFinalizerStub
+	fakeReturns := fake.removeClusterFinalizerReturns
+	fake.recordInvocation("RemoveClusterFinalizer", []interface{}{arg1, arg2, arg3})
+	fake.removeClusterFinalizerMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeClusterClient) RemoveClusterFinalizerCallCount() int {
+	fake.removeClusterFinalizerMutex.RLock()
+	defer fake.removeClusterFinalizerMutex.RUnlock()
+	return len(fake.removeClusterFinalizerArgsForCall)
+}
+
+func (fake *FakeClusterClient) RemoveClusterFinalizerCalls(stub func(context.Context, *v1beta1b.Cluster, string) error) {
+	fake.removeClusterFinalizerMutex.Lock()
+	defer fake.removeClusterFinalizerMutex.Unlock()
+	fake.RemoveClusterFinalizerStub = stub
+}
+
+func (fake *FakeClusterClient) RemoveClusterFinalizerArgsForCall(i int) (context.Context, *v1beta1b.Cluster, string) {
+	fake.removeClusterFinalizerMutex.RLock()
+	defer fake.removeClusterFinalizerMutex.RUnlock()
+	argsForCall := fake.removeClusterFinalizerArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeClusterClient) RemoveClusterFinalizerReturns(result1 error) {
+	fake.removeClusterFinalizerMutex.Lock()
+	defer fake.removeClusterFinalizerMutex.Unlock()
+	fake.RemoveClusterFinalizerStub = nil
+	fake.removeClusterFinalizerReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeClusterClient) RemoveClusterFinalizerReturnsOnCall(i int, result1 error) {
+	fake.removeClusterFinalizerMutex.Lock()
+	defer fake.removeClusterFinalizerMutex.Unlock()
+	fake.RemoveClusterFinalizerStub = nil
+	if fake.removeClusterFinalizerReturnsOnCall == nil {
+		fake.removeClusterFinalizerReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.removeClusterFinalizerReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakeClusterClient) Unpause(arg1 context.Context, arg2 *v1beta1.AWSCluster, arg3 *v1beta1b.Cluster) error {
 	fake.unpauseMutex.Lock()
 	ret, specificReturn := fake.unpauseReturnsOnCall[len(fake.unpauseArgsForCall)]
@@ -875,6 +1027,8 @@ func (fake *FakeClusterClient) Invocations() map[string][][]interface{} {
 	defer fake.addAWSClusterFinalizerMutex.RUnlock()
 	fake.addAWSManagedControlPlaneFinalizerMutex.RLock()
 	defer fake.addAWSManagedControlPlaneFinalizerMutex.RUnlock()
+	fake.addClusterFinalizerMutex.RLock()
+	defer fake.addClusterFinalizerMutex.RUnlock()
 	fake.getAWSClusterMutex.RLock()
 	defer fake.getAWSClusterMutex.RUnlock()
 	fake.getAWSManagedControlPlaneMutex.RLock()
@@ -891,6 +1045,8 @@ func (fake *FakeClusterClient) Invocations() map[string][][]interface{} {
 	defer fake.removeAWSClusterFinalizerMutex.RUnlock()
 	fake.removeAWSManagedControlPlaneFinalizerMutex.RLock()
 	defer fake.removeAWSManagedControlPlaneFinalizerMutex.RUnlock()
+	fake.removeClusterFinalizerMutex.RLock()
+	defer fake.removeClusterFinalizerMutex.RUnlock()
 	fake.unpauseMutex.RLock()
 	defer fake.unpauseMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
