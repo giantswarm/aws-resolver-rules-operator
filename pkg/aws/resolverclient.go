@@ -34,12 +34,12 @@ func (a *AWSResolver) CreateResolverRule(ctx context.Context, logger logr.Logger
 	}
 
 	// Otherwise we create it.
-	inboundEndpointId, err := a.createResolverEndpointWithContext(ctx, logger, "INBOUND", getInboundEndpointName(cluster.Name), []string{securityGroupId}, cluster.Subnets)
+	inboundEndpointId, err := a.createResolverEndpointWithContext(ctx, logger, "INBOUND", getInboundEndpointName(cluster.Name), []string{securityGroupId}, cluster.Subnets, cluster.AdditionalTags)
 	if err != nil {
 		return resolver.ResolverRule{}, errors.WithStack(err)
 	}
 
-	outboundEndpointId, err := a.createResolverEndpointWithContext(ctx, logger, "OUTBOUND", getOutboundEndpointName(cluster.Name), []string{securityGroupId}, cluster.Subnets)
+	outboundEndpointId, err := a.createResolverEndpointWithContext(ctx, logger, "OUTBOUND", getOutboundEndpointName(cluster.Name), []string{securityGroupId}, cluster.Subnets, cluster.AdditionalTags)
 	if err != nil {
 		return resolver.ResolverRule{}, errors.WithStack(err)
 	}
@@ -58,7 +58,7 @@ func (a *AWSResolver) CreateResolverRule(ctx context.Context, logger logr.Logger
 			Port: aws.Int64(53),
 		})
 	}
-	resolverRule, err = a.createResolverRule(ctx, logger, domainName, resolverRuleName, outboundEndpointId, targetAddress)
+	resolverRule, err = a.createResolverRule(ctx, logger, domainName, resolverRuleName, outboundEndpointId, targetAddress, cluster.AdditionalTags)
 	if err != nil {
 		return resolver.ResolverRule{}, errors.WithStack(err)
 	}
@@ -68,7 +68,7 @@ func (a *AWSResolver) CreateResolverRule(ctx context.Context, logger logr.Logger
 
 // createResolverRule will create a new Resolver Rule.
 // If the Rule already exists, it will try to fetch it to return the Rule ARN and ID.
-func (a *AWSResolver) createResolverRule(ctx context.Context, logger logr.Logger, domainName, resolverRuleName, endpointId string, targetIps []*route53resolver.TargetAddress) (resolver.ResolverRule, error) {
+func (a *AWSResolver) createResolverRule(ctx context.Context, logger logr.Logger, domainName, resolverRuleName, endpointId string, targetIps []*route53resolver.TargetAddress, tags map[string]string) (resolver.ResolverRule, error) {
 	now := time.Now()
 	response, err := a.client.CreateResolverRuleWithContext(ctx, &route53resolver.CreateResolverRuleInput{
 		CreatorRequestId:   aws.String(fmt.Sprintf("%d", now.UnixNano())),
@@ -77,6 +77,7 @@ func (a *AWSResolver) createResolverRule(ctx context.Context, logger logr.Logger
 		ResolverEndpointId: aws.String(endpointId),
 		RuleType:           aws.String("FORWARD"),
 		TargetIps:          targetIps,
+		Tags:               getRoute53ResolverTags(tags),
 	})
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
@@ -104,7 +105,7 @@ func (a *AWSResolver) createResolverRule(ctx context.Context, logger logr.Logger
 // CreateResolverEndpointWithContext creates a Resolver endpoint.
 // It won't return an error if the endpoint already exists. Errors can be found here
 // https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_CreateResolverEndpoint.html#API_route53resolver_CreateResolverEndpoint_Errors
-func (a *AWSResolver) createResolverEndpointWithContext(ctx context.Context, logger logr.Logger, direction, name string, securityGroupIds, subnetIds []string) (string, error) {
+func (a *AWSResolver) createResolverEndpointWithContext(ctx context.Context, logger logr.Logger, direction, name string, securityGroupIds, subnetIds []string, tags map[string]string) (string, error) {
 	resolverEndpoint, err := a.getResolverEndpoint(ctx, name)
 	if err != nil {
 		if !errors.Is(err, &ResolverEndpointNotFoundError{}) {
@@ -133,6 +134,7 @@ func (a *AWSResolver) createResolverEndpointWithContext(ctx context.Context, log
 		IpAddresses:      ipAddresses,
 		Name:             aws.String(name),
 		SecurityGroupIds: aws.StringSlice(securityGroupIds),
+		Tags:             getRoute53ResolverTags(tags),
 	})
 
 	if err != nil {
@@ -435,4 +437,15 @@ func getInboundEndpointName(clusterName string) string {
 
 func getOutboundEndpointName(clusterName string) string {
 	return fmt.Sprintf("%s-outbound", clusterName)
+}
+
+func getRoute53ResolverTags(t map[string]string) []*route53resolver.Tag {
+	var tags []*route53resolver.Tag
+	for key, value := range t {
+		tags = append(tags, &route53resolver.Tag{
+			Key:   aws.String(key),
+			Value: aws.String(value),
+		})
+	}
+	return tags
 }

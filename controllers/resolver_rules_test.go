@@ -78,6 +78,9 @@ var _ = Describe("Resolver rules reconciler", func() {
 				Namespace: "bar",
 			},
 			Spec: capa.AWSClusterSpec{
+				AdditionalTags: map[string]string{
+					"test": "test-tag",
+				},
 				NetworkSpec: capa.NetworkSpec{
 					VPC: capa.VPCSpec{
 						ID:        WorkloadClusterVPCId,
@@ -225,7 +228,8 @@ var _ = Describe("Resolver rules reconciler", func() {
 
 						It("creates security group", func() {
 							Expect(ec2Client.CreateSecurityGroupForResolverEndpointsCallCount()).To(Equal(1))
-							_, vpcId, groupName := ec2Client.CreateSecurityGroupForResolverEndpointsArgsForCall(0)
+							_, vpcId, groupName, tags := ec2Client.CreateSecurityGroupForResolverEndpointsArgsForCall(0)
+							Expect(tags).To(Equal(map[string]string(awsCluster.Spec.AdditionalTags)))
 							Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
 							Expect(groupName).To(Equal(fmt.Sprintf("%s-resolverrules-endpoints", ClusterName)))
 							Expect(reconcileErr).NotTo(HaveOccurred())

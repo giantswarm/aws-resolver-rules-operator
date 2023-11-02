@@ -186,7 +186,7 @@ func (r *Resolver) createRule(ctx context.Context, logger logr.Logger, cluster C
 	}
 
 	logger.Info("Creating security group for the Resolver endpoints")
-	securityGroupId, err := ec2Client.CreateSecurityGroupForResolverEndpoints(ctx, cluster.VPCId, getSecurityGroupName(cluster.Name))
+	securityGroupId, err := ec2Client.CreateSecurityGroupForResolverEndpoints(ctx, cluster.VPCId, getSecurityGroupName(cluster.Name), cluster.AdditionalTags)
 	if err != nil {
 		return ResolverRule{}, errors.WithStack(err)
 	}

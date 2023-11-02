@@ -28,7 +28,7 @@ var _ = Describe("EC2 client", func() {
 	})
 
 	It("creates the security group successfully", func() {
-		resolverEndpointsSecurityGroup, err = ec2Client.CreateSecurityGroupForResolverEndpoints(ctx, VPCId, "my-security-group")
+		resolverEndpointsSecurityGroup, err = ec2Client.CreateSecurityGroupForResolverEndpoints(ctx, VPCId, "my-security-group", additionalTags)
 		Expect(err).NotTo(HaveOccurred())
 
 		securityGroupsResponse, err := rawEC2Client.DescribeSecurityGroupsWithContext(ctx, &ec2.DescribeSecurityGroupsInput{
@@ -52,7 +52,7 @@ var _ = Describe("EC2 client", func() {
 		Expect(*securityGroupsResponse.SecurityGroups[0].IpPermissions[1].IpProtocol).To(Equal("tcp"))
 
 		By("creating the security group again it doesn't fail", func() {
-			_, err = ec2Client.CreateSecurityGroupForResolverEndpoints(ctx, VPCId, "my-security-group")
+			_, err = ec2Client.CreateSecurityGroupForResolverEndpoints(ctx, VPCId, "my-security-group", additionalTags)
 			Expect(err).NotTo(HaveOccurred())
 
 			securityGroupsResponse, err = rawEC2Client.DescribeSecurityGroupsWithContext(ctx, &ec2.DescribeSecurityGroupsInput{
