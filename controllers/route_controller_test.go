@@ -43,6 +43,7 @@ var _ = Describe("RouteReconciler", func() {
 		transitGatewayID  = "tgw-019120b363d1e81e4"
 		prefixListARN     = fmt.Sprintf("arn:aws:ec2:eu-north-1:123456789012:prefix-list/%s", prefixlistID)
 		transitGatewayARN = fmt.Sprintf("arn:aws:ec2:eu-north-1:123456789012:transit-gateway/%s", transitGatewayID)
+		subnets           []*string
 	)
 
 	BeforeEach(func() {
@@ -86,7 +87,6 @@ var _ = Describe("RouteReconciler", func() {
 				},
 			},
 		}
-
 		cluster = &capi.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ClusterName,
@@ -98,6 +98,10 @@ var _ = Describe("RouteReconciler", func() {
 				},
 			},
 		}
+
+		subnets := make([]*string, 0)
+		subnets := append(subnets, &awsCluster.Spec.NetworkSpec.Subnets[0].ID)
+		subnets = append(subnets, &awsCluster.Spec.NetworkSpec.Subnets[1].ID)
 	})
 
 	JustBeforeEach(func() {
@@ -224,11 +228,12 @@ var _ = Describe("RouteReconciler", func() {
 
 					It("adds the routes", func() {
 						Expect(routeClient.AddRoutesCallCount()).To(Equal(1))
-						_, transitGatewayIDArg, prefixListIDArg, awsClusterArg, roleARN, _ := routeClient.AddRoutesArgsForCall(0)
+						_, transitGatewayIDArg, prefixListIDArg, subnetsArg, roleARN, region, _ := routeClient.AddRoutesArgsForCall(0)
 						Expect(*transitGatewayIDArg).To(Equal(transitGatewayID))
 						Expect(*prefixListIDArg).To(Equal(prefixlistID))
-						Expect(awsClusterArg).To(Equal(awsCluster))
+						Expect(subnetsArg).To(Equal(subnets))
 						Expect(roleARN).To(Equal(awsClusterRoleIdentity.Spec.RoleArn))
+						Expect(region).To(Equal(awsCluster.Spec.Region))
 					})
 				})
 
@@ -238,11 +243,12 @@ var _ = Describe("RouteReconciler", func() {
 					})
 					It("deletes the routes", func() {
 						Expect(routeClient.RemoveRoutesCallCount()).To(Equal(1))
-						_, transitGatewayIDArg, prefixListIDArg, awsClusterArg, roleARN, _ := routeClient.RemoveRoutesArgsForCall(0)
+						_, transitGatewayIDArg, prefixListIDArg, subnetsArg, roleARN, region, _ := routeClient.RemoveRoutesArgsForCall(0)
 						Expect(*transitGatewayIDArg).To(Equal(transitGatewayID))
 						Expect(*prefixListIDArg).To(Equal(prefixlistID))
-						Expect(awsClusterArg).To(Equal(awsCluster))
+						Expect(subnetsArg).To(Equal(subnets))
 						Expect(roleARN).To(Equal(awsClusterRoleIdentity.Spec.RoleArn))
+						Expect(region).To(Equal(awsCluster.Spec.Region))
 					})
 
 					It("removes the finalizer from the cluster", func() {

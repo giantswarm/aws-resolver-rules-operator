@@ -7,7 +7,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
-	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
@@ -22,14 +21,8 @@ func NewRoute(awsClients resolver.AWSClients) (Route, error) {
 	}, nil
 }
 
-func (r *Route) AddRoutes(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string, logger logr.Logger) error {
-	subnets := []*string{}
-	for _, s := range awsCluster.Spec.NetworkSpec.Subnets {
-		temp := s.ID
-		subnets = append(subnets, &temp)
-	}
-
-	routeTablesClient, err := r.awsClients.NewRouteTablesClient(awsCluster.Spec.Region, roleArn)
+func (r *Route) AddRoutes(ctx context.Context, transitGatewayID, prefixListID *string, subnets []*string, roleArn, region string, logger logr.Logger) error {
+	routeTablesClient, err := r.awsClients.NewRouteTablesClient(region, roleArn)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -53,14 +46,8 @@ func (r *Route) AddRoutes(ctx context.Context, transitGatewayID, prefixListID *s
 	return nil
 }
 
-func (r *Route) RemoveRoutes(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster, roleArn string, logger logr.Logger) error {
-	subnets := []*string{}
-	for _, s := range awsCluster.Spec.NetworkSpec.Subnets {
-		temp := s.ID
-		subnets = append(subnets, &temp)
-	}
-
-	routeTablesClient, err := r.awsClients.NewRouteTablesClient(awsCluster.Spec.Region, roleArn)
+func (r *Route) RemoveRoutes(ctx context.Context, transitGatewayID, prefixListID *string, subnets []*string, roleArn, region string, logger logr.Logger) error {
+	routeTablesClient, err := r.awsClients.NewRouteTablesClient(region, roleArn)
 	if err != nil {
 		return errors.WithStack(err)
 	}

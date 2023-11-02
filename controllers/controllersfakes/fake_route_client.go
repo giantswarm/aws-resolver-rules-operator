@@ -7,19 +7,19 @@ import (
 
 	"github.com/aws-resolver-rules-operator/controllers"
 	"github.com/go-logr/logr"
-	"sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 )
 
 type FakeRouteClient struct {
-	AddRoutesStub        func(context.Context, *string, *string, *v1beta1.AWSCluster, string, logr.Logger) error
+	AddRoutesStub        func(context.Context, *string, *string, []*string, string, string, logr.Logger) error
 	addRoutesMutex       sync.RWMutex
 	addRoutesArgsForCall []struct {
 		arg1 context.Context
 		arg2 *string
 		arg3 *string
-		arg4 *v1beta1.AWSCluster
+		arg4 []*string
 		arg5 string
-		arg6 logr.Logger
+		arg6 string
+		arg7 logr.Logger
 	}
 	addRoutesReturns struct {
 		result1 error
@@ -27,15 +27,16 @@ type FakeRouteClient struct {
 	addRoutesReturnsOnCall map[int]struct {
 		result1 error
 	}
-	RemoveRoutesStub        func(context.Context, *string, *string, *v1beta1.AWSCluster, string, logr.Logger) error
+	RemoveRoutesStub        func(context.Context, *string, *string, []*string, string, string, logr.Logger) error
 	removeRoutesMutex       sync.RWMutex
 	removeRoutesArgsForCall []struct {
 		arg1 context.Context
 		arg2 *string
 		arg3 *string
-		arg4 *v1beta1.AWSCluster
+		arg4 []*string
 		arg5 string
-		arg6 logr.Logger
+		arg6 string
+		arg7 logr.Logger
 	}
 	removeRoutesReturns struct {
 		result1 error
@@ -47,23 +48,29 @@ type FakeRouteClient struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeRouteClient) AddRoutes(arg1 context.Context, arg2 *string, arg3 *string, arg4 *v1beta1.AWSCluster, arg5 string, arg6 logr.Logger) error {
+func (fake *FakeRouteClient) AddRoutes(arg1 context.Context, arg2 *string, arg3 *string, arg4 []*string, arg5 string, arg6 string, arg7 logr.Logger) error {
+	var arg4Copy []*string
+	if arg4 != nil {
+		arg4Copy = make([]*string, len(arg4))
+		copy(arg4Copy, arg4)
+	}
 	fake.addRoutesMutex.Lock()
 	ret, specificReturn := fake.addRoutesReturnsOnCall[len(fake.addRoutesArgsForCall)]
 	fake.addRoutesArgsForCall = append(fake.addRoutesArgsForCall, struct {
 		arg1 context.Context
 		arg2 *string
 		arg3 *string
-		arg4 *v1beta1.AWSCluster
+		arg4 []*string
 		arg5 string
-		arg6 logr.Logger
-	}{arg1, arg2, arg3, arg4, arg5, arg6})
+		arg6 string
+		arg7 logr.Logger
+	}{arg1, arg2, arg3, arg4Copy, arg5, arg6, arg7})
 	stub := fake.AddRoutesStub
 	fakeReturns := fake.addRoutesReturns
-	fake.recordInvocation("AddRoutes", []interface{}{arg1, arg2, arg3, arg4, arg5, arg6})
+	fake.recordInvocation("AddRoutes", []interface{}{arg1, arg2, arg3, arg4Copy, arg5, arg6, arg7})
 	fake.addRoutesMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3, arg4, arg5, arg6)
+		return stub(arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 	}
 	if specificReturn {
 		return ret.result1
@@ -77,17 +84,17 @@ func (fake *FakeRouteClient) AddRoutesCallCount() int {
 	return len(fake.addRoutesArgsForCall)
 }
 
-func (fake *FakeRouteClient) AddRoutesCalls(stub func(context.Context, *string, *string, *v1beta1.AWSCluster, string, logr.Logger) error) {
+func (fake *FakeRouteClient) AddRoutesCalls(stub func(context.Context, *string, *string, []*string, string, string, logr.Logger) error) {
 	fake.addRoutesMutex.Lock()
 	defer fake.addRoutesMutex.Unlock()
 	fake.AddRoutesStub = stub
 }
 
-func (fake *FakeRouteClient) AddRoutesArgsForCall(i int) (context.Context, *string, *string, *v1beta1.AWSCluster, string, logr.Logger) {
+func (fake *FakeRouteClient) AddRoutesArgsForCall(i int) (context.Context, *string, *string, []*string, string, string, logr.Logger) {
 	fake.addRoutesMutex.RLock()
 	defer fake.addRoutesMutex.RUnlock()
 	argsForCall := fake.addRoutesArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5, argsForCall.arg6
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5, argsForCall.arg6, argsForCall.arg7
 }
 
 func (fake *FakeRouteClient) AddRoutesReturns(result1 error) {
@@ -113,23 +120,29 @@ func (fake *FakeRouteClient) AddRoutesReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
-func (fake *FakeRouteClient) RemoveRoutes(arg1 context.Context, arg2 *string, arg3 *string, arg4 *v1beta1.AWSCluster, arg5 string, arg6 logr.Logger) error {
+func (fake *FakeRouteClient) RemoveRoutes(arg1 context.Context, arg2 *string, arg3 *string, arg4 []*string, arg5 string, arg6 string, arg7 logr.Logger) error {
+	var arg4Copy []*string
+	if arg4 != nil {
+		arg4Copy = make([]*string, len(arg4))
+		copy(arg4Copy, arg4)
+	}
 	fake.removeRoutesMutex.Lock()
 	ret, specificReturn := fake.removeRoutesReturnsOnCall[len(fake.removeRoutesArgsForCall)]
 	fake.removeRoutesArgsForCall = append(fake.removeRoutesArgsForCall, struct {
 		arg1 context.Context
 		arg2 *string
 		arg3 *string
-		arg4 *v1beta1.AWSCluster
+		arg4 []*string
 		arg5 string
-		arg6 logr.Logger
-	}{arg1, arg2, arg3, arg4, arg5, arg6})
+		arg6 string
+		arg7 logr.Logger
+	}{arg1, arg2, arg3, arg4Copy, arg5, arg6, arg7})
 	stub := fake.RemoveRoutesStub
 	fakeReturns := fake.removeRoutesReturns
-	fake.recordInvocation("RemoveRoutes", []interface{}{arg1, arg2, arg3, arg4, arg5, arg6})
+	fake.recordInvocation("RemoveRoutes", []interface{}{arg1, arg2, arg3, arg4Copy, arg5, arg6, arg7})
 	fake.removeRoutesMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3, arg4, arg5, arg6)
+		return stub(arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 	}
 	if specificReturn {
 		return ret.result1
@@ -143,17 +156,17 @@ func (fake *FakeRouteClient) RemoveRoutesCallCount() int {
 	return len(fake.removeRoutesArgsForCall)
 }
 
-func (fake *FakeRouteClient) RemoveRoutesCalls(stub func(context.Context, *string, *string, *v1beta1.AWSCluster, string, logr.Logger) error) {
+func (fake *FakeRouteClient) RemoveRoutesCalls(stub func(context.Context, *string, *string, []*string, string, string, logr.Logger) error) {
 	fake.removeRoutesMutex.Lock()
 	defer fake.removeRoutesMutex.Unlock()
 	fake.RemoveRoutesStub = stub
 }
 
-func (fake *FakeRouteClient) RemoveRoutesArgsForCall(i int) (context.Context, *string, *string, *v1beta1.AWSCluster, string, logr.Logger) {
+func (fake *FakeRouteClient) RemoveRoutesArgsForCall(i int) (context.Context, *string, *string, []*string, string, string, logr.Logger) {
 	fake.removeRoutesMutex.RLock()
 	defer fake.removeRoutesMutex.RUnlock()
 	argsForCall := fake.removeRoutesArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5, argsForCall.arg6
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5, argsForCall.arg6, argsForCall.arg7
 }
 
 func (fake *FakeRouteClient) RemoveRoutesReturns(result1 error) {
