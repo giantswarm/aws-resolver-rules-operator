@@ -30,7 +30,7 @@ func (r *RouteTables) DeleteRoute(ctx context.Context, routeTableId, prefixListI
 	}); err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
-			case "InvalidRoute.NotFound	":
+			case "InvalidRoute.NotFound":
 				return nil
 			default:
 				return errors.WithStack(err)
@@ -43,7 +43,7 @@ func (r *RouteTables) DeleteRoute(ctx context.Context, routeTableId, prefixListI
 
 func (r *RouteTables) GetRouteTables(ctx context.Context, subnets []*string) ([]*ec2.RouteTable, error) {
 	filterName := "association.subnet-id"
-	output, err := r.ec2.DescribeRouteTables(&ec2.DescribeRouteTablesInput{
+	output, err := r.ec2.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{
 		Filters: []*ec2.Filter{
 			{Name: &filterName, Values: subnets},
 		},

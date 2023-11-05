@@ -100,7 +100,7 @@ var _ = Describe("RouteReconciler", func() {
 		}
 
 		subnets := make([]*string, 0)
-		subnets := append(subnets, &awsCluster.Spec.NetworkSpec.Subnets[0].ID)
+		subnets = append(subnets, &awsCluster.Spec.NetworkSpec.Subnets[0].ID)
 		subnets = append(subnets, &awsCluster.Spec.NetworkSpec.Subnets[1].ID)
 	})
 
