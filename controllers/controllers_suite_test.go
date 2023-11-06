@@ -39,6 +39,7 @@ import (
 
 	// +kubebuilder:scaffold:imports
 
+	"github.com/aws-resolver-rules-operator/controllers"
 	"github.com/aws-resolver-rules-operator/tests"
 )
 
@@ -126,7 +127,6 @@ func newCluster(name string, annotationsKeyValues ...string) *capa.AWSCluster {
 		annotations[annotationsKeyValues[i]] = annotationsKeyValues[i+1]
 	}
 
-	vpcID := uuid.NewString()
 	awsCluster := &capa.AWSCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
@@ -136,7 +136,7 @@ func newCluster(name string, annotationsKeyValues ...string) *capa.AWSCluster {
 		Spec: capa.AWSClusterSpec{
 			NetworkSpec: capa.NetworkSpec{
 				VPC: capa.VPCSpec{
-					ID: vpcID,
+					ID: uuid.NewString(),
 				},
 				Subnets: capa.Subnets{
 					{
@@ -148,6 +148,13 @@ func newCluster(name string, annotationsKeyValues ...string) *capa.AWSCluster {
 		},
 	}
 
+	return awsCluster
+}
+
+func createRandomCluster(annotationsKeyValues ...string) *capa.AWSCluster {
+	name := uuid.NewString()
+	awsCluster := newCluster(name, annotationsKeyValues...)
+
 	Expect(k8sClient.Create(context.Background(), awsCluster)).To(Succeed())
 	tests.PatchAWSClusterStatus(k8sClient, awsCluster, capa.AWSClusterStatus{
 		Ready: true,
@@ -156,7 +163,51 @@ func newCluster(name string, annotationsKeyValues ...string) *capa.AWSCluster {
 	return awsCluster
 }
 
-func newRandomCluster(annotationsKeyValues ...string) *capa.AWSCluster {
+func createRandomClusterWithIdentity(annotationsKeyValues ...string) (*capa.AWSClusterRoleIdentity, *capa.AWSCluster) {
 	name := uuid.NewString()
-	return newCluster(name, annotationsKeyValues...)
+	awsCluster := newCluster(name, annotationsKeyValues...)
+	identity := newRoleIdentity()
+
+	awsCluster.Spec.IdentityRef = &capa.AWSIdentityReference{
+		Name: identity.Name,
+		Kind: "AWSClusterRoleIdentity",
+	}
+
+	Expect(k8sClient.Create(context.Background(), awsCluster)).To(Succeed())
+	Expect(k8sClient.Create(context.Background(), identity)).To(Succeed())
+	tests.PatchAWSClusterStatus(k8sClient, awsCluster, capa.AWSClusterStatus{
+		Ready: true,
+	})
+
+	return identity, awsCluster
+}
+
+func newRoleIdentity() *capa.AWSClusterRoleIdentity {
+	name := uuid.NewString()
+	return &capa.AWSClusterRoleIdentity{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: capa.AWSClusterRoleIdentitySpec{
+			AWSRoleSpec: capa.AWSRoleSpec{
+				RoleArn: uuid.NewString(),
+			},
+		},
+	}
+}
+
+func newSubnetSpec(id, availabilityZone string, transitGatewayTagged bool) capa.SubnetSpec {
+	subnet := capa.SubnetSpec{
+		ID:               id,
+		AvailabilityZone: availabilityZone,
+		IsPublic:         false,
+		Tags:             map[string]string{},
+	}
+
+	if transitGatewayTagged {
+		subnet.Tags[controllers.TagSubnetTGWAttachements] = "true"
+	}
+
+	return subnet
 }

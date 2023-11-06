@@ -54,7 +54,7 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 
-		cluster = newRandomCluster(
+		cluster = createRandomCluster(
 			annotation.NetworkTopologyModeAnnotation,
 			annotation.NetworkTopologyModeGiantSwarmManaged,
 		)
@@ -132,7 +132,7 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 
 		When("the cluster is not the management cluster", func() {
 			BeforeEach(func() {
-				otherCluster := newRandomCluster()
+				otherCluster := createRandomCluster()
 				requestResourceName = otherCluster.Name
 			})
 

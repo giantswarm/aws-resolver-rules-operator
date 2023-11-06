@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws/arn"
@@ -9,7 +10,7 @@ import (
 func GetARNResourceID(resourceARN string) (string, error) {
 	gatewayARN, err := arn.Parse(resourceARN)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to parse arn: %w", err)
 	}
 
 	// The ARN struct holds the resource in the format "<resource-type>/<resource-name>"
