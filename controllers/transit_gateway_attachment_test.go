@@ -70,6 +70,10 @@ var _ = Describe("TransitGatewayAttachment", func() {
 		requestResourceName = cluster.Name
 
 		patchedCluster := cluster.DeepCopy()
+		patchedCluster.Spec.AdditionalTags = capa.Tags{
+			"additional-tag-1": "value1",
+			"additional-tag-2": "value2",
+		}
 		patchedCluster.Spec.NetworkSpec.Subnets = []capa.SubnetSpec{
 			newSubnetSpec("subnet-1", "av-zone-1", true),
 			newSubnetSpec("subnet-2", "av-zone-2", true),
@@ -190,22 +194,18 @@ var _ = Describe("TransitGatewayAttachment", func() {
 	})
 
 	Describe("GiantSwarm Managed Mode", func() {
-		BeforeEach(func() {
-			patchedCluster := cluster.DeepCopy()
-			patchedCluster.Annotations[annotation.NetworkTopologyModeAnnotation] = annotation.NetworkTopologyModeGiantSwarmManaged
-
-			err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
-			Expect(err).NotTo(HaveOccurred())
-		})
-
 		It("attaches the transit gateway", func() {
 			Expect(transitGatewayClient.ApplyAttachmentCallCount()).To(Equal(1))
 			_, attachment := transitGatewayClient.ApplyAttachmentArgsForCall(0)
 			Expect(attachment.TransitGatewayARN).To(Equal(transitGatewayARN))
 			Expect(attachment.VPCID).To(Equal(cluster.Spec.NetworkSpec.VPC.ID))
-			Expect(attachment.Tags).To(HaveLen(2))
+
+			By("tagging the transit gateway attachment")
+			Expect(attachment.Tags).To(HaveLen(4))
 			Expect(attachment.Tags).To(HaveKeyWithValue("Name", cluster.Name))
 			Expect(attachment.Tags).To(HaveKeyWithValue(fmt.Sprintf("kubernetes.io/cluster/%s", cluster.Name), "owned"))
+			Expect(attachment.Tags).To(HaveKeyWithValue("additional-tag-1", "value1"))
+			Expect(attachment.Tags).To(HaveKeyWithValue("additional-tag-2", "value2"))
 
 			By("attaching only the tgw tagged subnets in each availability zone")
 			Expect(attachment.SubnetIDs).To(ConsistOf("subnet-1", "subnet-2"))

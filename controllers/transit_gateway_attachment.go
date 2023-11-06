@@ -226,8 +226,9 @@ func filterTGWSubnets(subnets []capa.SubnetSpec) []capa.SubnetSpec {
 }
 
 func getAttachmentTags(cluster *capa.AWSCluster) map[string]string {
-	return map[string]string{
-		"Name": cluster.Name,
-		fmt.Sprintf("kubernetes.io/cluster/%s", cluster.Name): "owned",
-	}
+	tags := cluster.Spec.AdditionalTags
+	tags["Name"] = cluster.Name
+	tags[fmt.Sprintf("kubernetes.io/cluster/%s", cluster.Name)] = "owned"
+
+	return tags
 }

@@ -19,8 +19,7 @@ var _ = Describe("Transitgateway", func() {
 	var (
 		ctx context.Context
 
-		name           string
-		additionalTags map[string]string
+		name string
 
 		transitGateways resolver.TransitGatewayClient
 	)
@@ -57,10 +56,6 @@ var _ = Describe("Transitgateway", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 		name = uuid.NewString()
-
-		additionalTags = map[string]string{
-			"test": "test-tag",
-		}
 
 		var err error
 		transitGateways, err = awsClients.NewTransitGatewayClient(Region, AwsIamArn)
