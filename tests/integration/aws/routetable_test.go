@@ -47,7 +47,7 @@ var _ = Describe("RouteTables", func() {
 		transitGateways, err := awsClients.NewTransitGatewayClient(Region, AwsIamArn)
 		Expect(err).NotTo(HaveOccurred())
 
-		arn, err := transitGateways.Apply(ctx, clusterName)
+		arn, err := transitGateways.Apply(ctx, clusterName, additionalTags)
 		Expect(err).NotTo(HaveOccurred())
 
 		transitGatewayID, err = aws.GetARNResourceID(arn)
@@ -62,7 +62,7 @@ var _ = Describe("RouteTables", func() {
 		prefixLists, err := awsClients.NewPrefixListClient(Region, AwsIamArn)
 		Expect(err).NotTo(HaveOccurred())
 
-		arn, err = prefixLists.Apply(ctx, clusterName)
+		arn, err = prefixLists.Apply(ctx, clusterName, additionalTags)
 		Expect(err).NotTo(HaveOccurred())
 
 		prefixListID, err = aws.GetARNResourceID(arn)
