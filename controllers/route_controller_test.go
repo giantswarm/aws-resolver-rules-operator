@@ -43,7 +43,7 @@ var _ = Describe("RouteReconciler", func() {
 		transitGatewayID  = "tgw-019120b363d1e81e4"
 		prefixListARN     = fmt.Sprintf("arn:aws:ec2:eu-north-1:123456789012:prefix-list/%s", prefixlistID)
 		transitGatewayARN = fmt.Sprintf("arn:aws:ec2:eu-north-1:123456789012:transit-gateway/%s", transitGatewayID)
-		subnets           []*string
+		subnets           []string
 	)
 
 	BeforeEach(func() {
@@ -99,9 +99,7 @@ var _ = Describe("RouteReconciler", func() {
 			},
 		}
 
-		subnets := make([]*string, 0)
-		subnets = append(subnets, &awsCluster.Spec.NetworkSpec.Subnets[0].ID)
-		subnets = append(subnets, &awsCluster.Spec.NetworkSpec.Subnets[1].ID)
+		subnets = []string{awsCluster.Spec.NetworkSpec.Subnets[0].ID, awsCluster.Spec.NetworkSpec.Subnets[1].ID}
 	})
 
 	JustBeforeEach(func() {

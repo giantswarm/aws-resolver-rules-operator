@@ -21,7 +21,7 @@ func NewRoute(awsClients resolver.AWSClients) (Route, error) {
 	}, nil
 }
 
-func (r *Route) AddRoutes(ctx context.Context, transitGatewayID, prefixListID *string, subnets []*string, roleArn, region string, logger logr.Logger) error {
+func (r *Route) AddRoutes(ctx context.Context, transitGatewayID, prefixListID *string, subnets []string, roleArn, region string, logger logr.Logger) error {
 	routeTablesClient, err := r.awsClients.NewRouteTablesClient(region, roleArn)
 	if err != nil {
 		return errors.WithStack(err)
@@ -46,7 +46,7 @@ func (r *Route) AddRoutes(ctx context.Context, transitGatewayID, prefixListID *s
 	return nil
 }
 
-func (r *Route) RemoveRoutes(ctx context.Context, transitGatewayID, prefixListID *string, subnets []*string, roleArn, region string, logger logr.Logger) error {
+func (r *Route) RemoveRoutes(ctx context.Context, transitGatewayID, prefixListID *string, subnets []string, roleArn, region string, logger logr.Logger) error {
 	routeTablesClient, err := r.awsClients.NewRouteTablesClient(region, roleArn)
 	if err != nil {
 		return errors.WithStack(err)

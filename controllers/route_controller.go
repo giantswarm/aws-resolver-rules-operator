@@ -44,8 +44,8 @@ type RouteReconciler struct {
 
 //counterfeiter:generate . RouteClient
 type RouteClient interface {
-	AddRoutes(ctx context.Context, transitGatewayID, prefixListID *string, subnets []*string, roleArn, region string, logger logr.Logger) error
-	RemoveRoutes(ctx context.Context, transitGatewayID, prefixListID *string, subnets []*string, roleArn, region string, logger logr.Logger) error
+	AddRoutes(ctx context.Context, transitGatewayID, prefixListID *string, subnets []string, roleArn, region string, logger logr.Logger) error
+	RemoveRoutes(ctx context.Context, transitGatewayID, prefixListID *string, subnets []string, roleArn, region string, logger logr.Logger) error
 }
 
 func NewRouteReconciler(clusterClient ClusterClient, route RouteClient) *RouteReconciler {
@@ -122,10 +122,10 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	roleARN := identity.Spec.RoleArn
 
-	subnets := []*string{}
+	subnets := []string{}
 	for _, s := range awsCluster.Spec.NetworkSpec.Subnets {
 		temp := s.ID
-		subnets = append(subnets, &temp)
+		subnets = append(subnets, temp)
 	}
 
 	if !cluster.DeletionTimestamp.IsZero() {
@@ -135,7 +135,7 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	return r.reconcileNormal(ctx, &transitGatewayID, &prefixListID, subnets, cluster, roleARN, awsCluster.Spec.Region, logger)
 }
 
-func (r *RouteReconciler) reconcileNormal(ctx context.Context, transitGatewayID, prefixListID *string, subnets []*string, cluster *capi.Cluster, roleArn, region string, logger logr.Logger) (ctrl.Result, error) {
+func (r *RouteReconciler) reconcileNormal(ctx context.Context, transitGatewayID, prefixListID *string, subnets []string, cluster *capi.Cluster, roleArn, region string, logger logr.Logger) (ctrl.Result, error) {
 	logger.Info("Adding routes")
 
 	if err := r.clusterClient.AddClusterFinalizer(ctx, cluster, RouteFinalizer); err != nil {
@@ -148,7 +148,7 @@ func (r *RouteReconciler) reconcileNormal(ctx context.Context, transitGatewayID,
 	return ctrl.Result{}, nil
 }
 
-func (r *RouteReconciler) reconcileDelete(ctx context.Context, transitGatewayID, prefixListID *string, subnets []*string, cluster *capi.Cluster, roleArn, region string, logger logr.Logger) (ctrl.Result, error) {
+func (r *RouteReconciler) reconcileDelete(ctx context.Context, transitGatewayID, prefixListID *string, subnets []string, cluster *capi.Cluster, roleArn, region string, logger logr.Logger) (ctrl.Result, error) {
 	logger.Info("Deletig routes")
 
 	if err := r.routeClient.RemoveRoutes(ctx, transitGatewayID, prefixListID, subnets, roleArn, region, logger); err != nil {

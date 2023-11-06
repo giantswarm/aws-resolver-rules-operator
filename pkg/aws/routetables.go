@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
@@ -41,11 +42,11 @@ func (r *RouteTables) DeleteRoute(ctx context.Context, routeTableId, prefixListI
 	return nil
 }
 
-func (r *RouteTables) GetRouteTables(ctx context.Context, subnets []*string) ([]*ec2.RouteTable, error) {
+func (r *RouteTables) GetRouteTables(ctx context.Context, subnets []string) ([]*ec2.RouteTable, error) {
 	filterName := "association.subnet-id"
 	output, err := r.ec2.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{
 		Filters: []*ec2.Filter{
-			{Name: &filterName, Values: subnets},
+			{Name: &filterName, Values: aws.StringSlice(subnets)},
 		},
 	})
 	if err != nil {

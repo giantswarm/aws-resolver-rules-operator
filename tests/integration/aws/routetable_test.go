@@ -72,7 +72,7 @@ var _ = Describe("RouteTables", func() {
 
 	Describe("GetRouteTables", func() {
 		It("gets the route tables", func() {
-			routeTables, err := routeTablesClient.GetRouteTables(ctx, awssdk.StringSlice(subnets))
+			routeTables, err := routeTablesClient.GetRouteTables(ctx, subnets)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(routeTables).To(HaveLen(1))
 			Expect(*routeTables[0].RouteTableId).To(Equal(routeTableId))

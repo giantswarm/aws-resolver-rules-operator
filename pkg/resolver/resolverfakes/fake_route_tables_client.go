@@ -37,11 +37,11 @@ type FakeRouteTablesClient struct {
 	deleteRouteReturnsOnCall map[int]struct {
 		result1 error
 	}
-	GetRouteTablesStub        func(context.Context, []*string) ([]*ec2.RouteTable, error)
+	GetRouteTablesStub        func(context.Context, []string) ([]*ec2.RouteTable, error)
 	getRouteTablesMutex       sync.RWMutex
 	getRouteTablesArgsForCall []struct {
 		arg1 context.Context
-		arg2 []*string
+		arg2 []string
 	}
 	getRouteTablesReturns struct {
 		result1 []*ec2.RouteTable
@@ -182,17 +182,17 @@ func (fake *FakeRouteTablesClient) DeleteRouteReturnsOnCall(i int, result1 error
 	}{result1}
 }
 
-func (fake *FakeRouteTablesClient) GetRouteTables(arg1 context.Context, arg2 []*string) ([]*ec2.RouteTable, error) {
-	var arg2Copy []*string
+func (fake *FakeRouteTablesClient) GetRouteTables(arg1 context.Context, arg2 []string) ([]*ec2.RouteTable, error) {
+	var arg2Copy []string
 	if arg2 != nil {
-		arg2Copy = make([]*string, len(arg2))
+		arg2Copy = make([]string, len(arg2))
 		copy(arg2Copy, arg2)
 	}
 	fake.getRouteTablesMutex.Lock()
 	ret, specificReturn := fake.getRouteTablesReturnsOnCall[len(fake.getRouteTablesArgsForCall)]
 	fake.getRouteTablesArgsForCall = append(fake.getRouteTablesArgsForCall, struct {
 		arg1 context.Context
-		arg2 []*string
+		arg2 []string
 	}{arg1, arg2Copy})
 	stub := fake.GetRouteTablesStub
 	fakeReturns := fake.getRouteTablesReturns
@@ -213,13 +213,13 @@ func (fake *FakeRouteTablesClient) GetRouteTablesCallCount() int {
 	return len(fake.getRouteTablesArgsForCall)
 }
 
-func (fake *FakeRouteTablesClient) GetRouteTablesCalls(stub func(context.Context, []*string) ([]*ec2.RouteTable, error)) {
+func (fake *FakeRouteTablesClient) GetRouteTablesCalls(stub func(context.Context, []string) ([]*ec2.RouteTable, error)) {
 	fake.getRouteTablesMutex.Lock()
 	defer fake.getRouteTablesMutex.Unlock()
 	fake.GetRouteTablesStub = stub
 }
 
-func (fake *FakeRouteTablesClient) GetRouteTablesArgsForCall(i int) (context.Context, []*string) {
+func (fake *FakeRouteTablesClient) GetRouteTablesArgsForCall(i int) (context.Context, []string) {
 	fake.getRouteTablesMutex.RLock()
 	defer fake.getRouteTablesMutex.RUnlock()
 	argsForCall := fake.getRouteTablesArgsForCall[i]
