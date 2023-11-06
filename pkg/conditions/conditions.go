@@ -12,6 +12,7 @@ const (
 	NetworkTopologyCondition capi.ConditionType = "NetworkTopologyReady"
 	TransitGatewayCreated    capi.ConditionType = "TransitGatewayCreated"
 	TransitGatewayAttached   capi.ConditionType = "TransitGatewayAttached"
+	PrefixListEntriesReady   capi.ConditionType = "PrefixListEntriesReady"
 )
 
 func MarkReady(setter capiconditions.Setter, condition capi.ConditionType) {
