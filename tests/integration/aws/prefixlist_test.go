@@ -43,6 +43,9 @@ var _ = Describe("Prefix Lists", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: uuid.NewString(),
 			},
+			Spec: capa.AWSClusterSpec{
+				AdditionalTags: additionalTags,
+			},
 		}
 
 		prefixLists, err = awsClients.NewPrefixListClient(Region, AwsIamArn)
@@ -51,7 +54,7 @@ var _ = Describe("Prefix Lists", func() {
 
 	Describe("Apply", func() {
 		It("creates a prefix list", func() {
-			arn, err := prefixLists.Apply(ctx, cluster.Name)
+			arn, err := prefixLists.Apply(ctx, cluster.Name, cluster.Spec.AdditionalTags)
 			Expect(err).NotTo(HaveOccurred())
 
 			prefixListID, err := aws.GetARNResourceID(arn)
@@ -68,7 +71,7 @@ var _ = Describe("Prefix Lists", func() {
 			var originalID string
 
 			BeforeEach(func() {
-				arn, err := prefixLists.Apply(ctx, cluster.Name)
+				arn, err := prefixLists.Apply(ctx, cluster.Name, cluster.Spec.AdditionalTags)
 				Expect(err).NotTo(HaveOccurred())
 
 				originalID, err = aws.GetARNResourceID(arn)
@@ -76,7 +79,7 @@ var _ = Describe("Prefix Lists", func() {
 			})
 
 			It("does not return an error", func() {
-				arn, err := prefixLists.Apply(ctx, cluster.Name)
+				arn, err := prefixLists.Apply(ctx, cluster.Name, cluster.Spec.AdditionalTags)
 				Expect(err).NotTo(HaveOccurred())
 
 				actualID, err := aws.GetARNResourceID(arn)
@@ -97,7 +100,7 @@ var _ = Describe("Prefix Lists", func() {
 				})
 
 				It("returns an error", func() {
-					_, err := prefixLists.Apply(ctx, cluster.Name)
+					_, err := prefixLists.Apply(ctx, cluster.Name, cluster.Spec.AdditionalTags)
 					Expect(err).To(MatchError(ContainSubstring(
 						"found unexpected number: 2 of prefix lists for cluster",
 					)))

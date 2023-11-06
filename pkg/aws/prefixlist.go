@@ -22,7 +22,7 @@ type PrefixLists struct {
 	client *ec2.EC2
 }
 
-func (t *PrefixLists) Apply(ctx context.Context, name string) (string, error) {
+func (t *PrefixLists) Apply(ctx context.Context, name string, tags map[string]string) (string, error) {
 	prefixLists, err := t.get(ctx, name)
 	if err != nil {
 		return "", err
@@ -40,7 +40,7 @@ func (t *PrefixLists) Apply(ctx context.Context, name string) (string, error) {
 		)
 	}
 
-	return t.create(ctx, name)
+	return t.create(ctx, name, tags)
 }
 
 func (t *PrefixLists) Delete(ctx context.Context, name string) error {
@@ -87,11 +87,17 @@ func (t *PrefixLists) get(ctx context.Context, name string) ([]*ec2.ManagedPrefi
 	return out.PrefixLists, nil
 }
 
-func (t *PrefixLists) create(ctx context.Context, name string) (string, error) {
+func (t *PrefixLists) create(ctx context.Context, name string, tags map[string]string) (string, error) {
 	input := &ec2.CreateManagedPrefixListInput{
 		AddressFamily:  awssdk.String("IPv4"),
 		MaxEntries:     awssdk.Int64(prefixListMaxEntries),
 		PrefixListName: awssdk.String(GetPrefixListName(name)),
+		TagSpecifications: []*ec2.TagSpecification{
+			{
+				ResourceType: aws.String(ec2.ResourceTypePrefixList),
+				Tags:         getEc2Tags(tags),
+			},
+		},
 	}
 	out, err := t.client.CreateManagedPrefixListWithContext(ctx, input)
 	if err != nil {

@@ -9,11 +9,12 @@ import (
 )
 
 type FakeTransitGatewayClient struct {
-	ApplyStub        func(context.Context, string) (string, error)
+	ApplyStub        func(context.Context, string, map[string]string) (string, error)
 	applyMutex       sync.RWMutex
 	applyArgsForCall []struct {
 		arg1 context.Context
 		arg2 string
+		arg3 map[string]string
 	}
 	applyReturns struct {
 		result1 string
@@ -39,19 +40,20 @@ type FakeTransitGatewayClient struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeTransitGatewayClient) Apply(arg1 context.Context, arg2 string) (string, error) {
+func (fake *FakeTransitGatewayClient) Apply(arg1 context.Context, arg2 string, arg3 map[string]string) (string, error) {
 	fake.applyMutex.Lock()
 	ret, specificReturn := fake.applyReturnsOnCall[len(fake.applyArgsForCall)]
 	fake.applyArgsForCall = append(fake.applyArgsForCall, struct {
 		arg1 context.Context
 		arg2 string
-	}{arg1, arg2})
+		arg3 map[string]string
+	}{arg1, arg2, arg3})
 	stub := fake.ApplyStub
 	fakeReturns := fake.applyReturns
-	fake.recordInvocation("Apply", []interface{}{arg1, arg2})
+	fake.recordInvocation("Apply", []interface{}{arg1, arg2, arg3})
 	fake.applyMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2)
+		return stub(arg1, arg2, arg3)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -65,17 +67,17 @@ func (fake *FakeTransitGatewayClient) ApplyCallCount() int {
 	return len(fake.applyArgsForCall)
 }
 
-func (fake *FakeTransitGatewayClient) ApplyCalls(stub func(context.Context, string) (string, error)) {
+func (fake *FakeTransitGatewayClient) ApplyCalls(stub func(context.Context, string, map[string]string) (string, error)) {
 	fake.applyMutex.Lock()
 	defer fake.applyMutex.Unlock()
 	fake.ApplyStub = stub
 }
 
-func (fake *FakeTransitGatewayClient) ApplyArgsForCall(i int) (context.Context, string) {
+func (fake *FakeTransitGatewayClient) ApplyArgsForCall(i int) (context.Context, string, map[string]string) {
 	fake.applyMutex.RLock()
 	defer fake.applyMutex.RUnlock()
 	argsForCall := fake.applyArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
 func (fake *FakeTransitGatewayClient) ApplyReturns(result1 string, result2 error) {

@@ -10,12 +10,13 @@ import (
 )
 
 type FakeEC2Client struct {
-	CreateSecurityGroupForResolverEndpointsStub        func(context.Context, string, string) (string, error)
+	CreateSecurityGroupForResolverEndpointsStub        func(context.Context, string, string, map[string]string) (string, error)
 	createSecurityGroupForResolverEndpointsMutex       sync.RWMutex
 	createSecurityGroupForResolverEndpointsArgsForCall []struct {
 		arg1 context.Context
 		arg2 string
 		arg3 string
+		arg4 map[string]string
 	}
 	createSecurityGroupForResolverEndpointsReturns struct {
 		result1 string
@@ -43,20 +44,21 @@ type FakeEC2Client struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpoints(arg1 context.Context, arg2 string, arg3 string) (string, error) {
+func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpoints(arg1 context.Context, arg2 string, arg3 string, arg4 map[string]string) (string, error) {
 	fake.createSecurityGroupForResolverEndpointsMutex.Lock()
 	ret, specificReturn := fake.createSecurityGroupForResolverEndpointsReturnsOnCall[len(fake.createSecurityGroupForResolverEndpointsArgsForCall)]
 	fake.createSecurityGroupForResolverEndpointsArgsForCall = append(fake.createSecurityGroupForResolverEndpointsArgsForCall, struct {
 		arg1 context.Context
 		arg2 string
 		arg3 string
-	}{arg1, arg2, arg3})
+		arg4 map[string]string
+	}{arg1, arg2, arg3, arg4})
 	stub := fake.CreateSecurityGroupForResolverEndpointsStub
 	fakeReturns := fake.createSecurityGroupForResolverEndpointsReturns
-	fake.recordInvocation("CreateSecurityGroupForResolverEndpoints", []interface{}{arg1, arg2, arg3})
+	fake.recordInvocation("CreateSecurityGroupForResolverEndpoints", []interface{}{arg1, arg2, arg3, arg4})
 	fake.createSecurityGroupForResolverEndpointsMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3)
+		return stub(arg1, arg2, arg3, arg4)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -70,17 +72,17 @@ func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpointsCallCount() in
 	return len(fake.createSecurityGroupForResolverEndpointsArgsForCall)
 }
 
-func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpointsCalls(stub func(context.Context, string, string) (string, error)) {
+func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpointsCalls(stub func(context.Context, string, string, map[string]string) (string, error)) {
 	fake.createSecurityGroupForResolverEndpointsMutex.Lock()
 	defer fake.createSecurityGroupForResolverEndpointsMutex.Unlock()
 	fake.CreateSecurityGroupForResolverEndpointsStub = stub
 }
 
-func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpointsArgsForCall(i int) (context.Context, string, string) {
+func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpointsArgsForCall(i int) (context.Context, string, string, map[string]string) {
 	fake.createSecurityGroupForResolverEndpointsMutex.RLock()
 	defer fake.createSecurityGroupForResolverEndpointsMutex.RUnlock()
 	argsForCall := fake.createSecurityGroupForResolverEndpointsArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
 }
 
 func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpointsReturns(result1 string, result2 error) {

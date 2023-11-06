@@ -5,10 +5,12 @@ import (
 	"strings"
 
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	eks "sigs.k8s.io/cluster-api-provider-aws/controlplane/eks/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
@@ -21,6 +23,7 @@ const (
 
 func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity, mcIdentity *capa.AWSClusterRoleIdentity) resolver.Cluster {
 	cluster := resolver.Cluster{
+		AdditionalTags:       awsCluster.Spec.AdditionalTags,
 		Name:                 awsCluster.Name,
 		ControlPlaneEndpoint: awsCluster.Spec.ControlPlaneEndpoint.Host,
 		Region:               awsCluster.Spec.Region,
@@ -46,6 +49,7 @@ func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSC
 
 func buildClusterFromAWSManagedControlPlane(awsManagedControlPlane *eks.AWSManagedControlPlane, identity *capa.AWSClusterRoleIdentity, mcIdentity *capa.AWSClusterRoleIdentity) resolver.Cluster {
 	cluster := resolver.Cluster{
+		AdditionalTags:       awsManagedControlPlane.Spec.AdditionalTags,
 		Name:                 awsManagedControlPlane.Name,
 		ControlPlaneEndpoint: awsManagedControlPlane.Spec.ControlPlaneEndpoint.Host,
 		Region:               awsManagedControlPlane.Spec.Region,
@@ -97,4 +101,42 @@ type ClusterClient interface {
 	GetIdentity(context.Context, *capa.AWSIdentityReference) (*capa.AWSClusterRoleIdentity, error)
 	MarkConditionTrue(context.Context, *capi.Cluster, capi.ConditionType) error
 	GetBastionMachine(ctx context.Context, clusterName string) (*capi.Machine, error)
+}
+
+// predicateToFilterAWSClusterResourceVersionChanges is a function to avoid reconciling if the event triggering the reconciliation
+// is related to incremental status updates for AWSCluster resources only
+func predicateToFilterAWSClusterResourceVersionChanges(e event.UpdateEvent) bool {
+	if e.ObjectOld.GetObjectKind().GroupVersionKind().Kind != "AWSCluster" {
+		return true
+	}
+
+	oldCluster := e.ObjectOld.(*capa.AWSCluster).DeepCopy()
+	newCluster := e.ObjectNew.(*capa.AWSCluster).DeepCopy()
+
+	oldCluster.Status = capa.AWSClusterStatus{}
+	newCluster.Status = capa.AWSClusterStatus{}
+
+	oldCluster.ObjectMeta.ResourceVersion = ""
+	newCluster.ObjectMeta.ResourceVersion = ""
+
+	return !cmp.Equal(oldCluster, newCluster)
+}
+
+// predicateToFilterAWSManagedControlPlaneResourceVersionChanges is a function to avoid reconciling if the event triggering the reconciliation
+// is related to incremental status updates for AWSManagedControlPlane resources only
+func predicateToFilterAWSManagedControlPlaneResourceVersionChanges(e event.UpdateEvent) bool {
+	if e.ObjectOld.GetObjectKind().GroupVersionKind().Kind != "AWSManagedControlPlane" {
+		return true
+	}
+
+	oldCluster := e.ObjectOld.(*eks.AWSManagedControlPlane).DeepCopy()
+	newCluster := e.ObjectNew.(*eks.AWSManagedControlPlane).DeepCopy()
+
+	oldCluster.Status = eks.AWSManagedControlPlaneStatus{}
+	newCluster.Status = eks.AWSManagedControlPlaneStatus{}
+
+	oldCluster.ObjectMeta.ResourceVersion = ""
+	newCluster.ObjectMeta.ResourceVersion = ""
+
+	return !cmp.Equal(oldCluster, newCluster)
 }

@@ -24,7 +24,7 @@ type AWSClients interface {
 
 //counterfeiter:generate . EC2Client
 type EC2Client interface {
-	CreateSecurityGroupForResolverEndpoints(ctx context.Context, vpcId, groupName string) (string, error)
+	CreateSecurityGroupForResolverEndpoints(ctx context.Context, vpcId, groupName string, tags map[string]string) (string, error)
 	DeleteSecurityGroupForResolverEndpoints(ctx context.Context, logger logr.Logger, vpcId, groupName string) error
 }
 
@@ -59,13 +59,13 @@ type ResolverClient interface {
 
 //counterfeiter:generate . TransitGatewayClient
 type TransitGatewayClient interface {
-	Apply(context.Context, string) (string, error)
+	Apply(context.Context, string, map[string]string) (string, error)
 	Delete(context.Context, string) error
 }
 
 //counterfeiter:generate . PrefixListClient
 type PrefixListClient interface {
-	Apply(context.Context, string) (string, error)
+	Apply(context.Context, string, map[string]string) (string, error)
 	Delete(context.Context, string) error
 }
 
