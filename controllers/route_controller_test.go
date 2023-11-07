@@ -112,18 +112,18 @@ var _ = Describe("RouteReconciler", func() {
 		result, reconcileErr = reconciler.Reconcile(ctx, request)
 	})
 
-	When("there is an error trying to get the cluster being reconciled", func() {
+	When("there is an error trying to get the AWS Cluster being reconciled", func() {
 		BeforeEach(func() {
-			clusterClient.GetClusterReturns(nil, errors.New("failed fetching the cluster"))
+			clusterClient.GetAWSClusterReturns(nil, errors.New("failed fetching the cluster"))
 		})
 
 		It("returns the error", func() {
-			Expect(clusterClient.GetAWSClusterCallCount()).To(Equal(0))
+			Expect(clusterClient.GetIdentityCallCount()).To(Equal(0))
 			Expect(reconcileErr).To(HaveOccurred())
 		})
 	})
 
-	When("reconciling an existing cluster", func() {
+	When("reconciling an existing AWS Cluster", func() {
 		BeforeEach(func() {
 			clusterClient.GetClusterReturns(cluster, nil)
 			clusterClient.GetAWSClusterReturns(awsCluster, nil)
@@ -136,7 +136,7 @@ var _ = Describe("RouteReconciler", func() {
 				})
 
 				It("returns without error", func() {
-					Expect(clusterClient.GetAWSClusterCallCount()).To(Equal(0))
+					Expect(clusterClient.GetIdentityCallCount()).To(Equal(0))
 					Expect(reconcileErr).ToNot(HaveOccurred())
 				})
 			})
@@ -148,7 +148,7 @@ var _ = Describe("RouteReconciler", func() {
 				})
 
 				It("returns an error", func() {
-					Expect(clusterClient.GetAWSClusterCallCount()).To(Equal(0))
+					Expect(clusterClient.GetIdentityCallCount()).To(Equal(0))
 					Expect(reconcileErr).To(HaveOccurred())
 				})
 			})
@@ -161,7 +161,7 @@ var _ = Describe("RouteReconciler", func() {
 				}
 
 			})
-			When("there is an error trying to get the AWSCluster being reconciled", func() {
+			When("there is an error trying to get the AWS Cluster being reconciled", func() {
 				BeforeEach(func() {
 					clusterClient.GetAWSClusterReturns(nil, errors.New("failed fetching the AWSCluster"))
 				})
@@ -217,10 +217,10 @@ var _ = Describe("RouteReconciler", func() {
 				})
 				When("the cluster is not being deleted", func() {
 
-					It("adds the finalizer to the cluster", func() {
-						Expect(clusterClient.AddClusterFinalizerCallCount()).To(Equal(1))
-						_, clusterArg, finalizer := clusterClient.AddClusterFinalizerArgsForCall(0)
-						Expect(clusterArg.Name).To(Equal(ClusterName))
+					It("adds the finalizer to the AWS Cluster", func() {
+						Expect(clusterClient.AddAWSClusterFinalizerCallCount()).To(Equal(1))
+						_, awsClusterArg, finalizer := clusterClient.AddAWSClusterFinalizerArgsForCall(0)
+						Expect(awsClusterArg.Name).To(Equal(ClusterName))
 						Expect(finalizer).To(Equal(controllers.RouteFinalizer))
 					})
 
@@ -249,10 +249,10 @@ var _ = Describe("RouteReconciler", func() {
 						Expect(region).To(Equal(awsCluster.Spec.Region))
 					})
 
-					It("removes the finalizer from the cluster", func() {
-						Expect(clusterClient.RemoveClusterFinalizerCallCount()).To(Equal(1))
-						_, clusterArg, finalizer := clusterClient.RemoveClusterFinalizerArgsForCall(0)
-						Expect(clusterArg.Name).To(Equal(ClusterName))
+					It("removes the finalizer from the AWS Cluster", func() {
+						Expect(clusterClient.RemoveAWSClusterFinalizerCallCount()).To(Equal(1))
+						_, awsClusterArg, finalizer := clusterClient.RemoveAWSClusterFinalizerArgsForCall(0)
+						Expect(awsClusterArg.Name).To(Equal(ClusterName))
 						Expect(finalizer).To(Equal(controllers.RouteFinalizer))
 					})
 				})

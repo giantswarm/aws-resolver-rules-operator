@@ -23,9 +23,11 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/aws-resolver-rules-operator/pkg/aws"
 	"github.com/aws-resolver-rules-operator/pkg/util/annotations"
@@ -64,6 +66,11 @@ func NewRouteReconciler(clusterClient ClusterClient, route RouteClient) *RouteRe
 func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
+	awsCluster, err := r.clusterClient.GetAWSCluster(ctx, req.NamespacedName)
+	if err != nil {
+		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
+	}
+
 	cluster, err := r.clusterClient.GetCluster(ctx, req.NamespacedName)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
@@ -81,11 +88,6 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		err := fmt.Errorf("invalid NetworkTopologyMode value")
 		logger.Error(err, "Unexpected NetworkTopologyMode annotation value found on cluster", "NetworkTopologyMode", val)
 		return ctrl.Result{}, errors.WithStack(err)
-	}
-
-	awsCluster, err := r.clusterClient.GetAWSCluster(ctx, req.NamespacedName)
-	if err != nil {
-		return ctrl.Result{}, err
 	}
 
 	identity, err := r.clusterClient.GetIdentity(ctx, awsCluster.Spec.IdentityRef)
@@ -130,16 +132,16 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	if !cluster.DeletionTimestamp.IsZero() {
-		return r.reconcileDelete(ctx, &transitGatewayID, &prefixListID, subnets, cluster, roleARN, awsCluster.Spec.Region, logger)
+		return r.reconcileDelete(ctx, &transitGatewayID, &prefixListID, subnets, awsCluster, roleARN, awsCluster.Spec.Region, logger)
 	}
 
-	return r.reconcileNormal(ctx, &transitGatewayID, &prefixListID, subnets, cluster, roleARN, awsCluster.Spec.Region, logger)
+	return r.reconcileNormal(ctx, &transitGatewayID, &prefixListID, subnets, awsCluster, roleARN, awsCluster.Spec.Region, logger)
 }
 
-func (r *RouteReconciler) reconcileNormal(ctx context.Context, transitGatewayID, prefixListID *string, subnets []string, cluster *capi.Cluster, roleArn, region string, logger logr.Logger) (ctrl.Result, error) {
+func (r *RouteReconciler) reconcileNormal(ctx context.Context, transitGatewayID, prefixListID *string, subnets []string, awsCluster *capa.AWSCluster, roleArn, region string, logger logr.Logger) (ctrl.Result, error) {
 	logger.Info("Adding routes")
 
-	if err := r.clusterClient.AddClusterFinalizer(ctx, cluster, RouteFinalizer); err != nil {
+	if err := r.clusterClient.AddAWSClusterFinalizer(ctx, awsCluster, RouteFinalizer); err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
@@ -149,14 +151,14 @@ func (r *RouteReconciler) reconcileNormal(ctx context.Context, transitGatewayID,
 	return ctrl.Result{}, nil
 }
 
-func (r *RouteReconciler) reconcileDelete(ctx context.Context, transitGatewayID, prefixListID *string, subnets []string, cluster *capi.Cluster, roleArn, region string, logger logr.Logger) (ctrl.Result, error) {
+func (r *RouteReconciler) reconcileDelete(ctx context.Context, transitGatewayID, prefixListID *string, subnets []string, awsCluster *capa.AWSCluster, roleArn, region string, logger logr.Logger) (ctrl.Result, error) {
 	logger.Info("Deletig routes")
 
 	if err := r.routeClient.RemoveRoutes(ctx, transitGatewayID, prefixListID, subnets, roleArn, region, logger); err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	if err := r.clusterClient.RemoveClusterFinalizer(ctx, cluster, RouteFinalizer); err != nil {
+	if err := r.clusterClient.RemoveAWSClusterFinalizer(ctx, awsCluster, RouteFinalizer); err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 	return ctrl.Result{}, nil
@@ -165,6 +167,12 @@ func (r *RouteReconciler) reconcileDelete(ctx context.Context, transitGatewayID,
 // SetupWithManager sets up the controller with the Manager.
 func (r *RouteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&capi.Cluster{}).
+		Named("resolverrules").
+		For(&capa.AWSCluster{}).
+		WithEventFilter(
+			predicate.Funcs{
+				UpdateFunc: predicateToFilterAWSClusterResourceVersionChanges,
+			},
+		).
 		Complete(r)
 }
