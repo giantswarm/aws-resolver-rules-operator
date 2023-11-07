@@ -56,9 +56,18 @@ type ResolverClient interface {
 	FindResolverRuleIdsAssociatedWithVPCId(ctx context.Context, logger logr.Logger, vpcId string) ([]string, error)
 }
 
+type TransitGatewayAttachment struct {
+	TransitGatewayARN string
+	SubnetIDs         []string
+	VPCID             string
+	Tags              map[string]string
+}
+
 //counterfeiter:generate . TransitGatewayClient
 type TransitGatewayClient interface {
 	Apply(context.Context, string, map[string]string) (string, error)
+	ApplyAttachment(context.Context, TransitGatewayAttachment) error
+	Detach(context.Context, TransitGatewayAttachment) error
 	Delete(context.Context, string) error
 }
 

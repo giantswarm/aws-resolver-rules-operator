@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add tags from `AWSCluster.Spec.AdditionalTags` and `AWSManagedControlPlane.Spec.AdditionalTags` to  all created resources.
 - Add `global.podSecurityStandards.enforced` value for PSS migration.
 - Add managing prefix lists for management clusters and rename `ManagementClusterTransitGatewayReconciler` to `ManagementClusterNetworkReconciler`.
+- Add `TransitGatewayAttachmentReconciler`.
 
 ## [0.11.0] - 2023-10-04
 
