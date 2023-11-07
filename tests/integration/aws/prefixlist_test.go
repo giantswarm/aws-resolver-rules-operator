@@ -162,7 +162,7 @@ var _ = Describe("Prefix Lists", func() {
 
 		When("the cidr is not valid", func() {
 			It("returns an error", func() {
-				entry.CIDR = "not-valid"
+				entry.CIDR = "not-a-valid-cidr"
 				err := prefixLists.ApplyEntry(ctx, entry)
 				Expect(err).To(HaveOccurred())
 			})
@@ -170,7 +170,7 @@ var _ = Describe("Prefix Lists", func() {
 
 		When("the arn is invalid", func() {
 			It("returns an error", func() {
-				entry.PrefixListARN = "not-valid"
+				entry.PrefixListARN = "invalid-arn"
 				err := prefixLists.ApplyEntry(ctx, entry)
 				Expect(err).To(HaveOccurred())
 			})
@@ -224,7 +224,7 @@ var _ = Describe("Prefix Lists", func() {
 
 		When("the cidr is not valid", func() {
 			It("returns an error", func() {
-				entry.CIDR = "not-valid"
+				entry.CIDR = "not-a-valid-cidr"
 				err := prefixLists.ApplyEntry(ctx, entry)
 				Expect(err).To(HaveOccurred())
 			})
@@ -232,7 +232,7 @@ var _ = Describe("Prefix Lists", func() {
 
 		When("the arn is invalid", func() {
 			It("returns an error", func() {
-				entry.PrefixListARN = "not-valid"
+				entry.PrefixListARN = "not-a-valid-arn"
 				err := prefixLists.ApplyEntry(ctx, entry)
 				Expect(err).To(HaveOccurred())
 			})
