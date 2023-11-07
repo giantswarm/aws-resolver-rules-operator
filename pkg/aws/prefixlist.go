@@ -2,13 +2,13 @@ package aws
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 
 	"github.com/aws/aws-sdk-go/aws"
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/pkg/errors"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
@@ -50,17 +50,17 @@ func (t *PrefixLists) Apply(ctx context.Context, name string, tags map[string]st
 func (p *PrefixLists) ApplyEntry(ctx context.Context, entry resolver.PrefixListEntry) error {
 	prefixListID, err := GetARNResourceID(entry.PrefixListARN)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	err = validateCIDR(entry.CIDR)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	exists, err := p.entryExists(ctx, prefixListID, entry)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if exists {
@@ -73,17 +73,17 @@ func (p *PrefixLists) ApplyEntry(ctx context.Context, entry resolver.PrefixListE
 func (p *PrefixLists) DeleteEntry(ctx context.Context, entry resolver.PrefixListEntry) error {
 	prefixListID, err := GetARNResourceID(entry.PrefixListARN)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	err = validateCIDR(entry.CIDR)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	exists, err := p.entryExists(ctx, prefixListID, entry)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if !exists {
@@ -96,7 +96,7 @@ func (p *PrefixLists) DeleteEntry(ctx context.Context, entry resolver.PrefixList
 func (t *PrefixLists) Delete(ctx context.Context, name string) error {
 	prefixLists, err := t.get(ctx, name)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if len(prefixLists) == 0 {
@@ -116,7 +116,7 @@ func (t *PrefixLists) Delete(ctx context.Context, name string) error {
 		PrefixListId: id,
 	})
 
-	return err
+	return errors.WithStack(err)
 }
 
 func (t *PrefixLists) get(ctx context.Context, name string) ([]*ec2.ManagedPrefixList, error) {
@@ -168,7 +168,7 @@ func (p *PrefixLists) createEntry(ctx context.Context, prefixListID string, entr
 		},
 	})
 
-	return err
+	return errors.WithStack(err)
 }
 
 func (p *PrefixLists) entryExists(ctx context.Context, prefixListID string, entry resolver.PrefixListEntry) (bool, error) {
@@ -203,7 +203,7 @@ func (p *PrefixLists) deleteEntry(ctx context.Context, prefixListID string, entr
 		},
 	})
 
-	return err
+	return errors.WithStack(err)
 }
 
 func GetPrefixListName(name string) string {
@@ -212,5 +212,5 @@ func GetPrefixListName(name string) string {
 
 func validateCIDR(cidr string) error {
 	_, _, err := net.ParseCIDR(cidr)
-	return err
+	return errors.WithStack(err)
 }
