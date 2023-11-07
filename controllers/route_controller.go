@@ -57,12 +57,10 @@ func NewRouteReconciler(clusterClient ClusterClient, route RouteClient) *RouteRe
 	}
 }
 
-//+kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=routes/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=routes/finalizers,verbs=update
-
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
+// RouteReconciler reconciles AWSClusters.
+// It only reconciles AWSCluster owned by Cluster which uses  UserManaged or GiantswarmManaged topology mode,
+// set by the `network-topology.giantswarm.io/mode` annotation.
+// It creates routes in the routing tables associated with AWSClusters's subnets
 func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
