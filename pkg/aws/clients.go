@@ -194,21 +194,6 @@ func (c *Clients) NewRouteTablesClient(region, rolearn string) (resolver.RouteTa
 	}, nil
 }
 
-func (c *Clients) New(region, rolearn string) (resolver.TransitGatewayClient, error) {
-	session, err := c.sessionForRole(rolearn)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	ec2Client := ec2.New(session, &aws.Config{
-		Region: aws.String(region),
-	})
-
-	return &TransitGateways{
-		ec2: ec2Client,
-	}, nil
-}
-
 func (c *Clients) newRoute53Client(region, arn, externalId string) (*route53.Route53, error) {
 	session, err := c.sessionFromRegion(region)
 	if err != nil {

@@ -7,6 +7,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
+
+	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
 
 type RouteTables struct {
@@ -42,7 +44,7 @@ func (r *RouteTables) DeleteRoute(ctx context.Context, routeTableId, prefixListI
 	return nil
 }
 
-func (r *RouteTables) GetRouteTables(ctx context.Context, subnets []string) ([]*ec2.RouteTable, error) {
+func (r *RouteTables) GetRouteTables(ctx context.Context, subnets []string) ([]resolver.RouteTable, error) {
 	filterName := "association.subnet-id"
 	output, err := r.ec2.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{
 		Filters: []*ec2.Filter{
@@ -50,12 +52,24 @@ func (r *RouteTables) GetRouteTables(ctx context.Context, subnets []string) ([]*
 		},
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
-
+	routeTables := make([]resolver.RouteTable, 0)
 	if output != nil && len(output.RouteTables) > 0 {
-		return output.RouteTables, nil
+		for _, rt := range output.RouteTables {
+			routes := make([]resolver.RouteRule, 0)
+			for _, route := range rt.Routes {
+				routes = append(routes, resolver.RouteRule{
+					DestinationPrefixListId: route.DestinationPrefixListId,
+					TransitGatewayId:        route.TransitGatewayId,
+				})
+			}
+			routeTables = append(routeTables, resolver.RouteTable{
+				RouteTableId: rt.RouteTableId,
+				RouteRules:   routes,
+			})
+		}
+		return routeTables, nil
 	}
-
 	return nil, nil
 }

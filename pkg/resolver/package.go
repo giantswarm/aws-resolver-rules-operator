@@ -3,7 +3,6 @@ package resolver
 import (
 	"context"
 
-	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/go-logr/logr"
 )
 
@@ -73,5 +72,5 @@ type PrefixListClient interface {
 type RouteTablesClient interface {
 	CreateRoute(ctx context.Context, routeTableId, prefixListID, transitGatewayID *string) error
 	DeleteRoute(ctx context.Context, routeTableId, prefixListID *string) error
-	GetRouteTables(ctx context.Context, subnets []string) ([]*ec2.RouteTable, error)
+	GetRouteTables(ctx context.Context, subnets []string) ([]RouteTable, error)
 }

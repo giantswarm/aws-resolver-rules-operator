@@ -71,14 +71,15 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	switch val := annotations.GetAnnotation(cluster, gsannotation.NetworkTopologyModeAnnotation); val {
 	case "":
+		logger.Info("No NetworkTopologyMode annotation found on cluster, skipping")
 		return ctrl.Result{}, nil
 	case gsannotation.NetworkTopologyModeNone:
-		logger.Info("Mode currently not handled", "mode", gsannotation.NetworkTopologyModeNone)
+		logger.Info("Mode currently not handled", "NetworkTopologyMode", gsannotation.NetworkTopologyModeNone)
 		return ctrl.Result{}, nil
 	case gsannotation.NetworkTopologyModeUserManaged, gsannotation.NetworkTopologyModeGiantSwarmManaged:
 	default:
 		err := fmt.Errorf("invalid NetworkTopologyMode value")
-		logger.Error(err, "Unexpected NetworkTopologyMode annotation value found on cluster", "value", val)
+		logger.Error(err, "Unexpected NetworkTopologyMode annotation value found on cluster", "NetworkTopologyMode", val)
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 
@@ -33,7 +32,7 @@ func (r *Route) AddRoutes(ctx context.Context, transitGatewayID, prefixListID *s
 	}
 
 	for _, rt := range routeTables {
-		if !routeExists(rt.Routes, prefixListID, transitGatewayID) {
+		if !routeExists(rt.RouteRules, prefixListID, transitGatewayID) {
 			err := routeTablesClient.CreateRoute(ctx, rt.RouteTableId, prefixListID, transitGatewayID)
 			if err != nil {
 				logValues := fmt.Sprintf("routeTableID=%s, prefixListID=%s, transitGatewayID=%s", *rt.RouteTableId, *prefixListID, *transitGatewayID)
@@ -69,7 +68,7 @@ func (r *Route) RemoveRoutes(ctx context.Context, transitGatewayID, prefixListID
 	return nil
 }
 
-func routeExists(routes []*ec2.Route, prefixListID, transitGatewayID *string) bool {
+func routeExists(routes []resolver.RouteRule, prefixListID, transitGatewayID *string) bool {
 	for _, route := range routes {
 		if route.DestinationPrefixListId != nil && route.TransitGatewayId != nil && *route.DestinationPrefixListId == *prefixListID && *route.TransitGatewayId == *transitGatewayID {
 			return true

@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
-	"github.com/aws/aws-sdk-go/service/ec2"
 )
 
 type FakeRouteTablesClient struct {
@@ -37,18 +36,18 @@ type FakeRouteTablesClient struct {
 	deleteRouteReturnsOnCall map[int]struct {
 		result1 error
 	}
-	GetRouteTablesStub        func(context.Context, []string) ([]*ec2.RouteTable, error)
+	GetRouteTablesStub        func(context.Context, []string) ([]resolver.RouteTable, error)
 	getRouteTablesMutex       sync.RWMutex
 	getRouteTablesArgsForCall []struct {
 		arg1 context.Context
 		arg2 []string
 	}
 	getRouteTablesReturns struct {
-		result1 []*ec2.RouteTable
+		result1 []resolver.RouteTable
 		result2 error
 	}
 	getRouteTablesReturnsOnCall map[int]struct {
-		result1 []*ec2.RouteTable
+		result1 []resolver.RouteTable
 		result2 error
 	}
 	invocations      map[string][][]interface{}
@@ -182,7 +181,7 @@ func (fake *FakeRouteTablesClient) DeleteRouteReturnsOnCall(i int, result1 error
 	}{result1}
 }
 
-func (fake *FakeRouteTablesClient) GetRouteTables(arg1 context.Context, arg2 []string) ([]*ec2.RouteTable, error) {
+func (fake *FakeRouteTablesClient) GetRouteTables(arg1 context.Context, arg2 []string) ([]resolver.RouteTable, error) {
 	var arg2Copy []string
 	if arg2 != nil {
 		arg2Copy = make([]string, len(arg2))
@@ -213,7 +212,7 @@ func (fake *FakeRouteTablesClient) GetRouteTablesCallCount() int {
 	return len(fake.getRouteTablesArgsForCall)
 }
 
-func (fake *FakeRouteTablesClient) GetRouteTablesCalls(stub func(context.Context, []string) ([]*ec2.RouteTable, error)) {
+func (fake *FakeRouteTablesClient) GetRouteTablesCalls(stub func(context.Context, []string) ([]resolver.RouteTable, error)) {
 	fake.getRouteTablesMutex.Lock()
 	defer fake.getRouteTablesMutex.Unlock()
 	fake.GetRouteTablesStub = stub
@@ -226,28 +225,28 @@ func (fake *FakeRouteTablesClient) GetRouteTablesArgsForCall(i int) (context.Con
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeRouteTablesClient) GetRouteTablesReturns(result1 []*ec2.RouteTable, result2 error) {
+func (fake *FakeRouteTablesClient) GetRouteTablesReturns(result1 []resolver.RouteTable, result2 error) {
 	fake.getRouteTablesMutex.Lock()
 	defer fake.getRouteTablesMutex.Unlock()
 	fake.GetRouteTablesStub = nil
 	fake.getRouteTablesReturns = struct {
-		result1 []*ec2.RouteTable
+		result1 []resolver.RouteTable
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeRouteTablesClient) GetRouteTablesReturnsOnCall(i int, result1 []*ec2.RouteTable, result2 error) {
+func (fake *FakeRouteTablesClient) GetRouteTablesReturnsOnCall(i int, result1 []resolver.RouteTable, result2 error) {
 	fake.getRouteTablesMutex.Lock()
 	defer fake.getRouteTablesMutex.Unlock()
 	fake.GetRouteTablesStub = nil
 	if fake.getRouteTablesReturnsOnCall == nil {
 		fake.getRouteTablesReturnsOnCall = make(map[int]struct {
-			result1 []*ec2.RouteTable
+			result1 []resolver.RouteTable
 			result2 error
 		})
 	}
 	fake.getRouteTablesReturnsOnCall[i] = struct {
-		result1 []*ec2.RouteTable
+		result1 []resolver.RouteTable
 		result2 error
 	}{result1, result2}
 }
