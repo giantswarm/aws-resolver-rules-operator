@@ -12,14 +12,14 @@ replace (
 )
 
 require (
-	github.com/aws/aws-sdk-go v1.47.5
+	github.com/aws/aws-sdk-go v1.47.7
 	github.com/giantswarm/k8smetadata v0.23.0
 	github.com/go-logr/logr v1.3.0
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.4.0
 	github.com/maxbrunsfeld/counterfeiter/v6 v6.7.0
 	github.com/onsi/ginkgo/v2 v2.13.0
-	github.com/onsi/gomega v1.29.0
+	github.com/onsi/gomega v1.30.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.17.0
 	go.uber.org/zap v1.26.0
