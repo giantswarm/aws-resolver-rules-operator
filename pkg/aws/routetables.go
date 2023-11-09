@@ -71,5 +71,5 @@ func (r *RouteTables) GetRouteTables(ctx context.Context, subnets []string) ([]r
 		}
 		return routeTables, nil
 	}
-	return nil, nil
+	return nil, &RouteTableNotFoundError{}
 }
