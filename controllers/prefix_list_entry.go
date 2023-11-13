@@ -77,6 +77,9 @@ func (r *PrefixListEntryReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{RequeueAfter: time.Minute}, nil
 	}
 
+	logger = logger.WithValues("prefix-list-arn", prefixListARN)
+	log.IntoContext(ctx, logger)
+
 	identity, err := r.clusterClient.GetIdentity(ctx, cluster)
 	if err != nil {
 		logger.Error(err, "failed to get cluster identity")
@@ -121,6 +124,7 @@ func (r *PrefixListEntryReconciler) reconcileNormal(ctx context.Context, scope e
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
+	logger.Info("Applying prefix list entry")
 	err = scope.prefixListClient.ApplyEntry(ctx, resolver.PrefixListEntry{
 		PrefixListARN: scope.prefixListARN,
 		CIDR:          scope.cluster.Spec.NetworkSpec.VPC.CidrBlock,
@@ -138,6 +142,7 @@ func (r *PrefixListEntryReconciler) reconcileNormal(ctx context.Context, scope e
 func (r *PrefixListEntryReconciler) reconcileDelete(ctx context.Context, scope entryScope) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
+	logger.Info("Deleting prefix list entry")
 	err := scope.prefixListClient.DeleteEntry(ctx, resolver.PrefixListEntry{
 		PrefixListARN: scope.prefixListARN,
 		CIDR:          scope.cluster.Spec.NetworkSpec.VPC.CidrBlock,
