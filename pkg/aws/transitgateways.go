@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/pkg/errors"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
@@ -37,12 +38,12 @@ func (t *TransitGateways) Apply(ctx context.Context, name string, tags map[strin
 func (t *TransitGateways) ApplyAttachment(ctx context.Context, attachment resolver.TransitGatewayAttachment) error {
 	gatewayID, err := GetARNResourceID(attachment.TransitGatewayARN)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	vpcAttachment, err := t.getAttachment(ctx, gatewayID, attachment.VPCID)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if vpcAttachment != nil {
@@ -55,12 +56,12 @@ func (t *TransitGateways) ApplyAttachment(ctx context.Context, attachment resolv
 func (t *TransitGateways) Detach(ctx context.Context, attachment resolver.TransitGatewayAttachment) error {
 	gatewayID, err := GetARNResourceID(attachment.TransitGatewayARN)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	vpcAttachment, err := t.getAttachment(ctx, gatewayID, attachment.VPCID)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if vpcAttachment == nil {
@@ -70,13 +71,13 @@ func (t *TransitGateways) Detach(ctx context.Context, attachment resolver.Transi
 	_, err = t.ec2.DeleteTransitGatewayVpcAttachmentWithContext(ctx, &ec2.DeleteTransitGatewayVpcAttachmentInput{
 		TransitGatewayAttachmentId: vpcAttachment.TransitGatewayAttachmentId,
 	})
-	return err
+	return errors.WithStack(err)
 }
 
 func (t *TransitGateways) Delete(ctx context.Context, name string) error {
 	gateway, err := t.get(ctx, name)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if gateway == nil {
@@ -92,7 +93,7 @@ func (t *TransitGateways) delete(ctx context.Context, gateway *ec2.TransitGatewa
 		TransitGatewayId: id,
 	})
 
-	return err
+	return errors.WithStack(err)
 }
 
 func (t *TransitGateways) get(ctx context.Context, name string) (*ec2.TransitGateway, error) {
@@ -179,7 +180,7 @@ func (t *TransitGateways) attach(ctx context.Context, transitGatewayID string, a
 		},
 	})
 
-	return err
+	return errors.WithStack(err)
 }
 
 func (t *TransitGateways) getAttachment(ctx context.Context, gatewayID, vpcID string) (*ec2.TransitGatewayVpcAttachment, error) {

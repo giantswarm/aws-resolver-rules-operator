@@ -18,7 +18,9 @@ package controllers_test
 
 import (
 	"context"
+	"fmt"
 	"go/build"
+	"math/rand"
 	"path/filepath"
 	"testing"
 
@@ -136,7 +138,8 @@ func newCluster(name string, annotationsKeyValues ...string) *capa.AWSCluster {
 		Spec: capa.AWSClusterSpec{
 			NetworkSpec: capa.NetworkSpec{
 				VPC: capa.VPCSpec{
-					ID: uuid.NewString(),
+					ID:        uuid.NewString(),
+					CidrBlock: fmt.Sprintf("10.%d.0.0/24", rand.Intn(255)),
 				},
 				Subnets: capa.Subnets{
 					{

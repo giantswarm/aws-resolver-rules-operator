@@ -33,7 +33,7 @@ var _ = Describe("Prefix Lists", func() {
 		out, err := rawEC2Client.CreateManagedPrefixList(input)
 		Expect(err).NotTo(HaveOccurred())
 
-		return *out.PrefixList.PrefixListId
+		return *out.PrefixList.PrefixListArn
 	}
 
 	BeforeEach(func() {
@@ -109,11 +109,157 @@ var _ = Describe("Prefix Lists", func() {
 		})
 	})
 
+	Describe("ApplyEntry", func() {
+		var (
+			prefixListARN string
+			prefixListID  string
+			entry         resolver.PrefixListEntry
+		)
+
+		BeforeEach(func() {
+			prefixListARN = createPrefixList()
+			var err error
+			prefixListID, err = aws.GetARNResourceID(prefixListARN)
+			Expect(err).NotTo(HaveOccurred())
+
+			entry = resolver.PrefixListEntry{
+				PrefixListARN: prefixListARN,
+				CIDR:          "10.1.0.0/24",
+				Description:   "the-description",
+			}
+		})
+
+		It("adds the entry to the prefix list", func() {
+			err := prefixLists.ApplyEntry(ctx, entry)
+			Expect(err).NotTo(HaveOccurred())
+
+			out, err := rawEC2Client.GetManagedPrefixListEntries(&ec2.GetManagedPrefixListEntriesInput{
+				PrefixListId: awssdk.String(prefixListID),
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(out.Entries).To(HaveLen(1))
+		})
+
+		When("the entry already exists", func() {
+			BeforeEach(func() {
+				err := prefixLists.ApplyEntry(ctx, entry)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("does not return an error", func() {
+				err := prefixLists.ApplyEntry(ctx, entry)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			When("the entry's description doesn't match the desired one", func() {
+				It("returns an error", func() {
+					entry.Description = "something-else"
+					err := prefixLists.ApplyEntry(ctx, entry)
+					Expect(err).To(HaveOccurred())
+				})
+			})
+		})
+
+		When("the cidr is not valid", func() {
+			It("returns an error", func() {
+				entry.CIDR = "not-a-valid-cidr"
+				err := prefixLists.ApplyEntry(ctx, entry)
+				Expect(err).To(HaveOccurred())
+			})
+		})
+
+		When("the arn is invalid", func() {
+			It("returns an error", func() {
+				entry.PrefixListARN = "invalid-arn"
+				err := prefixLists.ApplyEntry(ctx, entry)
+				Expect(err).To(HaveOccurred())
+			})
+		})
+	})
+
+	Describe("DeleteEntry", func() {
+		var (
+			prefixListARN string
+			prefixListID  string
+			entry         resolver.PrefixListEntry
+		)
+
+		BeforeEach(func() {
+			prefixListARN = createPrefixList()
+			var err error
+			prefixListID, err = aws.GetARNResourceID(prefixListARN)
+			Expect(err).NotTo(HaveOccurred())
+
+			entry = resolver.PrefixListEntry{
+				PrefixListARN: prefixListARN,
+				CIDR:          "10.1.0.0/24",
+				Description:   "the-description",
+			}
+			err = prefixLists.ApplyEntry(ctx, entry)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("removes the entry to the prefix list", func() {
+			err = prefixLists.DeleteEntry(ctx, entry)
+			Expect(err).NotTo(HaveOccurred())
+
+			out, err := rawEC2Client.GetManagedPrefixListEntries(&ec2.GetManagedPrefixListEntriesInput{
+				PrefixListId: awssdk.String(prefixListID),
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(out.Entries).To(HaveLen(0))
+		})
+
+		When("the entry is already deleted", func() {
+			BeforeEach(func() {
+				err := prefixLists.DeleteEntry(ctx, entry)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("does not return an error", func() {
+				err = prefixLists.DeleteEntry(ctx, entry)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
+		When("the cidr is not valid", func() {
+			It("returns an error", func() {
+				entry.CIDR = "not-a-valid-cidr"
+				err := prefixLists.ApplyEntry(ctx, entry)
+				Expect(err).To(HaveOccurred())
+			})
+		})
+
+		When("the arn is invalid", func() {
+			It("returns an error", func() {
+				entry.PrefixListARN = "not-a-valid-arn"
+				err := prefixLists.ApplyEntry(ctx, entry)
+				Expect(err).To(HaveOccurred())
+			})
+		})
+
+		When("the entry's description doesn't match the desired one", func() {
+			BeforeEach(func() {
+				err := prefixLists.ApplyEntry(ctx, entry)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("returns an error", func() {
+				entry.Description = "something-else"
+				err := prefixLists.DeleteEntry(ctx, entry)
+				Expect(err).To(HaveOccurred())
+			})
+		})
+	})
+
 	Describe("Delete", func() {
 		var prefixListID string
 
 		BeforeEach(func() {
-			prefixListID = createPrefixList()
+			prefixListARN := createPrefixList()
+			var err error
+			prefixListID, err = aws.GetARNResourceID(prefixListARN)
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("deletes the prefix list", func() {

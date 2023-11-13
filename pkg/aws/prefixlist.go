@@ -3,10 +3,14 @@ package aws
 import (
 	"context"
 	"fmt"
+	"net"
 
 	"github.com/aws/aws-sdk-go/aws"
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/pkg/errors"
+
+	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
 
 const (
@@ -43,10 +47,56 @@ func (t *PrefixLists) Apply(ctx context.Context, name string, tags map[string]st
 	return t.create(ctx, name, tags)
 }
 
+func (p *PrefixLists) ApplyEntry(ctx context.Context, entry resolver.PrefixListEntry) error {
+	prefixListID, err := GetARNResourceID(entry.PrefixListARN)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	err = validateCIDR(entry.CIDR)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	exists, err := p.entryExists(ctx, prefixListID, entry)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	if exists {
+		return nil
+	}
+
+	return p.createEntry(ctx, prefixListID, entry)
+}
+
+func (p *PrefixLists) DeleteEntry(ctx context.Context, entry resolver.PrefixListEntry) error {
+	prefixListID, err := GetARNResourceID(entry.PrefixListARN)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	err = validateCIDR(entry.CIDR)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	exists, err := p.entryExists(ctx, prefixListID, entry)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	if !exists {
+		return nil
+	}
+
+	return p.deleteEntry(ctx, prefixListID, entry)
+}
+
 func (t *PrefixLists) Delete(ctx context.Context, name string) error {
 	prefixLists, err := t.get(ctx, name)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if len(prefixLists) == 0 {
@@ -66,7 +116,7 @@ func (t *PrefixLists) Delete(ctx context.Context, name string) error {
 		PrefixListId: id,
 	})
 
-	return err
+	return errors.WithStack(err)
 }
 
 func (t *PrefixLists) get(ctx context.Context, name string) ([]*ec2.ManagedPrefixList, error) {
@@ -107,6 +157,60 @@ func (t *PrefixLists) create(ctx context.Context, name string, tags map[string]s
 	return *out.PrefixList.PrefixListArn, nil
 }
 
+func (p *PrefixLists) createEntry(ctx context.Context, prefixListID string, entry resolver.PrefixListEntry) error {
+	_, err := p.client.ModifyManagedPrefixListWithContext(ctx, &ec2.ModifyManagedPrefixListInput{
+		PrefixListId: awssdk.String(prefixListID),
+		AddEntries: []*ec2.AddPrefixListEntry{
+			{
+				Cidr:        awssdk.String(entry.CIDR),
+				Description: awssdk.String(entry.Description),
+			},
+		},
+	})
+
+	return errors.WithStack(err)
+}
+
+func (p *PrefixLists) entryExists(ctx context.Context, prefixListID string, entry resolver.PrefixListEntry) (bool, error) {
+	out, err := p.client.GetManagedPrefixListEntriesWithContext(ctx, &ec2.GetManagedPrefixListEntriesInput{
+		PrefixListId: awssdk.String(prefixListID),
+		MaxResults:   awssdk.Int64(100),
+	})
+	if err != nil {
+		return false, err
+	}
+
+	for _, e := range out.Entries {
+		if *e.Cidr == entry.CIDR {
+			if *e.Description != entry.Description {
+				return false, errors.New("found conflicting prefix list entry")
+			}
+
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (p *PrefixLists) deleteEntry(ctx context.Context, prefixListID string, entry resolver.PrefixListEntry) error {
+	_, err := p.client.ModifyManagedPrefixListWithContext(ctx, &ec2.ModifyManagedPrefixListInput{
+		PrefixListId: awssdk.String(prefixListID),
+		RemoveEntries: []*ec2.RemovePrefixListEntry{
+			{
+				Cidr: awssdk.String(entry.CIDR),
+			},
+		},
+	})
+
+	return errors.WithStack(err)
+}
+
 func GetPrefixListName(name string) string {
 	return fmt.Sprintf("%s-tgw-prefixlist", name)
+}
+
+func validateCIDR(cidr string) error {
+	_, _, err := net.ParseCIDR(cidr)
+	return errors.WithStack(err)
 }

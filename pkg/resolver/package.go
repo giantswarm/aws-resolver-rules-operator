@@ -70,8 +70,16 @@ type TransitGatewayClient interface {
 	Delete(context.Context, string) error
 }
 
+type PrefixListEntry struct {
+	PrefixListARN string
+	CIDR          string
+	Description   string
+}
+
 //counterfeiter:generate . PrefixListClient
 type PrefixListClient interface {
 	Apply(context.Context, string, map[string]string) (string, error)
+	ApplyEntry(context.Context, PrefixListEntry) error
+	DeleteEntry(context.Context, PrefixListEntry) error
 	Delete(context.Context, string) error
 }
