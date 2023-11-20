@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/aws-resolver-rules-operator/pkg/aws"
+	"github.com/aws-resolver-rules-operator/pkg/resolver"
 	"github.com/aws-resolver-rules-operator/pkg/util/annotations"
 	gsannotation "github.com/giantswarm/k8smetadata/pkg/annotation"
 )
@@ -40,20 +41,16 @@ const (
 
 // RouteReconciler reconciles a Route object
 type RouteReconciler struct {
-	clusterClient ClusterClient
-	routeClient   RouteClient
+	managementCluster types.NamespacedName
+	clusterClient     ClusterClient
+	awsClients        resolver.AWSClients
 }
 
-//counterfeiter:generate . RouteClient
-type RouteClient interface {
-	AddRoutes(ctx context.Context, transitGatewayID, prefixListID *string, subnets []string, roleArn, region string, logger logr.Logger) error
-	RemoveRoutes(ctx context.Context, transitGatewayID, prefixListID *string, subnets []string, roleArn, region string, logger logr.Logger) error
-}
-
-func NewRouteReconciler(clusterClient ClusterClient, route RouteClient) *RouteReconciler {
+func NewRouteReconciler(managementCluster types.NamespacedName, clusterClient ClusterClient, clients resolver.AWSClients) *RouteReconciler {
 	return &RouteReconciler{
-		clusterClient: clusterClient,
-		routeClient:   route,
+		managementCluster: managementCluster,
+		clusterClient:     clusterClient,
+		awsClients:        clients,
 	}
 }
 
@@ -69,12 +66,7 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
 	}
 
-	cluster, err := r.clusterClient.GetCluster(ctx, req.NamespacedName)
-	if err != nil {
-		return ctrl.Result{}, errors.WithStack(err)
-	}
-
-	switch val := annotations.GetAnnotation(cluster, gsannotation.NetworkTopologyModeAnnotation); val {
+	switch val := annotations.GetAnnotation(awsCluster, gsannotation.NetworkTopologyModeAnnotation); val {
 	case "":
 		logger.Info("No NetworkTopologyMode annotation found on cluster, skipping")
 		return ctrl.Result{}, nil
@@ -88,6 +80,11 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
+	managementCluster, err := r.clusterClient.GetAWSCluster(ctx, r.managementCluster)
+	if err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
 	identity, err := r.clusterClient.GetIdentity(ctx, awsCluster.Spec.IdentityRef)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
@@ -98,7 +95,7 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, nil
 	}
 
-	transitGatewayARN := annotations.GetNetworkTopologyTransitGateway(cluster)
+	transitGatewayARN := getTransitGatewayARN(awsCluster, managementCluster)
 	if transitGatewayARN == "" {
 		logger.Info("transitGatewayARN is not set yet, skipping")
 		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
@@ -109,7 +106,7 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	prefixListARN := annotations.GetNetworkTopologyPrefixList(cluster)
+	prefixListARN := getPrefixListARN(awsCluster, managementCluster)
 
 	if prefixListARN == "" {
 		logger.Info("prefixListARN is not set yet, skipping")
@@ -129,30 +126,44 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		subnets = append(subnets, temp)
 	}
 
-	if !cluster.DeletionTimestamp.IsZero() {
-		return r.reconcileDelete(ctx, &transitGatewayID, &prefixListID, subnets, awsCluster, roleARN, awsCluster.Spec.Region, logger)
+	routeRule := resolver.RouteRule{
+		DestinationPrefixListId: prefixListID,
+		TransitGatewayId:        transitGatewayID,
 	}
 
-	return r.reconcileNormal(ctx, &transitGatewayID, &prefixListID, subnets, awsCluster, roleARN, awsCluster.Spec.Region, logger)
+	subnetFilter := subnets
+
+	routeTableClient, err := r.awsClients.NewRouteTableClient(awsCluster.Spec.Region, roleARN)
+	if err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
+	if !awsCluster.DeletionTimestamp.IsZero() {
+		return r.reconcileDelete(ctx, awsCluster, routeRule, subnetFilter, routeTableClient)
+	}
+
+	return r.reconcileNormal(ctx, awsCluster, routeRule, subnetFilter, routeTableClient)
 }
 
-func (r *RouteReconciler) reconcileNormal(ctx context.Context, transitGatewayID, prefixListID *string, subnets []string, awsCluster *capa.AWSCluster, roleArn, region string, logger logr.Logger) (ctrl.Result, error) {
+func (r *RouteReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AWSCluster, routeRule resolver.RouteRule, subnetFilter resolver.Filter, routeTableClient resolver.RouteTableClient) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
 	logger.Info("Adding routes")
 
 	if err := r.clusterClient.AddAWSClusterFinalizer(ctx, awsCluster, RouteFinalizer); err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	if err := r.routeClient.AddRoutes(ctx, transitGatewayID, prefixListID, subnets, roleArn, region, logger); err != nil {
+	if err := routeTableClient.AddRoutes(ctx, routeRule, subnetFilter); err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 	return ctrl.Result{}, nil
 }
 
-func (r *RouteReconciler) reconcileDelete(ctx context.Context, transitGatewayID, prefixListID *string, subnets []string, awsCluster *capa.AWSCluster, roleArn, region string, logger logr.Logger) (ctrl.Result, error) {
+func (r *RouteReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AWSCluster, routeRule resolver.RouteRule, subnetFilter resolver.Filter, routeTableClient resolver.RouteTableClient) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
 	logger.Info("Deletig routes")
 
-	if err := r.routeClient.RemoveRoutes(ctx, transitGatewayID, prefixListID, subnets, roleArn, region, logger); err != nil {
+	if err := routeTableClient.RemoveRoutes(ctx, routeRule, subnetFilter); err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 

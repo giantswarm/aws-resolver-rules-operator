@@ -13,19 +13,20 @@ import (
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
 
-var _ = Describe("RouteTables", func() {
+var _ = Describe("RouteTable", func() {
 	var (
-		ctx               context.Context
-		routeTablesClient resolver.RouteTablesClient
-		routeTableId      string
-		prefixListID      string
-		transitGatewayID  string
+		ctx              context.Context
+		routeTableClient resolver.RouteTableClient
+		RouteRule        resolver.RouteRule
+		routeTableId     string
+		prefixListID     string
+		transitGatewayID string
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
 
-		routeTablesClient, err = awsClients.NewRouteTablesClient(Region, AwsIamArn)
+		routeTableClient, err = awsClients.NewRouteTableClient(Region, AwsIamArn)
 		Expect(err).NotTo(HaveOccurred())
 
 		ec2Output, err := rawEC2Client.CreateRouteTable(&ec2.CreateRouteTableInput{
@@ -68,28 +69,23 @@ var _ = Describe("RouteTables", func() {
 		prefixListID, err = aws.GetARNResourceID(arn)
 		Expect(err).NotTo(HaveOccurred())
 
+		RouteRule = resolver.RouteRule{
+			TransitGatewayId:        transitGatewayID,
+			DestinationPrefixListId: prefixListID,
+		}
 	})
 
-	Describe("GetRouteTables", func() {
-		It("gets the route tables", func() {
-			routeTables, err := routeTablesClient.GetRouteTables(ctx, subnets)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(routeTables).To(HaveLen(1))
-			Expect(*routeTables[0].RouteTableId).To(Equal(routeTableId))
-		})
-	})
-
-	Describe("CreateRoute", func() {
+	Describe("AddRoute", func() {
 		It("creates a route", func() {
-			err := routeTablesClient.CreateRoute(ctx, &routeTableId, &prefixListID, &transitGatewayID)
+			err := routeTableClient.AddRoutes(ctx, RouteRule, subnets)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 
-	Describe("DeleteRoute", func() {
+	Describe("RemoveRoute", func() {
 		When("the route does not exist", func() {
 			It("does not return an error", func() {
-				err := routeTablesClient.DeleteRoute(ctx, &routeTableId, &prefixListID)
+				err := routeTableClient.RemoveRoutes(ctx, RouteRule, subnets)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -104,7 +100,7 @@ var _ = Describe("RouteTables", func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 			It("deletes a route", func() {
-				err := routeTablesClient.DeleteRoute(ctx, &routeTableId, &prefixListID)
+				err := routeTableClient.RemoveRoutes(ctx, RouteRule, subnets)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})

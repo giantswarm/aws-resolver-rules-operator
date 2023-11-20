@@ -27,6 +27,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
@@ -40,7 +41,6 @@ import (
 	"github.com/aws-resolver-rules-operator/pkg/aws"
 	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
-	"github.com/aws-resolver-rules-operator/pkg/route"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -130,12 +130,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	route, err := route.NewRoute(awsClients)
-	if err != nil {
-		setupLog.Error(err, "unable to create Route client")
-		os.Exit(1)
-	}
-
 	if err = (controllers.NewResolverRulesReconciler(k8sAwsClusterClient, awsResolver)).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller")
 		os.Exit(1)
@@ -156,7 +150,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (controllers.NewRouteReconciler(k8sClusterClient, &route)).SetupWithManager(mgr); err != nil {
+	if err = (controllers.NewRouteReconciler(types.NamespacedName{Namespace: managementClusterNamespace, Name: managementClusterName}, k8sClusterClient, awsClients)).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Route")
 		os.Exit(1)
 	}

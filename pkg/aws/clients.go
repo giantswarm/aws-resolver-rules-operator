@@ -179,7 +179,7 @@ func (c *Clients) NewPrefixListClient(region, rolearn string) (resolver.PrefixLi
 	}, nil
 }
 
-func (c *Clients) NewRouteTablesClient(region, rolearn string) (resolver.RouteTablesClient, error) {
+func (c *Clients) NewRouteTableClient(region, rolearn string) (resolver.RouteTableClient, error) {
 	session, err := c.sessionForRole(rolearn)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -189,8 +189,8 @@ func (c *Clients) NewRouteTablesClient(region, rolearn string) (resolver.RouteTa
 		Region: aws.String(region),
 	})
 
-	return &RouteTables{
-		ec2: ec2Client,
+	return &RouteTableClient{
+		client: ec2Client,
 	}, nil
 }
 

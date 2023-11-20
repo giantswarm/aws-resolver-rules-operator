@@ -52,10 +52,11 @@ func TestControllers(t *testing.T) {
 }
 
 var (
-	logger    logr.Logger
-	k8sClient client.Client
-	testEnv   *envtest.Environment
-	namespace string
+	logger           logr.Logger
+	k8sClient        client.Client
+	testEnv          *envtest.Environment
+	namespace        string
+	notExistResource = "does-not-exist"
 )
 
 var _ = BeforeSuite(func() {

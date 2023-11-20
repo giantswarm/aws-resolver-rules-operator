@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
+	"github.com/aws-resolver-rules-operator/pkg/util/annotations"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
@@ -139,4 +140,22 @@ func predicateToFilterAWSManagedControlPlaneResourceVersionChanges(e event.Updat
 	newCluster.ObjectMeta.ResourceVersion = ""
 
 	return !cmp.Equal(oldCluster, newCluster)
+}
+
+func getTransitGatewayARN(cluster, managementCluster *capa.AWSCluster) string {
+	transitGatewayARN := annotations.GetNetworkTopologyTransitGateway(cluster)
+	if transitGatewayARN != "" {
+		return transitGatewayARN
+	}
+
+	return annotations.GetNetworkTopologyTransitGateway(managementCluster)
+}
+
+func getPrefixListARN(cluster, managementCluster *capa.AWSCluster) string {
+	prefixListARN := annotations.GetNetworkTopologyPrefixList(cluster)
+	if prefixListARN != "" {
+		return prefixListARN
+	}
+
+	return annotations.GetNetworkTopologyPrefixList(managementCluster)
 }

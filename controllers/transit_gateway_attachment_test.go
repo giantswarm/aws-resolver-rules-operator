@@ -125,7 +125,7 @@ var _ = Describe("TransitGatewayAttachment", func() {
 
 		When("the cluster does not exist", func() {
 			BeforeEach(func() {
-				requestResourceName = "does-not-exist"
+				requestResourceName = notExistResource
 			})
 
 			It("does not reconcile", func() {
