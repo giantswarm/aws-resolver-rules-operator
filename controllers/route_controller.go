@@ -176,7 +176,7 @@ func (r *RouteReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.
 // SetupWithManager sets up the controller with the Manager.
 func (r *RouteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		Named("resolverrules").
+		Named("routerules").
 		For(&capa.AWSCluster{}).
 		WithEventFilter(
 			predicate.Funcs{
