@@ -162,15 +162,6 @@ func (r *PrefixListEntryReconciler) reconcileDelete(ctx context.Context, scope e
 	return ctrl.Result{}, nil
 }
 
-func getPrefixListARN(cluster, managementCluster *capa.AWSCluster) string {
-	prefixListARN := annotations.GetNetworkTopologyPrefixList(cluster)
-	if prefixListARN != "" {
-		return prefixListARN
-	}
-
-	return annotations.GetNetworkTopologyPrefixList(managementCluster)
-}
-
 func getPrefixListEntryDescription(clusterName string) string {
 	return fmt.Sprintf("CIDR block for cluster %s", clusterName)
 }
