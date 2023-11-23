@@ -258,6 +258,57 @@ var _ = Describe("ClusterClient", func() {
 		})
 	})
 
+	Describe("AddClusterFinalizer", func() {
+		var cluster *capi.Cluster
+
+		BeforeEach(func() {
+			cluster = &capi.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster2",
+					Namespace: namespace,
+				},
+			}
+			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
+		})
+
+		It("adds the finalizer to the cluster", func() {
+			err := clusterClient.AddClusterFinalizer(ctx, cluster, controllers.ResolverRulesFinalizer)
+			Expect(err).NotTo(HaveOccurred())
+
+			actualCluster := &capi.Cluster{}
+			err = k8sClient.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, actualCluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(actualCluster.Finalizers).To(ContainElement(controllers.ResolverRulesFinalizer))
+		})
+
+		When("the cluster does not exist", func() {
+			It("returns an error", func() {
+				nonExistingCluster := &capi.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "does-not-exist",
+						Namespace: namespace,
+					},
+				}
+				err := clusterClient.AddClusterFinalizer(ctx, nonExistingCluster, controllers.RouteFinalizer)
+				Expect(k8serrors.IsNotFound(err)).To(BeTrue())
+			})
+		})
+
+		When("the context is cancelled", func() {
+			BeforeEach(func() {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			})
+
+			It("returns an error", func() {
+				err := clusterClient.AddClusterFinalizer(ctx, cluster, controllers.RouteFinalizer)
+				Expect(err).To(MatchError(ContainSubstring("context canceled")))
+			})
+		})
+	})
+
 	Describe("RemoveFinalizer", func() {
 		var awsCluster *capa.AWSCluster
 
@@ -322,6 +373,70 @@ var _ = Describe("ClusterClient", func() {
 				Expect(err).To(MatchError(ContainSubstring("context canceled")))
 			})
 		})
+	})
+
+	Describe("RemoveClusterFinalizer", func() {
+		var cluster *capi.Cluster
+
+		BeforeEach(func() {
+			cluster = &capi.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster2",
+					Namespace: namespace,
+				},
+			}
+			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
+		})
+
+		It("removes the finalizer from the cluster", func() {
+			err := clusterClient.RemoveClusterFinalizer(ctx, cluster, controllers.RouteFinalizer)
+			Expect(err).NotTo(HaveOccurred())
+
+			actualCluster := &capi.Cluster{}
+			err = k8sClient.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, actualCluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(actualCluster.Finalizers).NotTo(ContainElement(controllers.RouteFinalizer))
+		})
+
+		When("the finalizer doesn't exists", func() {
+			BeforeEach(func() {
+				err := clusterClient.RemoveClusterFinalizer(ctx, cluster, controllers.RouteFinalizer)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("does not return an error", func() {
+				err := clusterClient.RemoveClusterFinalizer(ctx, cluster, controllers.RouteFinalizer)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
+		When("the cluster does not exist", func() {
+			It("returns an error", func() {
+				cluster = &capi.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "does-not-exist",
+						Namespace: namespace,
+					},
+				}
+				err := clusterClient.RemoveClusterFinalizer(ctx, cluster, controllers.RouteFinalizer)
+				Expect(k8serrors.IsNotFound(err)).To(BeTrue())
+			})
+		})
+
+		When("the context is cancelled", func() {
+			BeforeEach(func() {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			})
+
+			It("returns an error", func() {
+				err := clusterClient.RemoveClusterFinalizer(ctx, cluster, controllers.RouteFinalizer)
+				Expect(err).To(MatchError(ContainSubstring("context canceled")))
+			})
+		})
+
 	})
 
 	Describe("GetIdentity", func() {

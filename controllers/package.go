@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
+	"github.com/aws-resolver-rules-operator/pkg/util/annotations"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
@@ -93,9 +94,11 @@ type ClusterClient interface {
 	GetCluster(context.Context, types.NamespacedName) (*capi.Cluster, error)
 	AddAWSClusterFinalizer(ctx context.Context, cluster *capa.AWSCluster, finalizer string) error
 	AddAWSManagedControlPlaneFinalizer(ctx context.Context, awsManagedControlPlane *eks.AWSManagedControlPlane, finalizer string) error
+	AddClusterFinalizer(context.Context, *capi.Cluster, string) error
 	Unpause(context.Context, *capa.AWSCluster, *capi.Cluster) error
 	RemoveAWSClusterFinalizer(ctx context.Context, awsCluster *capa.AWSCluster, finalizer string) error
 	RemoveAWSManagedControlPlaneFinalizer(ctx context.Context, awsManagedControlPlane *eks.AWSManagedControlPlane, finalizer string) error
+	RemoveClusterFinalizer(context.Context, *capi.Cluster, string) error
 	GetIdentity(context.Context, *capa.AWSIdentityReference) (*capa.AWSClusterRoleIdentity, error)
 	MarkConditionTrue(context.Context, *capi.Cluster, capi.ConditionType) error
 	GetBastionMachine(ctx context.Context, clusterName string) (*capi.Machine, error)
@@ -137,4 +140,22 @@ func predicateToFilterAWSManagedControlPlaneResourceVersionChanges(e event.Updat
 	newCluster.ObjectMeta.ResourceVersion = ""
 
 	return !cmp.Equal(oldCluster, newCluster)
+}
+
+func getTransitGatewayARN(cluster, managementCluster *capa.AWSCluster) string {
+	transitGatewayARN := annotations.GetNetworkTopologyTransitGateway(cluster)
+	if transitGatewayARN != "" {
+		return transitGatewayARN
+	}
+
+	return annotations.GetNetworkTopologyTransitGateway(managementCluster)
+}
+
+func getPrefixListARN(cluster, managementCluster *capa.AWSCluster) string {
+	prefixListARN := annotations.GetNetworkTopologyPrefixList(cluster)
+	if prefixListARN != "" {
+		return prefixListARN
+	}
+
+	return annotations.GetNetworkTopologyPrefixList(managementCluster)
 }

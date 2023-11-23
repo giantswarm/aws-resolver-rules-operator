@@ -47,3 +47,14 @@ func (e *DnsRecordNotSupportedError) Error() string {
 func (e *DnsRecordNotSupportedError) Is(target error) bool {
 	return reflect.TypeOf(target) == reflect.TypeOf(e)
 }
+
+type RouteTableNotFoundError struct {
+}
+
+func (e *RouteTableNotFoundError) Error() string {
+	return "route table was not found"
+}
+
+func (e *RouteTableNotFoundError) Is(target error) bool {
+	return reflect.TypeOf(target) == reflect.TypeOf(e)
+}

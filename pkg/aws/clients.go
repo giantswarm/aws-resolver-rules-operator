@@ -179,6 +179,21 @@ func (c *Clients) NewPrefixListClient(region, rolearn string) (resolver.PrefixLi
 	}, nil
 }
 
+func (c *Clients) NewRouteTableClient(region, rolearn string) (resolver.RouteTableClient, error) {
+	session, err := c.sessionForRole(rolearn)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	ec2Client := ec2.New(session, &aws.Config{
+		Region: aws.String(region),
+	})
+
+	return &RouteTableClient{
+		client: ec2Client,
+	}, nil
+}
+
 func (c *Clients) newRoute53Client(region, arn, externalId string) (*route53.Route53, error) {
 	session, err := c.sessionFromRegion(region)
 	if err != nil {

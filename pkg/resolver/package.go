@@ -18,6 +18,7 @@ type AWSClients interface {
 	NewRoute53Client(region, arn string) (Route53Client, error)
 	NewTransitGatewayClient(region, arn string) (TransitGatewayClient, error)
 	NewPrefixListClient(region, arn string) (PrefixListClient, error)
+	NewRouteTableClient(region, arn string) (RouteTableClient, error)
 }
 
 //counterfeiter:generate . EC2Client
@@ -82,4 +83,17 @@ type PrefixListClient interface {
 	ApplyEntry(context.Context, PrefixListEntry) error
 	DeleteEntry(context.Context, PrefixListEntry) error
 	Delete(context.Context, string) error
+}
+
+type Filter []string
+
+type RouteRule struct {
+	DestinationPrefixListId string
+	TransitGatewayId        string
+}
+
+//counterfeiter:generate . RouteTableClient
+type RouteTableClient interface {
+	AddRoutes(ctx context.Context, routeRule RouteRule, filter Filter) error
+	RemoveRoutes(ctx context.Context, routeRule RouteRule, filter Filter) error
 }

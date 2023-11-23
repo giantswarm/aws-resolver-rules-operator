@@ -167,15 +167,6 @@ func (r *TransitGatewayAttachmentReconciler) reconcileDelete(ctx context.Context
 	return ctrl.Result{}, nil
 }
 
-func getTransitGatewayARN(cluster, managementCluster *capa.AWSCluster) string {
-	transitGatewayARN := annotations.GetNetworkTopologyTransitGateway(cluster)
-	if transitGatewayARN != "" {
-		return transitGatewayARN
-	}
-
-	return annotations.GetNetworkTopologyTransitGateway(managementCluster)
-}
-
 func getSubnets(cluster *capa.AWSCluster) ([]string, error) {
 	subnets := cluster.Spec.NetworkSpec.Subnets
 	subnets = filterTGWSubnets(subnets)

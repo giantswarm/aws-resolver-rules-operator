@@ -27,6 +27,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
@@ -149,6 +150,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (controllers.NewRouteReconciler(types.NamespacedName{Namespace: managementClusterNamespace, Name: managementClusterName}, k8sClusterClient, awsClients)).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Route")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
