@@ -133,7 +133,7 @@ var _ = Describe("RAM client", func() {
 			})
 		})
 
-		When("the destination account does invalid", func() {
+		When("the destination account is invalid", func() {
 			BeforeEach(func() {
 				share.ExternalAccountID = "notavalidaccount"
 			})
