@@ -37,8 +37,6 @@ type ResourceShare struct {
 type RAMClient interface {
 	ApplyResourceShare(context.Context, ResourceShare) error
 	DeleteResourceShare(context.Context, string) error
-	CreateResourceShareWithContext(ctx context.Context, logger logr.Logger, resourceShareName string, resourceArns, principals string) (string, error)
-	DeleteResourceShareWithContext(ctx context.Context, logger logr.Logger, resourceShareName string) error
 }
 
 //counterfeiter:generate . Route53Client

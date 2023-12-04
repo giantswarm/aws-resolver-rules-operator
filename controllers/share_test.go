@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/giantswarm/k8smetadata/pkg/annotation"
 	gsannotation "github.com/giantswarm/k8smetadata/pkg/annotation"
+	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,9 +33,10 @@ var _ = Describe("Share", func() {
 		externalAccountID = "987654321098"
 		notValidArn       = "not:a:valid/arn"
 
-		identity *capa.AWSClusterRoleIdentity
-		cluster  *capa.AWSCluster
-		request  ctrl.Request
+		identity          *capa.AWSClusterRoleIdentity
+		cluster           *capa.AWSCluster
+		managementCluster *capa.AWSCluster
+		request           ctrl.Request
 
 		ramClient  *resolverfakes.FakeRAMClient
 		reconciler *controllers.ShareReconciler
@@ -43,14 +46,22 @@ var _ = Describe("Share", func() {
 		ctx = context.Background()
 
 		identity, cluster = createRandomClusterWithIdentity(
-			gsannotation.NetworkTopologyTransitGatewayIDAnnotation, transitGatewayARN,
-			gsannotation.NetworkTopologyPrefixListIDAnnotation, prefixListARN,
-			gsannotation.NetworkTopologyModeAnnotation, gsannotation.NetworkTopologyModeGiantSwarmManaged,
+			gsannotation.NetworkTopologyModeAnnotation,
+			gsannotation.NetworkTopologyModeGiantSwarmManaged,
 		)
 		patchedIdentity := identity.DeepCopy()
 		patchedIdentity.Spec.RoleArn = fmt.Sprintf("arn:aws:iam::%s:role/the-role-name", externalAccountID)
 		err := k8sClient.Patch(context.Background(), patchedIdentity, client.MergeFrom(identity))
 		Expect(err).NotTo(HaveOccurred())
+
+		managementCluster = createRandomCluster(
+			annotation.NetworkTopologyModeAnnotation,
+			annotation.NetworkTopologyModeGiantSwarmManaged,
+			annotation.NetworkTopologyTransitGatewayIDAnnotation,
+			transitGatewayARN,
+			annotation.NetworkTopologyPrefixListIDAnnotation,
+			prefixListARN,
+		)
 
 		request = ctrl.Request{
 			NamespacedName: types.NamespacedName{
@@ -62,6 +73,7 @@ var _ = Describe("Share", func() {
 		ramClient = new(resolverfakes.FakeRAMClient)
 		clusterClient := k8sclient.NewAWSClusterClient(k8sClient)
 		reconciler = controllers.NewShareReconciler(
+			client.ObjectKeyFromObject(managementCluster),
 			clusterClient,
 			ramClient,
 		)
@@ -147,10 +159,28 @@ var _ = Describe("Share", func() {
 			})
 		})
 
-		When("the cluster still has the networktopology finalizer", func() {
+		When("the transit gateway hasn't been detached", func() {
 			BeforeEach(func() {
 				patchedCluster := cluster.DeepCopy()
 				controllerutil.AddFinalizer(patchedCluster, controllers.FinalizerTransitGatewayAttachment)
+				err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("does not reconcile", func() {
+				result, err := reconciler.Reconcile(ctx, request)
+
+				Expect(result.Requeue).To(BeFalse())
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(ramClient.DeleteResourceShareCallCount()).To(Equal(0))
+			})
+		})
+
+		When("the prefix list entries haven't been removed", func() {
+			BeforeEach(func() {
+				patchedCluster := cluster.DeepCopy()
+				controllerutil.AddFinalizer(patchedCluster, controllers.FinalizerPrefixListEntry)
 				err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
 				Expect(err).NotTo(HaveOccurred())
 			})
@@ -168,7 +198,7 @@ var _ = Describe("Share", func() {
 
 	When("the transit gateway hasn't been created yet", func() {
 		BeforeEach(func() {
-			patchedCluster := cluster.DeepCopy()
+			patchedCluster := managementCluster.DeepCopy()
 			patchedCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation] = ""
 			err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
 			Expect(err).NotTo(HaveOccurred())
@@ -186,7 +216,7 @@ var _ = Describe("Share", func() {
 
 	When("the transit gateway hasn't been created yet", func() {
 		BeforeEach(func() {
-			patchedCluster := cluster.DeepCopy()
+			patchedCluster := managementCluster.DeepCopy()
 			patchedCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation] = ""
 			err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
 			Expect(err).NotTo(HaveOccurred())
@@ -200,6 +230,40 @@ var _ = Describe("Share", func() {
 			Expect(ramClient.ApplyResourceShareCallCount()).To(Equal(1))
 			_, resourceShare := ramClient.ApplyResourceShareArgsForCall(0)
 			Expect(resourceShare.ResourceArns).To(ConsistOf(prefixListARN))
+		})
+	})
+
+	When("the transit gateway and prefix list are set on the workload cluster", func() {
+		var (
+			wcTransitGatewayARN string
+			wcPrefixListARN     string
+		)
+
+		BeforeEach(func() {
+			wcTransitGatewayARN = fmt.Sprintf("arn:aws:iam::123456789012:transit-gateways/%s", uuid.NewString())
+			wcPrefixListARN = fmt.Sprintf("arn:aws:iam::123456789012:prefix-lists/%s", uuid.NewString())
+			patchedCluster := cluster.DeepCopy()
+			patchedCluster.Annotations[annotation.NetworkTopologyTransitGatewayIDAnnotation] = wcTransitGatewayARN
+			patchedCluster.Annotations[annotation.NetworkTopologyPrefixListIDAnnotation] = wcPrefixListARN
+			err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("overrides the management cluster transit gateway", func() {
+			result, err := reconciler.Reconcile(ctx, request)
+
+			Expect(result.Requeue).To(BeFalse())
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(ramClient.ApplyResourceShareCallCount()).To(Equal(2))
+			_, resourceShare := ramClient.ApplyResourceShareArgsForCall(0)
+			Expect(resourceShare.Name).To(Equal(fmt.Sprintf("%s-transit-gateway", cluster.Name)))
+			Expect(resourceShare.ResourceArns).To(ConsistOf(wcTransitGatewayARN))
+			Expect(resourceShare.ExternalAccountID).To(Equal(externalAccountID))
+			_, resourceShare = ramClient.ApplyResourceShareArgsForCall(1)
+			Expect(resourceShare.Name).To(Equal(fmt.Sprintf("%s-prefix-list", cluster.Name)))
+			Expect(resourceShare.ResourceArns).To(ConsistOf(wcPrefixListARN))
+			Expect(resourceShare.ExternalAccountID).To(Equal(externalAccountID))
 		})
 	})
 
@@ -251,7 +315,11 @@ var _ = Describe("Share", func() {
 		BeforeEach(func() {
 			fakeClusterClient := new(controllersfakes.FakeAWSClusterClient)
 			fakeClusterClient.GetAWSClusterReturns(nil, errors.New("boom"))
-			reconciler = controllers.NewShareReconciler(fakeClusterClient, ramClient)
+			reconciler = controllers.NewShareReconciler(
+				client.ObjectKeyFromObject(managementCluster),
+				fakeClusterClient,
+				ramClient,
+			)
 		})
 
 		It("returns an error", func() {

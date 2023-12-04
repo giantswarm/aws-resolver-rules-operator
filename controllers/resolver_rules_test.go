@@ -170,7 +170,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 					Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
 					Expect(reconcileErr).NotTo(HaveOccurred())
 					Expect(ec2Client.CreateSecurityGroupForResolverEndpointsCallCount()).To(BeZero())
-					Expect(ramClient.DeleteResourceShareWithContextCallCount()).To(BeZero())
+					Expect(ramClient.DeleteResourceShareCallCount()).To(BeZero())
 				})
 			})
 
@@ -265,7 +265,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 								})
 
 								It("returns the error", func() {
-									Expect(ramClient.CreateResourceShareWithContextCallCount()).To(BeZero())
+									Expect(ramClient.ApplyResourceShareCallCount()).To(BeZero())
 									Expect(reconcileErr).To(HaveOccurred())
 								})
 							})
@@ -276,15 +276,16 @@ var _ = Describe("Resolver rules reconciler", func() {
 								})
 
 								It("creates ram share resource", func() {
-									_, _, resourceShareName, principal, resourceArn := ramClient.CreateResourceShareWithContextArgsForCall(0)
-									Expect(resourceShareName).To(Equal(fmt.Sprintf("giantswarm-%s-%s-rr", ClusterName, "resolver-rule-id")))
-									Expect(principal).To(Equal("resolver-rule-principal-arn"))
-									Expect(resourceArn).To(Equal(DnsServerAWSAccountId))
+									Expect(ramClient.ApplyResourceShareCallCount()).To(Equal(1))
+									_, share := ramClient.ApplyResourceShareArgsForCall(0)
+									Expect(share.Name).To(Equal(fmt.Sprintf("giantswarm-%s-%s-rr", ClusterName, "resolver-rule-id")))
+									Expect(share.ExternalAccountID).To(Equal(DnsServerAWSAccountId))
+									Expect(share.ResourceArns).To(ConsistOf("resolver-rule-principal-arn"))
 								})
 
 								When("creating ram share resource fails", func() {
 									BeforeEach(func() {
-										ramClient.CreateResourceShareWithContextReturns("", errors.New("error creating ram"))
+										ramClient.ApplyResourceShareReturns(errors.New("error creating ram"))
 									})
 
 									It("returns the error", func() {
@@ -293,10 +294,6 @@ var _ = Describe("Resolver rules reconciler", func() {
 								})
 
 								When("creating ram share resource succeeds", func() {
-									BeforeEach(func() {
-										ramClient.CreateResourceShareWithContextReturns("resource-share-arn", nil)
-									})
-
 									It("associates resolver rule with VPC account", func() {
 										_, _, associationName, vpcId, resolverRuleId := dnsServerResolverClient.AssociateResolverRuleWithContextArgsForCall(0)
 										Expect(associationName).To(Equal(fmt.Sprintf("giantswarm-%s-rr-association", ClusterName)))
@@ -429,13 +426,13 @@ var _ = Describe("Resolver rules reconciler", func() {
 					})
 
 					It("deletes the ram share resource", func() {
-						_, _, resourceShareName := ramClient.DeleteResourceShareWithContextArgsForCall(0)
+						_, resourceShareName := ramClient.DeleteResourceShareArgsForCall(0)
 						Expect(resourceShareName).To(Equal("giantswarm-foo-resolver-rule-id-rr"))
 					})
 
 					When("removing the ram share resource fails", func() {
 						BeforeEach(func() {
-							ramClient.DeleteResourceShareWithContextReturns(errors.New("failing deleting ram resource share"))
+							ramClient.DeleteResourceShareReturns(errors.New("failing deleting ram resource share"))
 						})
 
 						It("does not delete the finalizer", func() {

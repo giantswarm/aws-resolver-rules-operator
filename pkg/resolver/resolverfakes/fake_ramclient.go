@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
-	"github.com/go-logr/logr"
 )
 
 type FakeRAMClient struct {
@@ -22,23 +21,6 @@ type FakeRAMClient struct {
 	applyResourceShareReturnsOnCall map[int]struct {
 		result1 error
 	}
-	CreateResourceShareWithContextStub        func(context.Context, logr.Logger, string, string, string) (string, error)
-	createResourceShareWithContextMutex       sync.RWMutex
-	createResourceShareWithContextArgsForCall []struct {
-		arg1 context.Context
-		arg2 logr.Logger
-		arg3 string
-		arg4 string
-		arg5 string
-	}
-	createResourceShareWithContextReturns struct {
-		result1 string
-		result2 error
-	}
-	createResourceShareWithContextReturnsOnCall map[int]struct {
-		result1 string
-		result2 error
-	}
 	DeleteResourceShareStub        func(context.Context, string) error
 	deleteResourceShareMutex       sync.RWMutex
 	deleteResourceShareArgsForCall []struct {
@@ -49,19 +31,6 @@ type FakeRAMClient struct {
 		result1 error
 	}
 	deleteResourceShareReturnsOnCall map[int]struct {
-		result1 error
-	}
-	DeleteResourceShareWithContextStub        func(context.Context, logr.Logger, string) error
-	deleteResourceShareWithContextMutex       sync.RWMutex
-	deleteResourceShareWithContextArgsForCall []struct {
-		arg1 context.Context
-		arg2 logr.Logger
-		arg3 string
-	}
-	deleteResourceShareWithContextReturns struct {
-		result1 error
-	}
-	deleteResourceShareWithContextReturnsOnCall map[int]struct {
 		result1 error
 	}
 	invocations      map[string][][]interface{}
@@ -130,74 +99,6 @@ func (fake *FakeRAMClient) ApplyResourceShareReturnsOnCall(i int, result1 error)
 	}{result1}
 }
 
-func (fake *FakeRAMClient) CreateResourceShareWithContext(arg1 context.Context, arg2 logr.Logger, arg3 string, arg4 string, arg5 string) (string, error) {
-	fake.createResourceShareWithContextMutex.Lock()
-	ret, specificReturn := fake.createResourceShareWithContextReturnsOnCall[len(fake.createResourceShareWithContextArgsForCall)]
-	fake.createResourceShareWithContextArgsForCall = append(fake.createResourceShareWithContextArgsForCall, struct {
-		arg1 context.Context
-		arg2 logr.Logger
-		arg3 string
-		arg4 string
-		arg5 string
-	}{arg1, arg2, arg3, arg4, arg5})
-	stub := fake.CreateResourceShareWithContextStub
-	fakeReturns := fake.createResourceShareWithContextReturns
-	fake.recordInvocation("CreateResourceShareWithContext", []interface{}{arg1, arg2, arg3, arg4, arg5})
-	fake.createResourceShareWithContextMutex.Unlock()
-	if stub != nil {
-		return stub(arg1, arg2, arg3, arg4, arg5)
-	}
-	if specificReturn {
-		return ret.result1, ret.result2
-	}
-	return fakeReturns.result1, fakeReturns.result2
-}
-
-func (fake *FakeRAMClient) CreateResourceShareWithContextCallCount() int {
-	fake.createResourceShareWithContextMutex.RLock()
-	defer fake.createResourceShareWithContextMutex.RUnlock()
-	return len(fake.createResourceShareWithContextArgsForCall)
-}
-
-func (fake *FakeRAMClient) CreateResourceShareWithContextCalls(stub func(context.Context, logr.Logger, string, string, string) (string, error)) {
-	fake.createResourceShareWithContextMutex.Lock()
-	defer fake.createResourceShareWithContextMutex.Unlock()
-	fake.CreateResourceShareWithContextStub = stub
-}
-
-func (fake *FakeRAMClient) CreateResourceShareWithContextArgsForCall(i int) (context.Context, logr.Logger, string, string, string) {
-	fake.createResourceShareWithContextMutex.RLock()
-	defer fake.createResourceShareWithContextMutex.RUnlock()
-	argsForCall := fake.createResourceShareWithContextArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5
-}
-
-func (fake *FakeRAMClient) CreateResourceShareWithContextReturns(result1 string, result2 error) {
-	fake.createResourceShareWithContextMutex.Lock()
-	defer fake.createResourceShareWithContextMutex.Unlock()
-	fake.CreateResourceShareWithContextStub = nil
-	fake.createResourceShareWithContextReturns = struct {
-		result1 string
-		result2 error
-	}{result1, result2}
-}
-
-func (fake *FakeRAMClient) CreateResourceShareWithContextReturnsOnCall(i int, result1 string, result2 error) {
-	fake.createResourceShareWithContextMutex.Lock()
-	defer fake.createResourceShareWithContextMutex.Unlock()
-	fake.CreateResourceShareWithContextStub = nil
-	if fake.createResourceShareWithContextReturnsOnCall == nil {
-		fake.createResourceShareWithContextReturnsOnCall = make(map[int]struct {
-			result1 string
-			result2 error
-		})
-	}
-	fake.createResourceShareWithContextReturnsOnCall[i] = struct {
-		result1 string
-		result2 error
-	}{result1, result2}
-}
-
 func (fake *FakeRAMClient) DeleteResourceShare(arg1 context.Context, arg2 string) error {
 	fake.deleteResourceShareMutex.Lock()
 	ret, specificReturn := fake.deleteResourceShareReturnsOnCall[len(fake.deleteResourceShareArgsForCall)]
@@ -260,80 +161,13 @@ func (fake *FakeRAMClient) DeleteResourceShareReturnsOnCall(i int, result1 error
 	}{result1}
 }
 
-func (fake *FakeRAMClient) DeleteResourceShareWithContext(arg1 context.Context, arg2 logr.Logger, arg3 string) error {
-	fake.deleteResourceShareWithContextMutex.Lock()
-	ret, specificReturn := fake.deleteResourceShareWithContextReturnsOnCall[len(fake.deleteResourceShareWithContextArgsForCall)]
-	fake.deleteResourceShareWithContextArgsForCall = append(fake.deleteResourceShareWithContextArgsForCall, struct {
-		arg1 context.Context
-		arg2 logr.Logger
-		arg3 string
-	}{arg1, arg2, arg3})
-	stub := fake.DeleteResourceShareWithContextStub
-	fakeReturns := fake.deleteResourceShareWithContextReturns
-	fake.recordInvocation("DeleteResourceShareWithContext", []interface{}{arg1, arg2, arg3})
-	fake.deleteResourceShareWithContextMutex.Unlock()
-	if stub != nil {
-		return stub(arg1, arg2, arg3)
-	}
-	if specificReturn {
-		return ret.result1
-	}
-	return fakeReturns.result1
-}
-
-func (fake *FakeRAMClient) DeleteResourceShareWithContextCallCount() int {
-	fake.deleteResourceShareWithContextMutex.RLock()
-	defer fake.deleteResourceShareWithContextMutex.RUnlock()
-	return len(fake.deleteResourceShareWithContextArgsForCall)
-}
-
-func (fake *FakeRAMClient) DeleteResourceShareWithContextCalls(stub func(context.Context, logr.Logger, string) error) {
-	fake.deleteResourceShareWithContextMutex.Lock()
-	defer fake.deleteResourceShareWithContextMutex.Unlock()
-	fake.DeleteResourceShareWithContextStub = stub
-}
-
-func (fake *FakeRAMClient) DeleteResourceShareWithContextArgsForCall(i int) (context.Context, logr.Logger, string) {
-	fake.deleteResourceShareWithContextMutex.RLock()
-	defer fake.deleteResourceShareWithContextMutex.RUnlock()
-	argsForCall := fake.deleteResourceShareWithContextArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
-}
-
-func (fake *FakeRAMClient) DeleteResourceShareWithContextReturns(result1 error) {
-	fake.deleteResourceShareWithContextMutex.Lock()
-	defer fake.deleteResourceShareWithContextMutex.Unlock()
-	fake.DeleteResourceShareWithContextStub = nil
-	fake.deleteResourceShareWithContextReturns = struct {
-		result1 error
-	}{result1}
-}
-
-func (fake *FakeRAMClient) DeleteResourceShareWithContextReturnsOnCall(i int, result1 error) {
-	fake.deleteResourceShareWithContextMutex.Lock()
-	defer fake.deleteResourceShareWithContextMutex.Unlock()
-	fake.DeleteResourceShareWithContextStub = nil
-	if fake.deleteResourceShareWithContextReturnsOnCall == nil {
-		fake.deleteResourceShareWithContextReturnsOnCall = make(map[int]struct {
-			result1 error
-		})
-	}
-	fake.deleteResourceShareWithContextReturnsOnCall[i] = struct {
-		result1 error
-	}{result1}
-}
-
 func (fake *FakeRAMClient) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
 	fake.applyResourceShareMutex.RLock()
 	defer fake.applyResourceShareMutex.RUnlock()
-	fake.createResourceShareWithContextMutex.RLock()
-	defer fake.createResourceShareWithContextMutex.RUnlock()
 	fake.deleteResourceShareMutex.RLock()
 	defer fake.deleteResourceShareMutex.RUnlock()
-	fake.deleteResourceShareWithContextMutex.RLock()
-	defer fake.deleteResourceShareWithContextMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value
