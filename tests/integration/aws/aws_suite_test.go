@@ -1,171 +1,183 @@
-/*
-Copyright 2022.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package aws_test
 
 import (
-	"context"
-	"os"
+	"fmt"
 	"testing"
 
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
-	awssession "github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/route53"
-	"github.com/aws/aws-sdk-go/service/route53resolver"
+	"github.com/aws/aws-sdk-go/service/ram"
 	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/pkg/errors"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-
-	// +kubebuilder:scaffold:imports
+	"go.uber.org/zap/zapcore"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/aws-resolver-rules-operator/pkg/aws"
-	"github.com/aws-resolver-rules-operator/pkg/resolver"
 	"github.com/aws-resolver-rules-operator/tests"
 )
 
-// These tests use Ginkgo (BDD-style Go testing framework). Refer to
-// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
-
-func TestControllers(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "AWS Suite")
-}
-
-const (
-	AwsIamArn              = "arn:aws:iam::1234567890:role/IamRole"
-	Region                 = "eu-central-1"
-	LocalstackAWSAccountId = "000000000000"
-)
-
 var (
-	additionalTags    map[string]string
-	awsClients        resolver.AWSClients
-	ctx               context.Context
-	ec2Client         resolver.EC2Client
-	logger            logr.Logger
-	resolverClient    resolver.ResolverClient
-	route53Client     resolver.Route53Client
-	err               error
-	rawEC2Client      *ec2.EC2
-	rawResolverClient *route53resolver.Route53Resolver
-	rawRoute53Client  *route53.Route53
-	subnets           []string
-	MCVPCId           string
-	VPCId             string
+	logger logr.Logger
+
+	mcAccount string
+	wcAccount string
+	iamRoleId string
+	awsRegion string
+
+	mcIAMRoleARN string
+	wcIAMRoleARN string
+
+	rawEC2Client *ec2.EC2
+	rawRamClient *ram.RAM
 )
+
+func TestAws(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Aws Suite")
+}
 
 var _ = BeforeSuite(func() {
-	logger = GinkgoLogr
-	logf.SetLogger(logger)
-	tests.GetEnvOrSkip("AWS_ENDPOINT")
-	additionalTags = map[string]string{
-		"test": "test-tag",
+	opts := zap.Options{
+		DestWriter:  GinkgoWriter,
+		Development: true,
+		TimeEncoder: zapcore.RFC3339TimeEncoder,
 	}
 
-	awsClients = aws.NewClients(os.Getenv("AWS_ENDPOINT"))
+	logger = zap.New(zap.UseFlagOptions(&opts))
 
-	rawEC2Client, err = NewEC2Client(Region, AwsIamArn, "")
-	Expect(err).NotTo(HaveOccurred())
+	mcAccount = tests.GetEnvOrSkip("MC_AWS_ACCOUNT")
+	wcAccount = tests.GetEnvOrSkip("WC_AWS_ACCOUNT")
+	iamRoleId = tests.GetEnvOrSkip("AWS_IAM_ROLE_ID")
+	awsRegion = tests.GetEnvOrSkip("AWS_REGION")
 
-	rawResolverClient, err = NewResolverClient(Region, AwsIamArn, "")
-	Expect(err).NotTo(HaveOccurred())
+	mcIAMRoleARN = fmt.Sprintf("arn:aws:iam::%s:role/%s", mcAccount, iamRoleId)
+	wcIAMRoleARN = fmt.Sprintf("arn:aws:iam::%s:role/%s", wcAccount, iamRoleId)
 
-	rawRoute53Client, err = NewRoute53Client(Region, AwsIamArn, "")
-	Expect(err).NotTo(HaveOccurred())
-
-	createMCVPCResponse, err := rawEC2Client.CreateVpc(&ec2.CreateVpcInput{
-		CidrBlock: awssdk.String("10.0.0.0/16"),
-	})
-	Expect(err).NotTo(HaveOccurred())
-	MCVPCId = *createMCVPCResponse.Vpc.VpcId
-
-	createVPCResponse, err := rawEC2Client.CreateVpc(&ec2.CreateVpcInput{
-		CidrBlock: awssdk.String("10.0.0.0/16"),
-	})
-	Expect(err).NotTo(HaveOccurred())
-	VPCId = *createVPCResponse.Vpc.VpcId
-
-	createSubnetResponse1, err := rawEC2Client.CreateSubnet(&ec2.CreateSubnetInput{
-		CidrBlock: awssdk.String("10.0.0.0/24"),
-		VpcId:     awssdk.String(VPCId),
+	session, err := session.NewSession(&awssdk.Config{
+		Region: awssdk.String(awsRegion),
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	createSubnetResponse2, err := rawEC2Client.CreateSubnet(&ec2.CreateSubnetInput{
-		CidrBlock: awssdk.String("10.0.1.0/24"),
-		VpcId:     awssdk.String(VPCId),
-	})
-	Expect(err).NotTo(HaveOccurred())
-	subnets = []string{*createSubnetResponse1.Subnet.SubnetId, *createSubnetResponse2.Subnet.SubnetId}
+	rawEC2Client = ec2.New(session,
+		&awssdk.Config{
+			Credentials: stscreds.NewCredentials(session, mcIAMRoleARN),
+		},
+	)
+	rawRamClient = ram.New(session,
+		&awssdk.Config{
+			Credentials: stscreds.NewCredentials(session, mcIAMRoleARN),
+		},
+	)
 })
 
-func NewEC2Client(region, arn, externalId string) (*ec2.EC2, error) {
-	session, err := awssession.NewSession(&awssdk.Config{
-		Region:   awssdk.String(region),
-		Endpoint: awssdk.String(os.Getenv("AWS_ENDPOINT")),
-	})
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	client := ec2.New(session, &awssdk.Config{Credentials: stscreds.NewCredentials(session, arn, func(assumeRoleProvider *stscreds.AssumeRoleProvider) {
-		if externalId != "" {
-			assumeRoleProvider.ExternalID = awssdk.String(externalId)
+func getResourceAssociationStatus(resourceShareName string, prefixList *ec2.ManagedPrefixList) func(g Gomega) *string {
+	return func(g Gomega) *string {
+		getResourceShareOutput, err := rawRamClient.GetResourceShares(&ram.GetResourceSharesInput{
+			Name:          awssdk.String(resourceShareName),
+			ResourceOwner: awssdk.String(aws.ResourceOwnerSelf),
+		})
+		Expect(err).NotTo(HaveOccurred())
+		resourceShares := []*ram.ResourceShare{}
+		for _, share := range getResourceShareOutput.ResourceShares {
+			if !isResourceShareDeleted(share) {
+				resourceShares = append(resourceShares, share)
+			}
 		}
-	})})
+		Expect(resourceShares).To(HaveLen(1))
 
-	return client, nil
+		resourceShare := resourceShares[0]
+
+		listAssociationsOutput, err := rawRamClient.GetResourceShareAssociations(&ram.GetResourceShareAssociationsInput{
+			AssociationType:   awssdk.String(ram.ResourceShareAssociationTypeResource),
+			ResourceArn:       prefixList.PrefixListArn,
+			ResourceShareArns: []*string{resourceShare.ResourceShareArn},
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(listAssociationsOutput.ResourceShareAssociations).To(HaveLen(1))
+		return listAssociationsOutput.ResourceShareAssociations[0].Status
+	}
 }
 
-func NewResolverClient(region, arn, externalId string) (*route53resolver.Route53Resolver, error) {
-	session, err := awssession.NewSession(&awssdk.Config{
-		Region:   awssdk.String(region),
-		Endpoint: awssdk.String(os.Getenv("AWS_ENDPOINT")),
-	})
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	client := route53resolver.New(session, &awssdk.Config{Credentials: stscreds.NewCredentials(session, arn, func(assumeRoleProvider *stscreds.AssumeRoleProvider) {
-		if externalId != "" {
-			assumeRoleProvider.ExternalID = awssdk.String(externalId)
+func getPrincipalAssociationStatus(resourceShareName string) func(g Gomega) *string {
+	return func(g Gomega) *string {
+		getResourceShareOutput, err := rawRamClient.GetResourceShares(&ram.GetResourceSharesInput{
+			Name:          awssdk.String(resourceShareName),
+			ResourceOwner: awssdk.String(aws.ResourceOwnerSelf),
+		})
+		Expect(err).NotTo(HaveOccurred())
+		resourceShares := []*ram.ResourceShare{}
+		for _, share := range getResourceShareOutput.ResourceShares {
+			if !isResourceShareDeleted(share) {
+				resourceShares = append(resourceShares, share)
+			}
 		}
-	})})
+		Expect(resourceShares).To(HaveLen(1))
 
-	return client, nil
+		resourceShare := resourceShares[0]
+		listAssociationsOutput, err := rawRamClient.GetResourceShareAssociations(&ram.GetResourceShareAssociationsInput{
+			AssociationType:   awssdk.String(ram.ResourceShareAssociationTypePrincipal),
+			Principal:         awssdk.String(wcAccount),
+			ResourceShareArns: []*string{resourceShare.ResourceShareArn},
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(listAssociationsOutput.ResourceShareAssociations).To(HaveLen(1))
+		return listAssociationsOutput.ResourceShareAssociations[0].Status
+	}
 }
 
-func NewRoute53Client(region, arn, externalId string) (*route53.Route53, error) {
-	session, err := awssession.NewSession(&awssdk.Config{
-		Region:   awssdk.String(region),
-		Endpoint: awssdk.String(os.Getenv("AWS_ENDPOINT")),
+func getResourceShares(ramClient *ram.RAM, name string) func(g Gomega) []*ram.ResourceShare {
+	return func(g Gomega) []*ram.ResourceShare {
+		resourceShareOutput, err := ramClient.GetResourceShares(&ram.GetResourceSharesInput{
+			Name:          awssdk.String(name),
+			ResourceOwner: awssdk.String(aws.ResourceOwnerSelf),
+		})
+		g.Expect(err).NotTo(HaveOccurred())
+		return resourceShareOutput.ResourceShares
+	}
+}
+
+func getSharedResources(ramClient *ram.RAM, prefixList *ec2.ManagedPrefixList) func(g Gomega) []*ram.Resource {
+	return func(g Gomega) []*ram.Resource {
+		listResourcesOutput, err := ramClient.ListResources(&ram.ListResourcesInput{
+			Principal:     awssdk.String(wcAccount),
+			ResourceArns:  awssdk.StringSlice([]string{*prefixList.PrefixListArn}),
+			ResourceOwner: awssdk.String(aws.ResourceOwnerSelf),
+		})
+		g.Expect(err).NotTo(HaveOccurred())
+		return listResourcesOutput.Resources
+	}
+}
+
+func createManagedPrefixList(ec2Client *ec2.EC2, name string) *ec2.ManagedPrefixList {
+	createPrefixListOutput, err := ec2Client.CreateManagedPrefixList(&ec2.CreateManagedPrefixListInput{
+		AddressFamily:  awssdk.String("IPv4"),
+		MaxEntries:     awssdk.Int64(2),
+		PrefixListName: awssdk.String(name),
 	})
-	if err != nil {
-		return nil, errors.WithStack(err)
+	Expect(err).NotTo(HaveOccurred())
+	prefixList := createPrefixListOutput.PrefixList
+	Eventually(func() string {
+		prefixListOutput, err := ec2Client.DescribeManagedPrefixLists(&ec2.DescribeManagedPrefixListsInput{
+			PrefixListIds: []*string{prefixList.PrefixListId},
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(prefixListOutput.PrefixLists).To(HaveLen(1))
+		return *prefixListOutput.PrefixLists[0].State
+	}).Should(Equal("create-complete"))
+
+	return prefixList
+}
+
+func isResourceShareDeleted(resourceShare *ram.ResourceShare) bool {
+	if resourceShare.Status == nil {
+		return false
 	}
 
-	client := route53.New(session, &awssdk.Config{Credentials: stscreds.NewCredentials(session, arn, func(assumeRoleProvider *stscreds.AssumeRoleProvider) {
-		if externalId != "" {
-			assumeRoleProvider.ExternalID = awssdk.String(externalId)
-		}
-	})})
-
-	return client, nil
+	status := *resourceShare.Status
+	return status == ram.ResourceShareStatusDeleted || status == ram.ResourceShareStatusDeleting
 }

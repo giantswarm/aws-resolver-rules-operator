@@ -16,10 +16,18 @@ test-unit: ginkgo generate fmt vet envtest ## Run unit tests
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) -p --nodes 4 -r -randomize-all --randomize-suites --skip-package=tests --cover --coverpkg=`go list ./... | grep -v fakes | tr '\n' ','` ./...
 
 .PHONY: test-integration
-test-integration: ginkgo start-localstack ## Run integration tests
-	sleep 4
-	AWS_ACCESS_KEY_ID="dummy" AWS_SECRET_ACCESS_KEY="dummy" AWS_ENDPOINT="http://localhost:4566" AWS_REGION="eu-central-1" $(GINKGO) -p --nodes 4 -r -randomize-all --randomize-suites --cover --coverpkg=github.com/aws-resolver-rules-operator/pkg/aws tests/integration
+test-integration: test-integration-localstack test-integration-aws
+
+.PHONY: test-integration-localstack
+test-integration-localstack: ginkgo start-localstack ## Run integration tests against localstack
+	AWS_ACCESS_KEY_ID="dummy" AWS_SECRET_ACCESS_KEY="dummy" AWS_ENDPOINT="http://localhost:4566" AWS_REGION="eu-central-1" $(GINKGO) -p --nodes 4 -r -randomize-all --randomize-suites --cover --coverpkg=github.com/aws-resolver-rules-operator/pkg/aws tests/integration/localstack
 	$(MAKE) stop-localstack
+
+.PHONY: test-integration-aws
+test-integration-aws: ginkgo ## Run integration tests against aws
+	$(GINKGO) -p --nodes 4 -r -randomize-all --randomize-suites --cover --coverpkg=github.com/aws-resolver-rules-operator/pkg/aws tests/integration/aws
+	$(MAKE) stop-localstack
+
 
 .PHONY: start-localstack
 start-localstack: docker-compose ## Run localstack with docker-compose

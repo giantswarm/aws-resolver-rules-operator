@@ -162,7 +162,7 @@ func (r *Resolver) DeleteRule(ctx context.Context, logger logr.Logger, cluster C
 		}
 	}
 
-	err = ramClient.DeleteResourceShareWithContext(ctx, logger, getResourceShareName(cluster.Name, resolverRule.Id))
+	err = ramClient.DeleteResourceShare(ctx, getResourceShareName(cluster.Name, resolverRule.Id))
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -214,7 +214,12 @@ func (r *Resolver) associateRule(ctx context.Context, logger logr.Logger, cluste
 	}
 
 	logger.Info("Creating resource share item so we can share resolver rule with a different aws account")
-	_, err = ramClient.CreateResourceShareWithContext(ctx, logger, getResourceShareName(cluster.Name, resolverRule.Id), resolverRule.Arn, r.dnsServer.AWSAccountId)
+	share := ResourceShare{
+		Name:              getResourceShareName(cluster.Name, resolverRule.Id),
+		ResourceArns:      []string{resolverRule.Arn},
+		ExternalAccountID: r.dnsServer.AWSAccountId,
+	}
+	err = ramClient.ApplyResourceShare(ctx, share)
 	if err != nil {
 		return errors.WithStack(err)
 	}
