@@ -90,6 +90,16 @@ var _ = Describe("RAM client", func() {
 			Eventually(getSharedResources(rawRamClient, prefixList)).Should(HaveLen(1))
 		})
 
+		When("the resource is in the same account", func() {
+			It("does not create a resource share", func() {
+				share.ExternalAccountID = mcAccount
+				err := ramClient.ApplyResourceShare(ctx, share)
+				Expect(err).NotTo(HaveOccurred())
+				Consistently(getResourceShares(rawRamClient, share.Name)).Should(HaveLen(0))
+				Consistently(getSharedResources(rawRamClient, prefixList)).Should(HaveLen(0))
+			})
+		})
+
 		When("the resource has already been shared", func() {
 			BeforeEach(func() {
 				err := ramClient.ApplyResourceShare(ctx, share)

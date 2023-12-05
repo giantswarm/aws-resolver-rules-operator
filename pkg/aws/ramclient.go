@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	awssdk "github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/service/ram"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -26,6 +27,16 @@ func (c *RAM) ApplyResourceShare(ctx context.Context, share resolver.ResourceSha
 		"resource-arns", share.ResourceArns,
 		"external-accound-id", share.ExternalAccountID,
 	)
+	resourceARN, err := arn.Parse(share.ResourceArns[0])
+	if err != nil {
+		logger.Error(err, "failed to parse transit gateway arn")
+		return errors.WithStack(err)
+	}
+
+	if share.ExternalAccountID == resourceARN.AccountID {
+		logger.Info("resource in same account as cluster, there is no need to share it using ram. Skipping")
+		return nil
+	}
 
 	resourceShare, err := c.getResourceShare(ctx, share.Name)
 	if err != nil {
@@ -42,7 +53,7 @@ func (c *RAM) ApplyResourceShare(ctx context.Context, share resolver.ResourceSha
 	_, err = c.client.CreateResourceShare(&ram.CreateResourceShareInput{
 		AllowExternalPrincipals: awssdk.Bool(true),
 		Name:                    awssdk.String(share.Name),
-		Principals:              []*string{awssdk.String(share.ExternalAccountID)},
+		Principals:              awssdk.StringSlice([]string{share.ExternalAccountID}),
 		ResourceArns:            awssdk.StringSlice(share.ResourceArns),
 	})
 	if err != nil {

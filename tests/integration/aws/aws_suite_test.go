@@ -130,6 +130,17 @@ func getPrincipalAssociationStatus(resourceShareName string) func(g Gomega) *str
 	}
 }
 
+func getResourceShares(ramClient *ram.RAM, name string) func(g Gomega) []*ram.ResourceShare {
+	return func(g Gomega) []*ram.ResourceShare {
+		resourceShareOutput, err := ramClient.GetResourceShares(&ram.GetResourceSharesInput{
+			Name:          awssdk.String(name),
+			ResourceOwner: awssdk.String(aws.ResourceOwnerSelf),
+		})
+		g.Expect(err).NotTo(HaveOccurred())
+		return resourceShareOutput.ResourceShares
+	}
+}
+
 func getSharedResources(ramClient *ram.RAM, prefixList *ec2.ManagedPrefixList) func(g Gomega) []*ram.Resource {
 	return func(g Gomega) []*ram.Resource {
 		listResourcesOutput, err := ramClient.ListResources(&ram.ListResourcesInput{

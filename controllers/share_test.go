@@ -267,24 +267,6 @@ var _ = Describe("Share", func() {
 		})
 	})
 
-	When("the transit gateway is in the same account as the cluster", func() {
-		BeforeEach(func() {
-			patchedIdentity := identity.DeepCopy()
-			patchedIdentity.Spec.RoleArn = fmt.Sprintf("arn:aws:iam::%s:role/the-role-name", sourceAccountID)
-			err := k8sClient.Patch(context.Background(), patchedIdentity, client.MergeFrom(identity))
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("does not reconcile", func() {
-			result, err := reconciler.Reconcile(ctx, request)
-
-			Expect(result.Requeue).To(BeFalse())
-			Expect(err).NotTo(HaveOccurred())
-
-			Expect(ramClient.ApplyResourceShareCallCount()).To(Equal(0))
-		})
-	})
-
 	When("applying the resource share fails", func() {
 		BeforeEach(func() {
 			ramClient.ApplyResourceShareReturns(errors.New("boom"))
@@ -325,34 +307,6 @@ var _ = Describe("Share", func() {
 		It("returns an error", func() {
 			_, err := reconciler.Reconcile(ctx, request)
 			Expect(err).To(MatchError(ContainSubstring("boom")))
-		})
-	})
-
-	When("the transit gateway arn annotation is invalid", func() {
-		BeforeEach(func() {
-			patchedCluster := cluster.DeepCopy()
-			patchedCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation] = notValidArn
-			err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("returns an error", func() {
-			_, err := reconciler.Reconcile(ctx, request)
-			Expect(err).To(HaveOccurred())
-		})
-	})
-
-	When("the prefix list arn annotation is invalid", func() {
-		BeforeEach(func() {
-			patchedCluster := cluster.DeepCopy()
-			patchedCluster.Annotations[gsannotation.NetworkTopologyPrefixListIDAnnotation] = notValidArn
-			err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("returns an error", func() {
-			_, err := reconciler.Reconcile(ctx, request)
-			Expect(err).To(HaveOccurred())
 		})
 	})
 

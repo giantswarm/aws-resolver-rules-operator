@@ -170,25 +170,14 @@ func getPrefixListResourceShareName(cluster *capa.AWSCluster) string {
 func (r *ShareReconciler) shareTransitGateway(ctx context.Context, cluster, managementCluster *capa.AWSCluster, accountID string) (requeue bool, err error) {
 	logger := log.FromContext(ctx)
 
-	transitGatewayAnnotation := getTransitGatewayARN(cluster, managementCluster)
+	transitGatewayARN := getTransitGatewayARN(cluster, managementCluster)
 
-	if transitGatewayAnnotation == "" {
+	if transitGatewayARN == "" {
 		logger.Info("transit gateway arn annotation not set yet")
 		return true, nil
 	}
 
-	logger = logger.WithValues("transit-gateway-annotation", transitGatewayAnnotation)
-
-	transitGatewayARN, err := arn.Parse(transitGatewayAnnotation)
-	if err != nil {
-		logger.Error(err, "failed to parse transit gateway arn")
-		return false, err
-	}
-
-	if accountID == transitGatewayARN.AccountID {
-		logger.Info("transit gateway in same account as cluster, there is no need to share it using ram. Skipping")
-		return false, err
-	}
+	logger = logger.WithValues("transit-gateway-annotation", transitGatewayARN)
 
 	err = r.clusterClient.AddFinalizer(ctx, cluster, FinalizerResourceShare)
 	if err != nil {
@@ -199,7 +188,7 @@ func (r *ShareReconciler) shareTransitGateway(ctx context.Context, cluster, mana
 	err = r.ramClient.ApplyResourceShare(ctx, resolver.ResourceShare{
 		Name: getTransitGatewayResourceShareName(cluster),
 		ResourceArns: []string{
-			transitGatewayARN.String(),
+			transitGatewayARN,
 		},
 		ExternalAccountID: accountID,
 	})
@@ -213,30 +202,19 @@ func (r *ShareReconciler) shareTransitGateway(ctx context.Context, cluster, mana
 
 func (r *ShareReconciler) sharePrefixList(ctx context.Context, cluster, managementCluster *capa.AWSCluster, accountID string) (requeue bool, err error) {
 	logger := log.FromContext(ctx)
-	prefixListAnnotation := getPrefixListARN(cluster, managementCluster)
+	prefixListARN := getPrefixListARN(cluster, managementCluster)
 
-	if prefixListAnnotation == "" {
+	if prefixListARN == "" {
 		logger.Info("prefix list arn annotation not set yet")
 		return true, nil
 	}
 
-	logger = logger.WithValues("prefix-list-annotation", prefixListAnnotation)
-
-	prefixListARN, err := arn.Parse(prefixListAnnotation)
-	if err != nil {
-		logger.Error(err, "failed to parse prefix list arn", "Annotation", prefixListAnnotation)
-		return false, err
-	}
-
-	if accountID == prefixListARN.AccountID {
-		logger.Info("prefix list in same account as cluster, there is no need to share it using ram. Skipping")
-		return false, nil
-	}
+	logger = logger.WithValues("prefix-list-annotation", prefixListARN)
 
 	err = r.ramClient.ApplyResourceShare(ctx, resolver.ResourceShare{
 		Name: getPrefixListResourceShareName(cluster),
 		ResourceArns: []string{
-			prefixListARN.String(),
+			prefixListARN,
 		},
 		ExternalAccountID: accountID,
 	})
