@@ -1,17 +1,6 @@
 module github.com/aws-resolver-rules-operator
 
-go 1.19
-
-replace (
-	// Fixes CVE-2022-29153 in hashicorp/consul and hashicorp/api
-	github.com/spf13/cobra v1.2.1 => github.com/spf13/cobra v1.4.0
-	// Fixes CVE-2023-47108 in go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.46.0
-	// Fixes CVE-2023-39325 in ngolang.org/x/net
-	golang.org/x/net v0.14.0 => golang.org/x/net v0.17.0
-	// Fixes CVE-2023-32731 in google.golang.org/grpc
-	google.golang.org/grpc => google.golang.org/grpc v1.59.0
-)
+go 1.21
 
 require (
 	github.com/aws/aws-sdk-go v1.48.1
