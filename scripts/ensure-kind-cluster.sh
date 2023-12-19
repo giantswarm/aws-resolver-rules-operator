@@ -2,11 +2,12 @@
 
 set -euo pipefail
 
-readonly SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-readonly REPO_ROOT="${SCRIPT_DIR}/.."
-readonly KIND="${KIND:?kind binary path not exported}"
-readonly CLUSTER="${CLUSTER:?cluster not exported}"
-readonly IMG="${IMG:?image not exported}"
+KIND="${KIND:?kind binary path not exported}"
+CLUSTER="${CLUSTER:?cluster not exported}"
+IMG="${IMG:?image not exported}"
+readonly KIND
+readonly CLUSTER
+readonly IMG
 
 ensure_kind_cluster() {
   local cluster
