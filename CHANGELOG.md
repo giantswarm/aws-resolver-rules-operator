@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `TransitGatewayAttachmentReconciler`.
 - Add `PrefixListEntryReconciler`.
 - Add `ShareReconciler`.
+- Add acceptance tests.
 
 
 ## [0.12.0] - 2023-11-02
