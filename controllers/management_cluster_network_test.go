@@ -21,8 +21,10 @@ import (
 	"github.com/giantswarm/k8smetadata/pkg/annotation"
 
 	"github.com/aws-resolver-rules-operator/controllers"
+	"github.com/aws-resolver-rules-operator/pkg/aws"
 	"github.com/aws-resolver-rules-operator/pkg/conditions"
 	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
+	"github.com/aws-resolver-rules-operator/pkg/resolver"
 	"github.com/aws-resolver-rules-operator/pkg/resolver/resolverfakes"
 )
 
@@ -54,7 +56,7 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 
-		cluster = createRandomCluster(
+		_, cluster = createRandomClusterWithIdentity(
 			annotation.NetworkTopologyModeAnnotation,
 			annotation.NetworkTopologyModeGiantSwarmManaged,
 		)
@@ -65,11 +67,14 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 		clusterClient := k8sclient.NewAWSClusterClient(k8sClient)
 		transitGatewayClient = new(resolverfakes.FakeTransitGatewayClient)
 		prefixListClient = new(resolverfakes.FakePrefixListClient)
+		clientsFactory := &resolver.FakeClients{
+			TransitGatewayClient: transitGatewayClient,
+			PrefixListClient:     prefixListClient,
+		}
 		reconciler = controllers.NewManagementClusterTransitGateway(
 			client.ObjectKeyFromObject(cluster),
 			clusterClient,
-			transitGatewayClient,
-			prefixListClient,
+			clientsFactory,
 		)
 	})
 
@@ -273,6 +278,17 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 
 				It("returns an error", func() {
 					Expect(reconcileErr).To(MatchError(ContainSubstring("boom")))
+				})
+
+				When("it isn't detached yet", func() {
+					BeforeEach(func() {
+						transitGatewayClient.DeleteReturns(&aws.TransitGatewayNotDetachedError{})
+					})
+
+					It("requeues the event", func() {
+						Expect(reconcileErr).NotTo(HaveOccurred())
+						Expect(reconcileResult.RequeueAfter).To(Equal(controllers.RequeueDurationTransitGatewayNotDetached))
+					})
 				})
 			})
 

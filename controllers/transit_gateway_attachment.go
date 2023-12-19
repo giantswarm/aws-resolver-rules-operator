@@ -13,15 +13,18 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	"github.com/aws-resolver-rules-operator/pkg/aws"
 	"github.com/aws-resolver-rules-operator/pkg/conditions"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 	"github.com/aws-resolver-rules-operator/pkg/util/annotations"
 )
 
 const (
-	FinalizerTransitGatewayAttachment = "network-topology.finalizers.giantswarm.io/transit-gateway-attachment"
-	TagSubnetTGWAttachements          = "subnet.giantswarm.io/tgw"
+	FinalizerTransitGatewayAttachment     = "network-topology.finalizers.giantswarm.io/transit-gateway-attachment"
+	TagSubnetTGWAttachements              = "subnet.giantswarm.io/tgw"
+	RequeueDurationTransitGatewayNotReady = 10 * time.Second
 )
 
 type TransitGatewayAttachmentReconciler struct {
@@ -40,6 +43,18 @@ func NewTransitGatewayAttachmentReconciler(
 		clusterClient:     clusterClient,
 		clients:           clients,
 	}
+}
+
+func (r *TransitGatewayAttachmentReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&capa.AWSCluster{}).
+		WithEventFilter(
+			predicate.Funcs{
+				UpdateFunc: predicateToFilterAWSClusterResourceVersionChanges,
+			},
+		).
+		Named("transit-gateway-attachment").
+		Complete(r)
 }
 
 type attachmentScope struct {
@@ -138,6 +153,10 @@ func (r *TransitGatewayAttachmentReconciler) reconcileNormal(ctx context.Context
 		Tags:              getAttachmentTags(scope.cluster),
 	}
 	err = scope.transitGatewayClient.ApplyAttachment(ctx, attachment)
+	if errors.Is(err, &aws.TransitGatewayNotReadyError{}) {
+		logger.Info("Transit gateway not ready yet")
+		return ctrl.Result{RequeueAfter: RequeueDurationTransitGatewayNotReady}, nil
+	}
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -159,7 +178,7 @@ func (r *TransitGatewayAttachmentReconciler) reconcileDelete(ctx context.Context
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	err = r.clusterClient.RemoveFinalizer(ctx, scope.cluster, FinalizerManagementCluster)
+	err = r.clusterClient.RemoveFinalizer(ctx, scope.cluster, FinalizerTransitGatewayAttachment)
 	if err != nil {
 		logger.Error(err, "Failed to delete finalizer")
 		return ctrl.Result{}, errors.WithStack(err)
@@ -218,6 +237,9 @@ func filterTGWSubnets(subnets []capa.SubnetSpec) []capa.SubnetSpec {
 
 func getAttachmentTags(cluster *capa.AWSCluster) map[string]string {
 	tags := cluster.Spec.AdditionalTags
+	if tags == nil {
+		tags = map[string]string{}
+	}
 	tags["Name"] = cluster.Name
 	tags[fmt.Sprintf("kubernetes.io/cluster/%s", cluster.Name)] = "owned"
 

@@ -15,6 +15,11 @@ pod:
   group:
     id: "1000"
 
+# This is intended for use during acceptance tests as the resolver
+# rules controllers currently don't have any tests and we don't want to
+# enable them. This should be removed when we implement those tests
+disableResolverControllers: false
+
 # AWS account id where the DNS server is deployed.
 dnsServerAWSAccountId: ""
 

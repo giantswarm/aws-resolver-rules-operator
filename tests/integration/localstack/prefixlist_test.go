@@ -102,7 +102,7 @@ var _ = Describe("Prefix Lists", func() {
 				It("returns an error", func() {
 					_, err := prefixLists.Apply(ctx, cluster.Name, cluster.Spec.AdditionalTags)
 					Expect(err).To(MatchError(ContainSubstring(
-						"found unexpected number: 2 of prefix lists for cluster",
+						"found unexpected number: 2 of prefix lists",
 					)))
 				})
 			})
@@ -297,7 +297,7 @@ var _ = Describe("Prefix Lists", func() {
 			It("returns an error", func() {
 				err := prefixLists.Delete(ctx, cluster.Name)
 				Expect(err).To(MatchError(ContainSubstring(
-					"found unexpected number: 2 of prefix lists for cluster",
+					"found unexpected number: 2 of prefix lists",
 				)))
 			})
 		})

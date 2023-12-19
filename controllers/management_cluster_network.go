@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"time"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -14,31 +15,38 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	"github.com/aws-resolver-rules-operator/pkg/aws"
 	"github.com/aws-resolver-rules-operator/pkg/conditions"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 	"github.com/aws-resolver-rules-operator/pkg/util/annotations"
 )
 
-const FinalizerManagementCluster = "network-topology.finalizers.giantswarm.io/management-cluster"
+const (
+	FinalizerManagementCluster               = "network-topology.finalizers.giantswarm.io/management-cluster"
+	RequeueDurationTransitGatewayNotDetached = 10 * time.Second
+)
 
 type ManagementClusterNetworkReconciler struct {
 	managementCluster types.NamespacedName
 	clusterClient     AWSClusterClient
-	transitGateways   resolver.TransitGatewayClient
-	prefixLists       resolver.PrefixListClient
+	awsClients        resolver.AWSClients
+}
+
+type networkReconcileScope struct {
+	cluster              *capa.AWSCluster
+	transitGatewayClient resolver.TransitGatewayClient
+	prefixListClient     resolver.PrefixListClient
 }
 
 func NewManagementClusterTransitGateway(
 	managementCluster types.NamespacedName,
 	client AWSClusterClient,
-	transitGatewayClient resolver.TransitGatewayClient,
-	prefixListClient resolver.PrefixListClient,
+	awsClients resolver.AWSClients,
 ) *ManagementClusterNetworkReconciler {
 	return &ManagementClusterNetworkReconciler{
 		managementCluster: managementCluster,
 		clusterClient:     client,
-		transitGateways:   transitGatewayClient,
-		prefixLists:       prefixListClient,
+		awsClients:        awsClients,
 	}
 }
 
@@ -80,6 +88,23 @@ func (r *ManagementClusterNetworkReconciler) Reconcile(ctx context.Context, req 
 		return ctrl.Result{}, nil
 	}
 
+	identity, err := r.clusterClient.GetIdentity(ctx, cluster)
+	if err != nil {
+		logger.Error(err, "Failed to get cluster identity")
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+	transitGatewayClient, err := r.awsClients.NewTransitGatewayClient(cluster.Spec.Region, identity.Spec.RoleArn)
+	if err != nil {
+		logger.Error(err, "Failed to create transit gateway client")
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
+	prefixListClient, err := r.awsClients.NewPrefixListClient(cluster.Spec.Region, identity.Spec.RoleArn)
+	if err != nil {
+		logger.Error(err, "Failed to create transit gateway client")
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
 	defer func() {
 		_ = r.clusterClient.UpdateStatus(ctx, cluster)
 	}()
@@ -92,29 +117,35 @@ func (r *ManagementClusterNetworkReconciler) Reconcile(ctx context.Context, req 
 			capi.ConditionSeverityInfo, "")
 	}
 
-	if !cluster.DeletionTimestamp.IsZero() {
-		logger.Info("Reconciling delete")
-		return r.reconcileDelete(ctx, cluster)
+	scope := networkReconcileScope{
+		cluster:              cluster,
+		transitGatewayClient: transitGatewayClient,
+		prefixListClient:     prefixListClient,
 	}
 
-	return r.reconcileNormal(ctx, cluster)
+	if !cluster.DeletionTimestamp.IsZero() {
+		logger.Info("Reconciling delete")
+		return r.reconcileDelete(ctx, scope)
+	}
+
+	return r.reconcileNormal(ctx, scope)
 }
 
-func (r *ManagementClusterNetworkReconciler) reconcileNormal(ctx context.Context, cluster *capa.AWSCluster) (ctrl.Result, error) {
+func (r *ManagementClusterNetworkReconciler) reconcileNormal(ctx context.Context, scope networkReconcileScope) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	err := r.clusterClient.AddFinalizer(ctx, cluster, FinalizerManagementCluster)
+	err := r.clusterClient.AddFinalizer(ctx, scope.cluster, FinalizerManagementCluster)
 	if err != nil {
 		logger.Error(err, "Failed to add finalizer")
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	err = r.applyTransitGateway(ctx, cluster)
+	err = r.applyTransitGateway(ctx, scope)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	err = r.applyPrefixList(ctx, cluster)
+	err = r.applyPrefixList(ctx, scope)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(err)
 	}
@@ -122,62 +153,66 @@ func (r *ManagementClusterNetworkReconciler) reconcileNormal(ctx context.Context
 	return ctrl.Result{}, nil
 }
 
-func (r *ManagementClusterNetworkReconciler) applyTransitGateway(ctx context.Context, cluster *capa.AWSCluster) error {
+func (r *ManagementClusterNetworkReconciler) applyTransitGateway(ctx context.Context, scope networkReconcileScope) error {
 	logger := log.FromContext(ctx)
 
-	id, err := r.transitGateways.Apply(ctx, cluster.Name, cluster.Spec.AdditionalTags)
+	id, err := scope.transitGatewayClient.Apply(ctx, scope.cluster.Name, scope.cluster.Spec.AdditionalTags)
 	if err != nil {
 		logger.Error(err, "Failed to create transit gateway")
 		return errors.WithStack(err)
 	}
 
-	baseCluster := cluster.DeepCopy()
-	annotations.SetNetworkTopologyTransitGateway(cluster, id)
-	if cluster, err = r.clusterClient.PatchCluster(ctx, cluster, client.MergeFrom(baseCluster)); err != nil {
+	baseCluster := scope.cluster.DeepCopy()
+	annotations.SetNetworkTopologyTransitGateway(scope.cluster, id)
+	if scope.cluster, err = r.clusterClient.PatchCluster(ctx, scope.cluster, client.MergeFrom(baseCluster)); err != nil {
 		logger.Error(err, "Failed to patch cluster resource with TGW ID")
 		return errors.WithStack(err)
 	}
 
-	conditions.MarkReady(cluster, conditions.TransitGatewayCreated)
+	conditions.MarkReady(scope.cluster, conditions.TransitGatewayCreated)
 	return nil
 }
 
-func (r *ManagementClusterNetworkReconciler) applyPrefixList(ctx context.Context, cluster *capa.AWSCluster) error {
+func (r *ManagementClusterNetworkReconciler) applyPrefixList(ctx context.Context, scope networkReconcileScope) error {
 	logger := log.FromContext(ctx)
 
-	id, err := r.prefixLists.Apply(ctx, cluster.Name, cluster.Spec.AdditionalTags)
+	id, err := scope.prefixListClient.Apply(ctx, scope.cluster.Name, scope.cluster.Spec.AdditionalTags)
 	if err != nil {
 		logger.Error(err, "Failed to create prefix list")
 		return errors.WithStack(err)
 	}
 
-	baseCluster := cluster.DeepCopy()
-	annotations.SetNetworkTopologyPrefixList(cluster, id)
-	if cluster, err = r.clusterClient.PatchCluster(ctx, cluster, client.MergeFrom(baseCluster)); err != nil {
+	baseCluster := scope.cluster.DeepCopy()
+	annotations.SetNetworkTopologyPrefixList(scope.cluster, id)
+	if scope.cluster, err = r.clusterClient.PatchCluster(ctx, scope.cluster, client.MergeFrom(baseCluster)); err != nil {
 		logger.Error(err, "Failed to patch cluster resource with prefix list ID")
 		return errors.WithStack(err)
 	}
 
-	conditions.MarkReady(cluster, conditions.TransitGatewayCreated)
+	conditions.MarkReady(scope.cluster, conditions.TransitGatewayCreated)
 	return nil
 }
 
-func (r *ManagementClusterNetworkReconciler) reconcileDelete(ctx context.Context, cluster *capa.AWSCluster) (ctrl.Result, error) {
+func (r *ManagementClusterNetworkReconciler) reconcileDelete(ctx context.Context, scope networkReconcileScope) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	err := r.transitGateways.Delete(ctx, cluster.Name)
+	err := scope.transitGatewayClient.Delete(ctx, scope.cluster.Name)
+	if errors.Is(err, &aws.TransitGatewayNotDetachedError{}) {
+		logger.Info("Transit gateway not ready yet")
+		return ctrl.Result{RequeueAfter: RequeueDurationTransitGatewayNotDetached}, nil
+	}
 	if err != nil {
 		logger.Error(err, "Failed to delete transit gateway")
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	err = r.prefixLists.Delete(ctx, cluster.Name)
+	err = scope.prefixListClient.Delete(ctx, scope.cluster.Name)
 	if err != nil {
 		logger.Error(err, "Failed to delete transit gateway")
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	err = r.clusterClient.RemoveFinalizer(ctx, cluster, FinalizerManagementCluster)
+	err = r.clusterClient.RemoveFinalizer(ctx, scope.cluster, FinalizerManagementCluster)
 	if err != nil {
 		logger.Error(err, "Failed to delete finalizer")
 		return ctrl.Result{}, errors.WithStack(err)
