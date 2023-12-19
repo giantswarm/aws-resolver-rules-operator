@@ -4,7 +4,7 @@ aws:
   region: region
 
 image:
-  registry: docker.io
+  registry: gsoci.azurecr.io
   name: giantswarm/aws-resolver-rules-operator
   tag: ""
   pullPolicy: IfNotPresent
@@ -56,7 +56,7 @@ securityContext:
     type: RuntimeDefault
   capabilities:
     drop:
-    - ALL
+      - ALL
 
 global:
   podSecurityStandards:
