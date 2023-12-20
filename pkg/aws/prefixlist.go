@@ -167,7 +167,7 @@ func (t *PrefixLists) create(ctx context.Context, name string, tags map[string]s
 func (p *PrefixLists) createEntry(ctx context.Context, prefixListID string, entry resolver.PrefixListEntry) error {
 	currentVersion, err := p.getCurrentVersion(ctx, prefixListID)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	_, err = p.client.ModifyManagedPrefixListWithContext(ctx, &ec2.ModifyManagedPrefixListInput{
