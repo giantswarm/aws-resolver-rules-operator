@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -15,8 +16,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	"github.com/aws-resolver-rules-operator/pkg/aws"
 	"github.com/aws-resolver-rules-operator/pkg/conditions"
+	gserrors "github.com/aws-resolver-rules-operator/pkg/errors"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 	"github.com/aws-resolver-rules-operator/pkg/util/annotations"
 )
@@ -197,9 +198,10 @@ func (r *ManagementClusterNetworkReconciler) reconcileDelete(ctx context.Context
 	logger := log.FromContext(ctx)
 
 	err := scope.transitGatewayClient.Delete(ctx, scope.cluster.Name)
-	if errors.Is(err, &aws.TransitGatewayNotDetachedError{}) {
-		logger.Info("Transit gateway not ready yet")
-		return ctrl.Result{RequeueAfter: RequeueDurationTransitGatewayNotDetached}, nil
+	retryableErr := &gserrors.RetryableError{}
+	if errors.As(err, &retryableErr) {
+		logger.Info(fmt.Sprintf("Failed to delete transit gateway %s", retryableErr.Error()))
+		return ctrl.Result{RequeueAfter: retryableErr.RetryAfter()}, nil
 	}
 	if err != nil {
 		logger.Error(err, "Failed to delete transit gateway")
@@ -208,7 +210,7 @@ func (r *ManagementClusterNetworkReconciler) reconcileDelete(ctx context.Context
 
 	err = scope.prefixListClient.Delete(ctx, scope.cluster.Name)
 	if err != nil {
-		logger.Error(err, "Failed to delete transit gateway")
+		logger.Error(err, "Failed to delete prefix list")
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 

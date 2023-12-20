@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 
@@ -10,10 +11,17 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
 
+	gserrors "github.com/aws-resolver-rules-operator/pkg/errors"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
 
-const clusterTagValue = "owned"
+const (
+	clusterTagValue                     = "owned"
+	TransitGatewayDetachedErrorMessage  = "transit gateway not detached yet"
+	TransitGatewayNotReadyErrorMessage  = "transit gateway not ready yet"
+	TransitGatewayDetachedRetryDuration = 10 * time.Second
+	TransitGatewayNotReadyRetryDuration = 10 * time.Second
+)
 
 func clusterTag(name string) string {
 	return fmt.Sprintf("kubernetes.io/cluster/%s", name)
@@ -94,7 +102,10 @@ func (t *TransitGateways) delete(ctx context.Context, gateway *ec2.TransitGatewa
 		TransitGatewayId: id,
 	})
 	if HasErrorCode(err, ErrIncorrectState) {
-		return &TransitGatewayNotDetachedError{}
+		return gserrors.NewRetryableError(
+			TransitGatewayDetachedErrorMessage,
+			TransitGatewayDetachedRetryDuration,
+		)
 	}
 
 	return errors.WithStack(err)
@@ -184,7 +195,10 @@ func (t *TransitGateways) attach(ctx context.Context, transitGatewayID string, a
 		},
 	})
 	if HasErrorCode(err, ErrIncorrectState) {
-		return &TransitGatewayNotReadyError{}
+		return gserrors.NewRetryableError(
+			TransitGatewayNotReadyErrorMessage,
+			TransitGatewayNotReadyRetryDuration,
+		)
 	}
 
 	return errors.WithStack(err)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
@@ -21,8 +22,8 @@ import (
 	"github.com/giantswarm/k8smetadata/pkg/annotation"
 
 	"github.com/aws-resolver-rules-operator/controllers"
-	"github.com/aws-resolver-rules-operator/pkg/aws"
 	"github.com/aws-resolver-rules-operator/pkg/conditions"
+	gserrors "github.com/aws-resolver-rules-operator/pkg/errors"
 	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 	"github.com/aws-resolver-rules-operator/pkg/resolver/resolverfakes"
@@ -282,12 +283,12 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 
 				When("it isn't detached yet", func() {
 					BeforeEach(func() {
-						transitGatewayClient.DeleteReturns(&aws.TransitGatewayNotDetachedError{})
+						transitGatewayClient.DeleteReturns(gserrors.NewRetryableError("boom", time.Second))
 					})
 
 					It("requeues the event", func() {
 						Expect(reconcileErr).NotTo(HaveOccurred())
-						Expect(reconcileResult.RequeueAfter).To(Equal(controllers.RequeueDurationTransitGatewayNotDetached))
+						Expect(reconcileResult.RequeueAfter).To(Equal(time.Second))
 					})
 				})
 			})

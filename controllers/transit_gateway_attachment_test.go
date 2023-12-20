@@ -21,8 +21,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/aws-resolver-rules-operator/controllers"
-	"github.com/aws-resolver-rules-operator/pkg/aws"
 	"github.com/aws-resolver-rules-operator/pkg/conditions"
+	gserrors "github.com/aws-resolver-rules-operator/pkg/errors"
 	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 	"github.com/aws-resolver-rules-operator/pkg/resolver/resolverfakes"
@@ -320,12 +320,12 @@ var _ = Describe("TransitGatewayAttachment", func() {
 
 			When("it isn't ready", func() {
 				BeforeEach(func() {
-					transitGatewayClient.ApplyAttachmentReturns(&aws.TransitGatewayNotReadyError{})
+					transitGatewayClient.ApplyAttachmentReturns(gserrors.NewRetryableError("boom", time.Second))
 				})
 
 				It("requeues the event", func() {
 					Expect(reconcileErr).NotTo(HaveOccurred())
-					Expect(reconcileResult.RequeueAfter).To(Equal(controllers.RequeueDurationTransitGatewayNotReady))
+					Expect(reconcileResult.RequeueAfter).To(Equal(time.Second))
 				})
 			})
 		})

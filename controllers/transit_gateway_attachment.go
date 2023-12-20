@@ -15,8 +15,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	"github.com/aws-resolver-rules-operator/pkg/aws"
 	"github.com/aws-resolver-rules-operator/pkg/conditions"
+	gserrors "github.com/aws-resolver-rules-operator/pkg/errors"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 	"github.com/aws-resolver-rules-operator/pkg/util/annotations"
 )
@@ -153,11 +153,13 @@ func (r *TransitGatewayAttachmentReconciler) reconcileNormal(ctx context.Context
 		Tags:              getAttachmentTags(scope.cluster),
 	}
 	err = scope.transitGatewayClient.ApplyAttachment(ctx, attachment)
-	if errors.Is(err, &aws.TransitGatewayNotReadyError{}) {
-		logger.Info("Transit gateway not ready yet")
-		return ctrl.Result{RequeueAfter: RequeueDurationTransitGatewayNotReady}, nil
+	retryableErr := &gserrors.RetryableError{}
+	if errors.As(err, &retryableErr) {
+		logger.Info(fmt.Sprintf("Failed to apply attachment %s", retryableErr.Error()))
+		return ctrl.Result{RequeueAfter: retryableErr.RetryAfter()}, nil
 	}
 	if err != nil {
+		logger.Error(err, "Failed to apply attachment")
 		return ctrl.Result{}, err
 	}
 

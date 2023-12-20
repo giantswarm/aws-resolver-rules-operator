@@ -26,16 +26,6 @@ func HasErrorCode(err error, code string) bool {
 	return apiError.Code() == code
 }
 
-type TransitGatewayNotDetachedError struct{}
-
-func (e *TransitGatewayNotDetachedError) Error() string {
-	return "transit gateway not detached"
-}
-
-func (e *TransitGatewayNotDetachedError) Is(target error) bool {
-	return reflect.TypeOf(target) == reflect.TypeOf(e)
-}
-
 type TransitGatewayNotReadyError struct{}
 
 func (e *TransitGatewayNotReadyError) Error() string {
