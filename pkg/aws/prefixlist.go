@@ -124,7 +124,7 @@ func (t *PrefixLists) getByID(ctx context.Context, id string) (*ec2.ManagedPrefi
 func (t *PrefixLists) get(ctx context.Context, input *ec2.DescribeManagedPrefixListsInput) (*ec2.ManagedPrefixList, error) {
 	out, err := t.client.DescribeManagedPrefixListsWithContext(ctx, input)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	if len(out.PrefixLists) == 1 {
