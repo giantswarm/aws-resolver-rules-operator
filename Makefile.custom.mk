@@ -10,12 +10,6 @@ CLUSTER ?= acceptance
 MANAGEMENT_CLUSTER_NAME ?= test-mc
 MANAGEMENT_CLUSTER_NAMESPACE ?= test
 
-.PHONY: render
-render: architect
-	mkdir -p $(shell pwd)/helm/rendered
-	cp -r $(shell pwd)/helm/aws-resolver-rules-operator $(shell pwd)/helm/rendered/
-	$(ARCHITECT) helm template --dir $(shell pwd)/helm/rendered/aws-resolver-rules-operator
-
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	go generate ./...
@@ -54,7 +48,7 @@ test-integration-localstack: ginkgo start-localstack ## Run integration tests ag
 
 .PHONY: test-integration-aws
 test-integration-aws: ginkgo ## Run integration tests against aws
-	$(GINKGO) -p --nodes 4 -r -randomize-all --randomize-suites --cover --coverpkg=github.com/aws-resolver-rules-operator/pkg/aws tests/integration/aws
+	$(GINKGO) -p --nodes 4 -r -randomize-all -v --randomize-suites --cover --coverpkg=github.com/aws-resolver-rules-operator/pkg/aws tests/integration/aws
 	$(MAKE) stop-localstack
 
 .PHONY: run-acceptance-tests
@@ -83,7 +77,7 @@ endif
 
 
 .PHONY: deploy
-deploy: manifests render ensure-deploy-envs ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+deploy: ensure-deploy-envs ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	KUBECONFIG=$(KUBECONFIG) helm upgrade --install \
 		--namespace giantswarm \
 		--set image.tag=$(IMAGE_TAG) \
@@ -95,7 +89,7 @@ deploy: manifests render ensure-deploy-envs ## Deploy controller to the K8s clus
 		--set aws.region=$(AWS_REGION) \
 		--set global.podSecurityStandards.enforced=true \
 		--wait \
-		aws-resolver-rules-operator helm/rendered/aws-resolver-rules-operator
+		aws-resolver-rules-operator helm/aws-resolver-rules-operator
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s  specified in ~/.kube/config.
@@ -128,6 +122,11 @@ ENVTEST = $(shell pwd)/bin/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
 	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@latest)
 
+.PHONY: docker-build
+docker-build: ## Build docker image with the manager.
+	docker build -t ${IMG} .
+
+
 GINKGO = $(shell pwd)/bin/ginkgo
 .PHONY: ginkgo
 ginkgo: ## Download ginkgo locally if necessary.
@@ -149,11 +148,6 @@ KIND = $(shell pwd)/bin/kind
 .PHONY: kind
 kind: ## Download kind locally if necessary.
 	$(call go-get-tool,$(KIND),sigs.k8s.io/kind@latest)
-
-ARCHITECT = $(shell pwd)/bin/architect
-.PHONY: architect
-architect: ## Download architect locally if necessary.
-	$(call go-get-tool,$(ARCHITECT),github.com/giantswarm/architect@latest)
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
