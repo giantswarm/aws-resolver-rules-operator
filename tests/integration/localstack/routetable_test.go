@@ -42,7 +42,7 @@ var _ = Describe("RouteTable", func() {
 		})
 		Expect(err).NotTo(HaveOccurred())
 
-		//Without transit gateway and prefix list, the route is not created
+		// Without transit gateway and prefix list, the route is not created
 		clusterName := uuid.NewString()
 
 		transitGateways, err := awsClients.NewTransitGatewayClient(Region, AwsIamArn)
@@ -104,6 +104,5 @@ var _ = Describe("RouteTable", func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
-
 	})
 })

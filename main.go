@@ -36,17 +36,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/aws-resolver-rules-operator/controllers"
 	"github.com/aws-resolver-rules-operator/pkg/aws"
 	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 	// +kubebuilder:scaffold:imports
-)
-
-var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
 )
 
 func init() {
@@ -57,10 +53,31 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
+var (
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
+)
+
+type reconcilerConfig struct {
+	dnsServerAWSAccountId      string
+	dnsServerIAMRoleArn        string
+	dnsServerIAMRoleExternalId string
+	dnsServerRegion            string
+	dnsServerVpcId             string
+	managementClusterName      string
+	managementClusterNamespace string
+	workloadClusterBaseDomain  string
+
+	awsClusterClient controllers.AWSClusterClient
+	clusterClient    controllers.ClusterClient
+	awsClients       resolver.AWSClients
+}
+
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
+	var disableResolverControllers bool
 	var dnsServerAWSAccountId string
 	var dnsServerIAMRoleArn string
 	var dnsServerIAMRoleExternalId string
@@ -76,6 +93,8 @@ func main() {
 	flag.StringVar(&dnsServerIAMRoleExternalId, "dns-server-iam-role-external-id", "", "The IAM external id used when assuming the role passed in 'dns-server-iam-role-arn'.")
 	flag.StringVar(&dnsServerRegion, "dns-server-region", "", "The AWS Region where the DNS server is.")
 	flag.StringVar(&dnsServerVpcId, "dns-server-vpc-id", "", "The AWS VPC where the DNS server is.")
+	flag.BoolVar(&disableResolverControllers, "disable-resolver-controllers", false,
+		"Disable the resolver controllers.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -90,7 +109,8 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	logger := zap.New(zap.UseFlagOptions(&opts))
+	ctrl.SetLogger(logger)
 
 	restConfig := ctrl.GetConfigOrDie()
 	restConfig.UserAgent = "giantswarm-capa-operator"
@@ -111,49 +131,124 @@ func main() {
 	k8sClusterClient := k8sclient.NewClusterClient(mgr.GetClient())
 
 	awsClients := aws.NewClients(os.Getenv("AWS_ENDPOINT"))
+	cfg := reconcilerConfig{
+		dnsServerAWSAccountId:      dnsServerAWSAccountId,
+		dnsServerIAMRoleArn:        dnsServerIAMRoleArn,
+		dnsServerIAMRoleExternalId: dnsServerIAMRoleExternalId,
+		dnsServerRegion:            dnsServerRegion,
+		dnsServerVpcId:             dnsServerVpcId,
+		managementClusterName:      managementClusterName,
+		managementClusterNamespace: managementClusterNamespace,
+		workloadClusterBaseDomain:  workloadClusterBaseDomain,
+		awsClusterClient:           k8sAwsClusterClient,
+		clusterClient:              k8sClusterClient,
+		awsClients:                 awsClients,
+	}
 
-	dnsserver, err := resolver.NewDNSServer(dnsServerAWSAccountId, dnsServerIAMRoleExternalId, dnsServerRegion, dnsServerIAMRoleArn, dnsServerVpcId)
+	// TODO: This is intended for use during acceptance tests as the resolver
+	// rules controllers currently don't have any tests and we don't want to
+	// enable them. This should be removed when we implement those tests, but
+	// maybe in the future we'd need some more granular way of disabling
+	// controllers as this project grows.
+	if !disableResolverControllers {
+		logger.Info("Wiring resolver rules reconcilers")
+		wireResolverRulesReconciler(cfg, mgr)
+	}
+
+	logger.Info("Wiring network topology reconcilers")
+	wireNetworkTopologyReconcilers(cfg, mgr)
+}
+
+func wireResolverRulesReconciler(cfg reconcilerConfig, mgr manager.Manager) {
+	dnsserver, err := resolver.NewDNSServer(
+		cfg.dnsServerAWSAccountId,
+		cfg.dnsServerIAMRoleExternalId,
+		cfg.dnsServerRegion,
+		cfg.dnsServerIAMRoleArn,
+		cfg.dnsServerVpcId,
+	)
 	if err != nil {
 		setupLog.Error(err, "unable to create DNSServer object")
 		os.Exit(1)
 	}
 
-	awsResolver, err := resolver.NewResolver(awsClients, dnsserver, workloadClusterBaseDomain)
+	awsResolver, err := resolver.NewResolver(cfg.awsClients, dnsserver, cfg.workloadClusterBaseDomain)
 	if err != nil {
 		setupLog.Error(err, "unable to create Resolver")
 		os.Exit(1)
 	}
 
-	dns, err := resolver.NewDnsZone(awsClients, workloadClusterBaseDomain)
+	dns, err := resolver.NewDnsZone(cfg.awsClients, cfg.workloadClusterBaseDomain)
 	if err != nil {
 		setupLog.Error(err, "unable to create Resolver")
 		os.Exit(1)
 	}
 
-	if err = (controllers.NewResolverRulesReconciler(k8sAwsClusterClient, awsResolver)).SetupWithManager(mgr); err != nil {
+	if err = (controllers.NewResolverRulesReconciler(cfg.awsClusterClient, awsResolver)).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller")
 		os.Exit(1)
 	}
 
-	if err = (controllers.NewUnpauseReconciler(k8sAwsClusterClient)).SetupWithManager(mgr); err != nil {
+	if err = (controllers.NewUnpauseReconciler(cfg.awsClusterClient)).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller")
 		os.Exit(1)
 	}
 
-	if err = (controllers.NewDnsReconciler(k8sClusterClient, dns, managementClusterName, managementClusterNamespace)).SetupWithManager(mgr); err != nil {
+	if err = (controllers.NewDnsReconciler(cfg.clusterClient, dns, cfg.managementClusterName, cfg.managementClusterNamespace)).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller")
 		os.Exit(1)
 	}
 
-	if err = (controllers.NewEKSDnsReconciler(k8sClusterClient, dns, managementClusterName, managementClusterNamespace)).SetupWithManager(mgr); err != nil {
+	if err = (controllers.NewEKSDnsReconciler(cfg.clusterClient, dns, cfg.managementClusterName, cfg.managementClusterNamespace)).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller")
 		os.Exit(1)
 	}
+}
 
-	if err = (controllers.NewRouteReconciler(types.NamespacedName{Namespace: managementClusterNamespace, Name: managementClusterName}, k8sClusterClient, awsClients)).SetupWithManager(mgr); err != nil {
+func wireNetworkTopologyReconcilers(cfg reconcilerConfig, mgr manager.Manager) {
+	managementCluster := types.NamespacedName{
+		Namespace: cfg.managementClusterNamespace,
+		Name:      cfg.managementClusterName,
+	}
+
+	if err := (controllers.NewRouteReconciler(managementCluster, cfg.clusterClient, cfg.awsClients)).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Route")
 		os.Exit(1)
 	}
+
+	mcTransitGatewayReconciler := controllers.NewManagementClusterTransitGateway(
+		managementCluster,
+		cfg.awsClusterClient,
+		cfg.awsClients,
+	)
+
+	if err := mcTransitGatewayReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller")
+		os.Exit(1)
+	}
+
+	tgwAttachmentReconciler := controllers.NewTransitGatewayAttachmentReconciler(
+		managementCluster,
+		cfg.awsClusterClient,
+		cfg.awsClients,
+	)
+
+	if err := tgwAttachmentReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller")
+		os.Exit(1)
+	}
+
+	prefixListEntryReconciler := controllers.NewPrefixListEntryReconciler(
+		managementCluster,
+		cfg.awsClusterClient,
+		cfg.awsClients,
+	)
+
+	if err := prefixListEntryReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller")
+		os.Exit(1)
+	}
+
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

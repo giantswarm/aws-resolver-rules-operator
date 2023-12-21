@@ -27,21 +27,13 @@ type PrefixLists struct {
 }
 
 func (t *PrefixLists) Apply(ctx context.Context, name string, tags map[string]string) (string, error) {
-	prefixLists, err := t.get(ctx, name)
+	prefixList, err := t.getByName(ctx, name)
 	if err != nil {
 		return "", err
 	}
 
-	if len(prefixLists) == 1 {
-		return *prefixLists[0].PrefixListArn, nil
-	}
-
-	if len(prefixLists) > 1 {
-		return "", fmt.Errorf(
-			"found unexpected number: %d of prefix lists for cluster %s",
-			len(prefixLists),
-			name,
-		)
+	if prefixList != nil {
+		return *prefixList.PrefixListArn, nil
 	}
 
 	return t.create(ctx, name, tags)
@@ -94,32 +86,23 @@ func (p *PrefixLists) DeleteEntry(ctx context.Context, entry resolver.PrefixList
 }
 
 func (t *PrefixLists) Delete(ctx context.Context, name string) error {
-	prefixLists, err := t.get(ctx, name)
+	prefixList, err := t.getByName(ctx, name)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	if len(prefixLists) == 0 {
+	if prefixList == nil {
 		return nil
 	}
 
-	if len(prefixLists) > 1 {
-		return fmt.Errorf(
-			"found unexpected number: %d of prefix lists for cluster %s",
-			len(prefixLists),
-			name,
-		)
-	}
-
-	id := prefixLists[0].PrefixListId
 	_, err = t.client.DeleteManagedPrefixList(&ec2.DeleteManagedPrefixListInput{
-		PrefixListId: id,
+		PrefixListId: prefixList.PrefixListId,
 	})
 
 	return errors.WithStack(err)
 }
 
-func (t *PrefixLists) get(ctx context.Context, name string) ([]*ec2.ManagedPrefixList, error) {
+func (t *PrefixLists) getByName(ctx context.Context, name string) (*ec2.ManagedPrefixList, error) {
 	input := &ec2.DescribeManagedPrefixListsInput{
 		Filters: []*ec2.Filter{
 			{
@@ -128,13 +111,34 @@ func (t *PrefixLists) get(ctx context.Context, name string) ([]*ec2.ManagedPrefi
 			},
 		},
 	}
+	return t.get(ctx, input)
+}
 
+func (t *PrefixLists) getByID(ctx context.Context, id string) (*ec2.ManagedPrefixList, error) {
+	input := &ec2.DescribeManagedPrefixListsInput{
+		PrefixListIds: awssdk.StringSlice([]string{id}),
+	}
+	return t.get(ctx, input)
+}
+
+func (t *PrefixLists) get(ctx context.Context, input *ec2.DescribeManagedPrefixListsInput) (*ec2.ManagedPrefixList, error) {
 	out, err := t.client.DescribeManagedPrefixListsWithContext(ctx, input)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
-	return out.PrefixLists, nil
+	if len(out.PrefixLists) == 1 {
+		return out.PrefixLists[0], nil
+	}
+
+	if len(out.PrefixLists) > 1 {
+		return nil, fmt.Errorf(
+			"found unexpected number: %d of prefix lists",
+			len(out.PrefixLists),
+		)
+	}
+
+	return nil, nil
 }
 
 func (t *PrefixLists) create(ctx context.Context, name string, tags map[string]string) (string, error) {
@@ -142,12 +146,15 @@ func (t *PrefixLists) create(ctx context.Context, name string, tags map[string]s
 		AddressFamily:  awssdk.String("IPv4"),
 		MaxEntries:     awssdk.Int64(prefixListMaxEntries),
 		PrefixListName: awssdk.String(GetPrefixListName(name)),
-		TagSpecifications: []*ec2.TagSpecification{
+	}
+	ec2Tags := getEc2Tags(tags)
+	if len(ec2Tags) != 0 {
+		input.TagSpecifications = []*ec2.TagSpecification{
 			{
 				ResourceType: aws.String(ec2.ResourceTypePrefixList),
-				Tags:         getEc2Tags(tags),
+				Tags:         ec2Tags,
 			},
-		},
+		}
 	}
 	out, err := t.client.CreateManagedPrefixListWithContext(ctx, input)
 	if err != nil {
@@ -158,8 +165,14 @@ func (t *PrefixLists) create(ctx context.Context, name string, tags map[string]s
 }
 
 func (p *PrefixLists) createEntry(ctx context.Context, prefixListID string, entry resolver.PrefixListEntry) error {
-	_, err := p.client.ModifyManagedPrefixListWithContext(ctx, &ec2.ModifyManagedPrefixListInput{
-		PrefixListId: awssdk.String(prefixListID),
+	currentVersion, err := p.getCurrentVersion(ctx, prefixListID)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	_, err = p.client.ModifyManagedPrefixListWithContext(ctx, &ec2.ModifyManagedPrefixListInput{
+		PrefixListId:   awssdk.String(prefixListID),
+		CurrentVersion: currentVersion,
 		AddEntries: []*ec2.AddPrefixListEntry{
 			{
 				Cidr:        awssdk.String(entry.CIDR),
@@ -171,11 +184,27 @@ func (p *PrefixLists) createEntry(ctx context.Context, prefixListID string, entr
 	return errors.WithStack(err)
 }
 
+func (p *PrefixLists) getCurrentVersion(ctx context.Context, prefixListID string) (*int64, error) {
+	prefixList, err := p.getByID(ctx, prefixListID)
+	if err != nil {
+		return nil, err
+	}
+
+	if prefixList == nil {
+		return nil, errors.New("prefix list not found")
+	}
+
+	return prefixList.Version, nil
+}
+
 func (p *PrefixLists) entryExists(ctx context.Context, prefixListID string, entry resolver.PrefixListEntry) (bool, error) {
 	out, err := p.client.GetManagedPrefixListEntriesWithContext(ctx, &ec2.GetManagedPrefixListEntriesInput{
 		PrefixListId: awssdk.String(prefixListID),
 		MaxResults:   awssdk.Int64(100),
 	})
+	if HasErrorCode(err, ErrPrefixListNotFound) {
+		return false, nil
+	}
 	if err != nil {
 		return false, err
 	}
@@ -194,14 +223,24 @@ func (p *PrefixLists) entryExists(ctx context.Context, prefixListID string, entr
 }
 
 func (p *PrefixLists) deleteEntry(ctx context.Context, prefixListID string, entry resolver.PrefixListEntry) error {
-	_, err := p.client.ModifyManagedPrefixListWithContext(ctx, &ec2.ModifyManagedPrefixListInput{
-		PrefixListId: awssdk.String(prefixListID),
+	currentVersion, err := p.getCurrentVersion(ctx, prefixListID)
+	if err != nil {
+		return err
+	}
+
+	_, err = p.client.ModifyManagedPrefixListWithContext(ctx, &ec2.ModifyManagedPrefixListInput{
+		CurrentVersion: currentVersion,
+		PrefixListId:   awssdk.String(prefixListID),
 		RemoveEntries: []*ec2.RemovePrefixListEntry{
 			{
 				Cidr: awssdk.String(entry.CIDR),
 			},
 		},
 	})
+
+	if HasErrorCode(err, ErrPrefixListNotFound) {
+		return nil
+	}
 
 	return errors.WithStack(err)
 }

@@ -22,6 +22,7 @@ import (
 
 	"github.com/aws-resolver-rules-operator/controllers"
 	"github.com/aws-resolver-rules-operator/pkg/conditions"
+	gserrors "github.com/aws-resolver-rules-operator/pkg/errors"
 	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 	"github.com/aws-resolver-rules-operator/pkg/resolver/resolverfakes"
@@ -316,12 +317,23 @@ var _ = Describe("TransitGatewayAttachment", func() {
 			It("returns an error", func() {
 				Expect(reconcileErr).To(MatchError(ContainSubstring("boom")))
 			})
+
+			When("it isn't ready", func() {
+				BeforeEach(func() {
+					transitGatewayClient.ApplyAttachmentReturns(gserrors.NewRetryableError("boom", time.Second))
+				})
+
+				It("requeues the event", func() {
+					Expect(reconcileErr).NotTo(HaveOccurred())
+					Expect(reconcileResult.RequeueAfter).To(Equal(time.Second))
+				})
+			})
 		})
 
 		When("the cluster has been deleted", func() {
 			BeforeEach(func() {
 				patchedCluster := cluster.DeepCopy()
-				patchedCluster.Finalizers = []string{controllers.FinalizerManagementCluster}
+				patchedCluster.Finalizers = []string{controllers.FinalizerTransitGatewayAttachment}
 
 				err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
 				Expect(err).NotTo(HaveOccurred())

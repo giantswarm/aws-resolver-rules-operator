@@ -12,6 +12,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/aws-resolver-rules-operator/pkg/conditions"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
@@ -36,6 +37,18 @@ func NewPrefixListEntryReconciler(
 		clusterClient:     clusterClient,
 		clients:           clients,
 	}
+}
+
+func (r *PrefixListEntryReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&capa.AWSCluster{}).
+		WithEventFilter(
+			predicate.Funcs{
+				UpdateFunc: predicateToFilterAWSClusterResourceVersionChanges,
+			},
+		).
+		Named("prefix-list-entry").
+		Complete(r)
 }
 
 type entryScope struct {
@@ -149,7 +162,7 @@ func (r *PrefixListEntryReconciler) reconcileDelete(ctx context.Context, scope e
 		Description:   getPrefixListEntryDescription(scope.cluster.Name),
 	})
 	if err != nil {
-		logger.Error(err, "Failed to apply prefix list entry")
+		logger.Error(err, "Failed to delete prefix list entry")
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 

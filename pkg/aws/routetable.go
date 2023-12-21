@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aws-resolver-rules-operator/pkg/resolver"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
 
 type RouteTable struct {
@@ -61,7 +62,7 @@ func (r *RouteTableClient) getRouteTables(ctx context.Context, filter resolver.F
 		return nil, errors.WithStack(err)
 	}
 
-	if output != nil && len(output.RouteTables) > 0 {
+	if output != nil {
 		return output.RouteTables, nil
 	}
 	return nil, &RouteTableNotFoundError{}

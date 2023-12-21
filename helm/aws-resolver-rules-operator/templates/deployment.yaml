@@ -47,6 +47,9 @@ spec:
             - --management-cluster-namespace={{ .Values.managementClusterNamespace }}
             - --management-cluster-name={{ .Values.managementClusterName  }}
             - --basedomain={{ .Values.baseDomain }}
+            {{- if .Values.disableResolverControllers }}
+            - --disable-resolver-controllers
+            {{- end }}
           securityContext:
             {{- with .Values.securityContext }}
               {{- . | toYaml | nindent 12 }}

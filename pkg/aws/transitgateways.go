@@ -3,16 +3,25 @@ package aws
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
 
+	gserrors "github.com/aws-resolver-rules-operator/pkg/errors"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
 
-const clusterTagValue = "owned"
+const (
+	clusterTagValue                     = "owned"
+	TransitGatewayDetachedErrorMessage  = "transit gateway not detached yet"
+	TransitGatewayNotReadyErrorMessage  = "transit gateway not ready yet"
+	TransitGatewayDetachedRetryDuration = 10 * time.Second
+	TransitGatewayNotReadyRetryDuration = 10 * time.Second
+)
 
 func clusterTag(name string) string {
 	return fmt.Sprintf("kubernetes.io/cluster/%s", name)
@@ -92,6 +101,12 @@ func (t *TransitGateways) delete(ctx context.Context, gateway *ec2.TransitGatewa
 	_, err := t.ec2.DeleteTransitGateway(&ec2.DeleteTransitGatewayInput{
 		TransitGatewayId: id,
 	})
+	if HasErrorCode(err, ErrIncorrectState) {
+		return gserrors.NewRetryableError(
+			TransitGatewayDetachedErrorMessage,
+			TransitGatewayDetachedRetryDuration,
+		)
+	}
 
 	return errors.WithStack(err)
 }
@@ -111,7 +126,7 @@ func (t *TransitGateways) get(ctx context.Context, name string) (*ec2.TransitGat
 	if err != nil {
 		return nil, err
 	}
-	gateways := out.TransitGateways
+	gateways := filterDeletedTransitGateways(out.TransitGateways)
 
 	if len(gateways) == 0 {
 		return nil, nil
@@ -179,6 +194,12 @@ func (t *TransitGateways) attach(ctx context.Context, transitGatewayID string, a
 			},
 		},
 	})
+	if HasErrorCode(err, ErrIncorrectState) {
+		return gserrors.NewRetryableError(
+			TransitGatewayNotReadyErrorMessage,
+			TransitGatewayNotReadyRetryDuration,
+		)
+	}
 
 	return errors.WithStack(err)
 }
@@ -213,4 +234,24 @@ func (t *TransitGateways) getAttachment(ctx context.Context, gatewayID, vpcID st
 	}
 
 	return attachments.TransitGatewayVpcAttachments[0], nil
+}
+
+func filterDeletedTransitGateways(transitGateways []*ec2.TransitGateway) []*ec2.TransitGateway {
+	filtered := []*ec2.TransitGateway{}
+	for _, gateway := range transitGateways {
+		if !isTransitGatewayDeleted(gateway) {
+			filtered = append(filtered, gateway)
+		}
+	}
+
+	return filtered
+}
+
+func isTransitGatewayDeleted(transitGateway *ec2.TransitGateway) bool {
+	if transitGateway.State == nil {
+		return false
+	}
+
+	state := *transitGateway.State
+	return state == ec2.TransitGatewayStateDeleted || state == ec2.TransitGatewayStateDeleting
 }
