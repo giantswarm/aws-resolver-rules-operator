@@ -29,7 +29,7 @@ create-acceptance-cluster: kind
 
 .PHONY: install-cluster-api
 install-cluster-api: clusterctl
-	AWS_B64ENCODED_CREDENTIALS="" $(CLUSTERCTL) init --kubeconfig "$(KUBECONFIG)" --infrastructure=aws --wait-providers || true
+	AWS_B64ENCODED_CREDENTIALS="" GOPROXY="off" $(CLUSTERCTL) init --kubeconfig "$(KUBECONFIG)" --infrastructure=aws:v2.3.0 --wait-providers || true
 
 .PHONY: deploy-acceptance-cluster
 deploy-acceptance-cluster: docker-build create-acceptance-cluster install-cluster-api deploy
