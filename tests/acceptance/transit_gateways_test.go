@@ -27,10 +27,10 @@ var _ = Describe("Transit Gateways", func() {
 		SetDefaultEventuallyPollingInterval(time.Second)
 		SetDefaultEventuallyTimeout(5 * time.Minute)
 
-		err := testFixture.Setup()
 		DeferCleanup(func() {
 			Expect(testFixture.Teardown()).To(Succeed())
 		})
+		err := testFixture.Setup()
 		Expect(err).NotTo(HaveOccurred())
 	})
 
