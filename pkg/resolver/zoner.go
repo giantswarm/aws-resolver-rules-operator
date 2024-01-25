@@ -32,9 +32,11 @@ func (d *Zoner) CreateHostedZone(ctx context.Context, logger logr.Logger, cluste
 	hostedZoneName := d.getHostedZoneName(cluster)
 	logger = logger.WithValues("hostedZoneName", hostedZoneName)
 
-	dnsZoneToCreate := BuildPublicHostedZone(hostedZoneName, d.getTagsForHostedZone(cluster))
+	var dnsZoneToCreate DnsZone
 	if cluster.IsDnsModePrivate {
 		dnsZoneToCreate = BuildPrivateHostedZone(hostedZoneName, d.getTagsForHostedZone(cluster), cluster.VPCId, cluster.Region, cluster.VPCsToAssociateToHostedZone)
+	} else {
+		dnsZoneToCreate = BuildPublicHostedZone(hostedZoneName, d.getTagsForHostedZone(cluster))
 	}
 
 	hostedZoneId, err := route53Client.CreateHostedZone(ctx, logger, dnsZoneToCreate)
@@ -79,6 +81,7 @@ func (d *Zoner) DeleteHostedZone(ctx context.Context, logger logr.Logger, cluste
 		return errors.WithStack(err)
 	}
 	hostedZoneName := d.getHostedZoneName(cluster)
+	logger = logger.WithValues("hostedZoneName", hostedZoneName)
 	hostedZoneId, err := route53Client.GetHostedZoneIdByName(ctx, logger, hostedZoneName)
 	if err != nil {
 		if errors.Is(err, &HostedZoneNotFoundError{}) {

@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/go-logr/logr"
+	gocache "github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
@@ -49,6 +50,19 @@ var (
 
 type Route53 struct {
 	client *route53.Route53
+
+	zoneNameToIdCache *gocache.Cache
+}
+
+func NewRoute53(client *route53.Route53) *Route53 {
+	return &Route53{
+		client: client,
+
+		// Avoid Route53 rate limit by caching zone ID for a short time. This is particularly
+		// helpful if the same object gets reconciled multiple times in a row. We don't want
+		// to repeat the same AWS API request each time.
+		zoneNameToIdCache: gocache.New(90*time.Second, 60*time.Second),
+	}
 }
 
 func (r *Route53) CreateHostedZone(ctx context.Context, logger logr.Logger, dnsZone resolver.DnsZone) (string, error) {
@@ -144,6 +158,15 @@ func (r *Route53) associateHostedZoneWithAdditionalVPCs(ctx context.Context, log
 
 func (r *Route53) DeleteHostedZone(ctx context.Context, logger logr.Logger, zoneId string) error {
 	logger.Info("Deleting hosted zone")
+	for zoneName, item := range r.zoneNameToIdCache.Items() {
+		cachedZoneId := item.Object.(string)
+		if cachedZoneId == zoneId {
+			r.zoneNameToIdCache.Delete(zoneName)
+			logger.Info("Removed hosted zone ID from cache")
+			break
+		}
+	}
+
 	_, err := r.client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: awssdk.String(zoneId)})
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
@@ -185,6 +208,12 @@ func (r *Route53) GetHostedZoneNSRecords(ctx context.Context, zoneId string) (*r
 }
 
 func (r *Route53) GetHostedZoneIdByName(ctx context.Context, logger logr.Logger, zoneName string) (string, error) {
+	if cachedValue, ok := r.zoneNameToIdCache.Get(zoneName); ok {
+		zoneId := cachedValue.(string)
+		logger.Info("Using hosted zone ID from cache", "zoneId", zoneId, "zoneName", zoneName)
+		return zoneId, nil
+	}
+
 	listResponse, err := r.client.ListHostedZonesByNameWithContext(ctx, &route53.ListHostedZonesByNameInput{
 		DNSName:  awssdk.String(zoneName),
 		MaxItems: awssdk.String("1"),
@@ -201,7 +230,10 @@ func (r *Route53) GetHostedZoneIdByName(ctx context.Context, logger logr.Logger,
 		return "", &resolver.HostedZoneNotFoundError{}
 	}
 
-	return *listResponse.HostedZones[0].Id, nil
+	zoneId := *listResponse.HostedZones[0].Id
+	logger.Info("Found hosted zone ID", "zoneId", zoneId, "zoneName", zoneName)
+	r.zoneNameToIdCache.SetDefault(zoneName, zoneId)
+	return zoneId, nil
 }
 
 // AddDelegationToParentZone adds a NS record (or updates if it already exists) to the parent hosted zone with the NS records of the subdomain.
