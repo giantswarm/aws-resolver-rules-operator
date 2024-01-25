@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2024-01-25
+
 ### Changed
 
 - Do not reconcile bastion machines anymore. They were removed in [cluster-aws v0.53.0](https://github.com/giantswarm/cluster-aws/blob/master/CHANGELOG.md#0530---2023-12-13) in favor of Teleport. On such newer clusters without a bastion host, the controller would retry unnecessary Route53 calls every minute, leading to a rate limit – this is fixed by removing the whole logic.
@@ -170,7 +172,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
 
-[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.10.1...v0.11.0
