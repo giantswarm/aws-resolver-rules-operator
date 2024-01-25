@@ -80,20 +80,6 @@ type FakeClusterClient struct {
 		result1 *v1beta1a.AWSManagedControlPlane
 		result2 error
 	}
-	GetBastionMachineStub        func(context.Context, string) (*v1beta1b.Machine, error)
-	getBastionMachineMutex       sync.RWMutex
-	getBastionMachineArgsForCall []struct {
-		arg1 context.Context
-		arg2 string
-	}
-	getBastionMachineReturns struct {
-		result1 *v1beta1b.Machine
-		result2 error
-	}
-	getBastionMachineReturnsOnCall map[int]struct {
-		result1 *v1beta1b.Machine
-		result2 error
-	}
 	GetClusterStub        func(context.Context, types.NamespacedName) (*v1beta1b.Cluster, error)
 	getClusterMutex       sync.RWMutex
 	getClusterArgsForCall []struct {
@@ -506,71 +492,6 @@ func (fake *FakeClusterClient) GetAWSManagedControlPlaneReturnsOnCall(i int, res
 	}
 	fake.getAWSManagedControlPlaneReturnsOnCall[i] = struct {
 		result1 *v1beta1a.AWSManagedControlPlane
-		result2 error
-	}{result1, result2}
-}
-
-func (fake *FakeClusterClient) GetBastionMachine(arg1 context.Context, arg2 string) (*v1beta1b.Machine, error) {
-	fake.getBastionMachineMutex.Lock()
-	ret, specificReturn := fake.getBastionMachineReturnsOnCall[len(fake.getBastionMachineArgsForCall)]
-	fake.getBastionMachineArgsForCall = append(fake.getBastionMachineArgsForCall, struct {
-		arg1 context.Context
-		arg2 string
-	}{arg1, arg2})
-	stub := fake.GetBastionMachineStub
-	fakeReturns := fake.getBastionMachineReturns
-	fake.recordInvocation("GetBastionMachine", []interface{}{arg1, arg2})
-	fake.getBastionMachineMutex.Unlock()
-	if stub != nil {
-		return stub(arg1, arg2)
-	}
-	if specificReturn {
-		return ret.result1, ret.result2
-	}
-	return fakeReturns.result1, fakeReturns.result2
-}
-
-func (fake *FakeClusterClient) GetBastionMachineCallCount() int {
-	fake.getBastionMachineMutex.RLock()
-	defer fake.getBastionMachineMutex.RUnlock()
-	return len(fake.getBastionMachineArgsForCall)
-}
-
-func (fake *FakeClusterClient) GetBastionMachineCalls(stub func(context.Context, string) (*v1beta1b.Machine, error)) {
-	fake.getBastionMachineMutex.Lock()
-	defer fake.getBastionMachineMutex.Unlock()
-	fake.GetBastionMachineStub = stub
-}
-
-func (fake *FakeClusterClient) GetBastionMachineArgsForCall(i int) (context.Context, string) {
-	fake.getBastionMachineMutex.RLock()
-	defer fake.getBastionMachineMutex.RUnlock()
-	argsForCall := fake.getBastionMachineArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
-}
-
-func (fake *FakeClusterClient) GetBastionMachineReturns(result1 *v1beta1b.Machine, result2 error) {
-	fake.getBastionMachineMutex.Lock()
-	defer fake.getBastionMachineMutex.Unlock()
-	fake.GetBastionMachineStub = nil
-	fake.getBastionMachineReturns = struct {
-		result1 *v1beta1b.Machine
-		result2 error
-	}{result1, result2}
-}
-
-func (fake *FakeClusterClient) GetBastionMachineReturnsOnCall(i int, result1 *v1beta1b.Machine, result2 error) {
-	fake.getBastionMachineMutex.Lock()
-	defer fake.getBastionMachineMutex.Unlock()
-	fake.GetBastionMachineStub = nil
-	if fake.getBastionMachineReturnsOnCall == nil {
-		fake.getBastionMachineReturnsOnCall = make(map[int]struct {
-			result1 *v1beta1b.Machine
-			result2 error
-		})
-	}
-	fake.getBastionMachineReturnsOnCall[i] = struct {
-		result1 *v1beta1b.Machine
 		result2 error
 	}{result1, result2}
 }
@@ -1033,8 +954,6 @@ func (fake *FakeClusterClient) Invocations() map[string][][]interface{} {
 	defer fake.getAWSClusterMutex.RUnlock()
 	fake.getAWSManagedControlPlaneMutex.RLock()
 	defer fake.getAWSManagedControlPlaneMutex.RUnlock()
-	fake.getBastionMachineMutex.RLock()
-	defer fake.getBastionMachineMutex.RUnlock()
 	fake.getClusterMutex.RLock()
 	defer fake.getClusterMutex.RUnlock()
 	fake.getIdentityMutex.RLock()

@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Do not reconcile bastion machines anymore. They were removed in [cluster-aws v0.53.0](https://github.com/giantswarm/cluster-aws/blob/master/CHANGELOG.md#0530---2023-12-13) in favor of Teleport. On such newer clusters without a bastion host, the controller would retry unnecessary Route53 calls every minute, leading to a rate limit – this is fixed by removing the whole logic.
+
 ## [0.13.0] - 2023-12-21
 
 ### Added
+
 - Added `RouteReconciler`.
 - Add `TransitGatewayAttachmentReconciler`.
 - Add `PrefixListEntryReconciler`.

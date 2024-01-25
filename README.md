@@ -18,7 +18,6 @@ This controller reconciles `Clusters`. It creates a hosted zone that could be a 
 The mode is selected using the `aws.giantswarm.io/dns-mode` annotation on the `AWSCluster` CR. It also creates three DNS records in the hosted zone:
 
 - `api`: a dns record of type `A` pointing to the control plane Load Balancer
-- `bastion1`: a dns record of type `A` pointing to the bastion `Machine` IP
 - `*`: a CNAME pointing to the `ingress.$basedomain` record
 
 When the mode is public, it creates a record set in the parent's hosted zone so that dns delegation works.
