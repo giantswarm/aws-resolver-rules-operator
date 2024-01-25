@@ -136,7 +136,7 @@ DOCKER_COMPOSE = $(shell pwd)/bin/docker-compose
 .PHONY: docker-compose
 docker-compose: ## Download docker-compose locally if necessary.
 	$(eval LATEST_RELEASE = $(shell curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r '.tag_name'))
-	curl -sL "https://github.com/docker/compose/releases/download/$(LATEST_RELEASE)/docker-compose-linux-x86_64" -o $(DOCKER_COMPOSE)
+	curl -fsSL "https://github.com/docker/compose/releases/download/$(LATEST_RELEASE)/docker-compose-$(shell go env GOOS)-$(shell go env GOARCH | sed 's/amd64/x86_64/; s/arm64/aarch64/')" -o $(DOCKER_COMPOSE)
 	chmod +x $(DOCKER_COMPOSE)
 
 CLUSTERCTL = $(shell pwd)/bin/clusterctl
