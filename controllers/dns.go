@@ -2,18 +2,15 @@ package controllers
 
 import (
 	"context"
-	"time"
 
 	"github.com/pkg/errors"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/annotations"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
 
@@ -22,7 +19,6 @@ import (
 // The mode is selected using the `aws.giantswarm.io/dns-mode` annotation on the `AWSCluster` CR.
 // It also creates three DNS records in the hosted zone
 // - `api`: a dns record of type `A` pointing to the control plane Load Balancer
-// - `bastion1`: a dns record of type `A` pointing to the bastion `Machine` IP
 // - `*`: a CNAME pointing to the `ingress.$basedomain` record
 //
 // When the mode is public, it creates a record set in the parent's hosted zone so that dns delegation works.
@@ -110,48 +106,12 @@ func (r *DnsReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AW
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	bastionIp, err := r.getBastionIp(ctx, cluster)
-	if err != nil && !errors.Is(err, &k8sclient.BastionNotFoundError{}) {
-		return ctrl.Result{}, errors.WithStack(err)
-	}
-	cluster.BastionIp = bastionIp
-
-	requeueAfter := 0 * time.Minute
-	// If there is a bastion machine, but it has no IP address just yet, we want to reconcile again soonish
-	if !errors.Is(err, &k8sclient.BastionNotFoundError{}) && bastionIp == "" {
-		requeueAfter = 1 * time.Minute
-	}
-
 	err = r.dnsZone.CreateHostedZone(ctx, logger, cluster)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{
-		RequeueAfter: requeueAfter,
-	}, nil
-}
-
-// getBastionIp tries to find a bastion machine in this cluster and fetch its IP address from the status field.
-// It will return the internal IP address when using private VPC mode, or an external IP address otherwise.
-func (r *DnsReconciler) getBastionIp(ctx context.Context, cluster resolver.Cluster) (string, error) {
-	bastionMachine, err := r.clusterClient.GetBastionMachine(ctx, cluster.Name)
-	if err != nil {
-		return "", errors.WithStack(err)
-	}
-
-	addressType := capi.MachineExternalIP
-	if cluster.IsVpcModePrivate {
-		addressType = capi.MachineInternalIP
-	}
-
-	for _, addr := range bastionMachine.Status.Addresses {
-		if addr.Type == addressType {
-			return addr.Address, nil
-		}
-	}
-
-	return "", nil
+	return ctrl.Result{}, nil
 }
 
 // reconcileDelete deletes the hosted zone and the DNS records for the workload cluster.

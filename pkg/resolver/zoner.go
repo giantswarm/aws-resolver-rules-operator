@@ -189,13 +189,5 @@ func (d *Zoner) getWorkloadClusterDnsRecords(workloadClusterHostedZoneName strin
 		}
 	}
 
-	if cluster.BastionIp != "" {
-		dnsRecords = append(dnsRecords, DNSRecord{
-			Kind:   DnsRecordTypeA,
-			Name:   fmt.Sprintf("bastion1.%s", workloadClusterHostedZoneName),
-			Values: []string{cluster.BastionIp},
-		})
-	}
-
 	return dnsRecords
 }

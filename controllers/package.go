@@ -101,7 +101,6 @@ type ClusterClient interface {
 	RemoveClusterFinalizer(context.Context, *capi.Cluster, string) error
 	GetIdentity(context.Context, *capa.AWSIdentityReference) (*capa.AWSClusterRoleIdentity, error)
 	MarkConditionTrue(context.Context, *capi.Cluster, capi.ConditionType) error
-	GetBastionMachine(ctx context.Context, clusterName string) (*capi.Machine, error)
 }
 
 // predicateToFilterAWSClusterResourceVersionChanges is a function to avoid reconciling if the event triggering the reconciliation

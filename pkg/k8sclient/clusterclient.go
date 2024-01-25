@@ -113,23 +113,6 @@ func (a *ClusterClient) GetIdentity(ctx context.Context, identityRef *capa.AWSId
 	return roleIdentity, nil
 }
 
-func (a *ClusterClient) GetBastionMachine(ctx context.Context, clusterName string) (*capi.Machine, error) {
-	bastionMachineList := &capi.MachineList{}
-	err := a.client.List(ctx, bastionMachineList, client.MatchingLabels{
-		capi.ClusterLabelName:   clusterName,
-		"cluster.x-k8s.io/role": "bastion",
-	})
-	if err != nil {
-		return &capi.Machine{}, errors.WithStack(err)
-	}
-
-	if len(bastionMachineList.Items) < 1 {
-		return &capi.Machine{}, &BastionNotFoundError{}
-	}
-
-	return &bastionMachineList.Items[0], nil
-}
-
 func (a *ClusterClient) MarkConditionTrue(ctx context.Context, cluster *capi.Cluster, condition capi.ConditionType) error {
 	originalCluster := cluster.DeepCopy()
 	conditions.MarkTrue(cluster, condition)

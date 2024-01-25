@@ -78,23 +78,6 @@ func (a *AWSClusterClient) GetIdentity(ctx context.Context, awsCluster *capa.AWS
 	return roleIdentity, nil
 }
 
-func (a *AWSClusterClient) GetBastionMachine(ctx context.Context, clusterName string) (*capi.Machine, error) {
-	bastionMachineList := &capi.MachineList{}
-	err := a.client.List(ctx, bastionMachineList, client.MatchingLabels{
-		capi.ClusterLabelName:   clusterName,
-		"cluster.x-k8s.io/role": "bastion",
-	})
-	if err != nil {
-		return &capi.Machine{}, errors.WithStack(err)
-	}
-
-	if len(bastionMachineList.Items) < 1 {
-		return &capi.Machine{}, &BastionNotFoundError{}
-	}
-
-	return &bastionMachineList.Items[0], nil
-}
-
 func (a *AWSClusterClient) MarkConditionTrue(ctx context.Context, awsCluster *capa.AWSCluster, condition capi.ConditionType) error {
 	originalCluster := awsCluster.DeepCopy()
 	conditions.MarkTrue(awsCluster, condition)
