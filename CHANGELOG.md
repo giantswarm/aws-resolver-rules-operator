@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Cache `GetHostedZoneIdByName` responses to avoid Route53 rate limit. The hosted zone IDs are unlikely to change so quickly. If reconciliation of an object (e.g. `AWSCluster`) permanently gets retriggered outside of this operator's control, it could previously lead to triggering the [account-wide AWS Route53 rate limit of five requests per second](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/DNSLimitations.html#limits-api-requests).
+
 ## [0.14.0] - 2024-01-25
 
 ### Changed

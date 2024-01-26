@@ -146,7 +146,7 @@ func (c *Clients) NewRoute53Client(region, arn string) (resolver.Route53Client, 
 		return nil, errors.WithStack(err)
 	}
 
-	return &Route53{client: client}, nil
+	return NewRoute53(client), nil
 }
 
 func (c *Clients) NewTransitGatewayClient(region, rolearn string) (resolver.TransitGatewayClient, error) {
