@@ -10,6 +10,8 @@ CLUSTER ?= acceptance
 MANAGEMENT_CLUSTER_NAME ?= test-mc
 MANAGEMENT_CLUSTER_NAMESPACE ?= test
 
+DOCKER_COMPOSE = bin/docker-compose
+
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	go generate ./...
@@ -98,11 +100,11 @@ undeploy: ## Undeploy controller from the K8s  specified in ~/.kube/config.
 		aws-resolver-rules-operator
 
 .PHONY: start-localstack
-start-localstack: docker-compose ## Run localstack with docker-compose
+start-localstack: $(DOCKER_COMPOSE) ## Run localstack with docker-compose
 	$(DOCKER_COMPOSE) up --detach --wait
 
 .PHONY: stop-localstack
-stop-localstack: docker-compose ## Run localstack with docker-compose
+stop-localstack: $(DOCKER_COMPOSE) ## Run localstack with docker-compose
 	$(DOCKER_COMPOSE) stop
 
 .PHONY: test-all
@@ -127,14 +129,17 @@ docker-build: ## Build docker image with the manager.
 	docker build -t ${IMG} .
 
 
+clean-tools:
+	rm -rf bin
+
+clean: clean-tools
+
 GINKGO = $(shell pwd)/bin/ginkgo
 .PHONY: ginkgo
 ginkgo: ## Download ginkgo locally if necessary.
 	$(call go-get-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo@latest)
 
-DOCKER_COMPOSE = $(shell pwd)/bin/docker-compose
-.PHONY: docker-compose
-docker-compose: ## Download docker-compose locally if necessary.
+$(DOCKER_COMPOSE): ## Download docker-compose locally if necessary.
 	$(eval LATEST_RELEASE = $(shell curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r '.tag_name'))
 	curl -fsSL "https://github.com/docker/compose/releases/download/$(LATEST_RELEASE)/docker-compose-$(shell go env GOOS)-$(shell go env GOARCH | sed 's/amd64/x86_64/; s/arm64/aarch64/')" -o $(DOCKER_COMPOSE)
 	chmod +x $(DOCKER_COMPOSE)

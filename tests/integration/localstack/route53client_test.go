@@ -83,7 +83,7 @@ var _ = Describe("Route53 Resolver client", func() {
 						MaxItems: awssdk.String("1"),
 					})
 					Expect(err).NotTo(HaveOccurred())
-					Expect(len(hostedZoneResponse.HostedZones)).To(Equal(1))
+					Expect(hostedZoneResponse.HostedZones).To(HaveLen(1))
 				})
 			})
 		})

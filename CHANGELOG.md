@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Cache hosted zone ID on creation
+- List many hosted zones at once in one Route53 request and cache all returned zones. This further reduces the number of Route53 requests and therefore avoids rate limit (throttling) errors.
+
 ## [0.14.1] - 2024-01-26
 
 ### Fixed
