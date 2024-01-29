@@ -215,26 +215,45 @@ func (r *Route53) GetHostedZoneIdByName(ctx context.Context, logger logr.Logger,
 		return zoneId, nil
 	}
 
+	// Request up to the allowed maximum of 100 items. This way, we can get and cache the IDs of other
+	// zones as well and thereby avoid making one request per zone name which can easily lead to AWS throttling
+	// (Route53: 5 req/sec rate limit!). Mind that `DNSName` acts like an alphabetical start marker, not as equality
+	// comparison - if that exact zone name does not exist, AWS may still return other zones!
+	//
+	// See https://docs.aws.amazon.com/Route53/latest/APIReference/API_ListHostedZonesByName.html.
 	listResponse, err := r.client.ListHostedZonesByNameWithContext(ctx, &route53.ListHostedZonesByNameInput{
 		DNSName:  awssdk.String(zoneName),
-		MaxItems: awssdk.String("1"),
+		MaxItems: awssdk.String("100"),
 	})
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
-	if len(listResponse.HostedZones) < 1 {
+	// Validate response (no duplicates expected) and search for our zone name
+	var foundZoneId string
+	wantedAWSZoneName := strings.TrimSuffix(zoneName, ".") + "."
+	for _, hostedZone := range listResponse.HostedZones {
+		if *hostedZone.Name == wantedAWSZoneName {
+			if foundZoneId != "" {
+				// We found this zone name already
+				return "", errors.New("found two identical zone names in ListHostedZonesByName response")
+			}
+			foundZoneId = *hostedZone.Id
+		}
+	}
+
+	// If the response was considered fully valid above, cache all returned zones
+	for _, hostedZone := range listResponse.HostedZones {
+		cacheKey := strings.TrimSuffix(*hostedZone.Name, ".")
+		r.zoneNameToIdCache.SetDefault(cacheKey, *hostedZone.Id)
+	}
+
+	if foundZoneId == "" {
 		return "", &resolver.HostedZoneNotFoundError{}
 	}
 
-	if *listResponse.HostedZones[0].Name != fmt.Sprintf("%s.", strings.TrimSuffix(zoneName, ".")) {
-		return "", &resolver.HostedZoneNotFoundError{}
-	}
-
-	zoneId := *listResponse.HostedZones[0].Id
-	logger.Info("Found hosted zone ID", "zoneId", zoneId, "zoneName", zoneName)
-	r.zoneNameToIdCache.SetDefault(zoneName, zoneId)
-	return zoneId, nil
+	logger.Info("Found hosted zone ID", "zoneId", foundZoneId, "zoneName", zoneName)
+	return foundZoneId, nil
 }
 
 // AddDelegationToParentZone adds a NS record (or updates if it already exists) to the parent hosted zone with the NS records of the subdomain.

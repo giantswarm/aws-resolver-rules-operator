@@ -26,7 +26,7 @@ type Zoner struct {
 func NewDnsZone(awsClients AWSClients, workloadClusterBaseDomain string) (Zoner, error) {
 	return Zoner{
 		awsClients:                awsClients,
-		awsClientCache:            gocache.New(300*time.Second, 60*time.Second),
+		awsClientCache:            gocache.New(15*time.Minute, 60*time.Second),
 		workloadClusterBaseDomain: workloadClusterBaseDomain,
 	}, nil
 }
