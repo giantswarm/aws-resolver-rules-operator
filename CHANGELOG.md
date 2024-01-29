@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Cache hosted zone ID on creation
+
 ## [0.14.1] - 2024-01-26
 
 ### Fixed

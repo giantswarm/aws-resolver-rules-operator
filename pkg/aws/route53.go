@@ -96,6 +96,7 @@ func (r *Route53) CreateHostedZone(ctx context.Context, logger logr.Logger, dnsZ
 			return "", errors.WithStack(err)
 		}
 		hostedZoneId = *createdHostedZone.HostedZone.Id
+		r.zoneNameToIdCache.SetDefault(dnsZone.DnsName, hostedZoneId)
 	}
 
 	logger = logger.WithValues("hostedZoneId", hostedZoneId)
