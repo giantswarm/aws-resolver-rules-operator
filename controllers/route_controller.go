@@ -26,6 +26,7 @@ import (
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -160,8 +161,12 @@ func (r *RouteReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.
 }
 
 func (r *RouteReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AWSCluster, routeRule resolver.RouteRule, subnetFilter resolver.Filter, routeTableClient resolver.RouteTableClient) (ctrl.Result, error) {
+	if !controllerutil.ContainsFinalizer(awsCluster, RouteFinalizer) {
+		return ctrl.Result{}, nil
+	}
+
 	logger := log.FromContext(ctx)
-	logger.Info("Deletig routes")
+	logger.Info("Deleting routes")
 
 	if err := routeTableClient.RemoveRoutes(ctx, routeRule, subnetFilter); err != nil {
 		return ctrl.Result{}, errors.WithStack(err)

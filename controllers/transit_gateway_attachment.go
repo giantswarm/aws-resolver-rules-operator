@@ -12,6 +12,7 @@ import (
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -168,6 +169,10 @@ func (r *TransitGatewayAttachmentReconciler) reconcileNormal(ctx context.Context
 }
 
 func (r *TransitGatewayAttachmentReconciler) reconcileDelete(ctx context.Context, scope attachmentScope) (ctrl.Result, error) {
+	if !controllerutil.ContainsFinalizer(scope.cluster, FinalizerTransitGatewayAttachment) {
+		return ctrl.Result{}, nil
+	}
+
 	logger := log.FromContext(ctx)
 
 	attachment := resolver.TransitGatewayAttachment{

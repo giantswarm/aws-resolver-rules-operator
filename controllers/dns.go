@@ -8,6 +8,7 @@ import (
 	"sigs.k8s.io/cluster-api/util/annotations"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -117,6 +118,10 @@ func (r *DnsReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AW
 // reconcileDelete deletes the hosted zone and the DNS records for the workload cluster.
 // It will delete the delegation records in the parent hosted zone when using public dns mode.
 func (r *DnsReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AWSCluster, cluster resolver.Cluster) (ctrl.Result, error) {
+	if !controllerutil.ContainsFinalizer(awsCluster, DnsFinalizer) {
+		return ctrl.Result{}, nil
+	}
+
 	logger := log.FromContext(ctx)
 
 	err := r.dnsZone.DeleteHostedZone(ctx, logger, cluster)

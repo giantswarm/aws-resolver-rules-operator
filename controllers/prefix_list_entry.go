@@ -11,6 +11,7 @@ import (
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -153,6 +154,10 @@ func (r *PrefixListEntryReconciler) reconcileNormal(ctx context.Context, scope e
 }
 
 func (r *PrefixListEntryReconciler) reconcileDelete(ctx context.Context, scope entryScope) (ctrl.Result, error) {
+	if !controllerutil.ContainsFinalizer(scope.cluster, FinalizerPrefixListEntry) {
+		return ctrl.Result{}, nil
+	}
+
 	logger := log.FromContext(ctx)
 
 	logger.Info("Deleting prefix list entry")

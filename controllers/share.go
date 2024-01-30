@@ -76,6 +76,10 @@ func (r *ShareReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 }
 
 func (r *ShareReconciler) reconcileDelete(ctx context.Context, cluster *capa.AWSCluster) (ctrl.Result, error) {
+	if !controllerutil.ContainsFinalizer(cluster, FinalizerResourceShare) {
+		return ctrl.Result{}, nil
+	}
+
 	logger := log.FromContext(ctx)
 
 	if resourcesStillInUse(cluster) {

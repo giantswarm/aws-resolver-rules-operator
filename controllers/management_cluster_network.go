@@ -13,6 +13,7 @@ import (
 	capiconditions "sigs.k8s.io/cluster-api/util/conditions"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -195,6 +196,10 @@ func (r *ManagementClusterNetworkReconciler) applyPrefixList(ctx context.Context
 }
 
 func (r *ManagementClusterNetworkReconciler) reconcileDelete(ctx context.Context, scope networkReconcileScope) (ctrl.Result, error) {
+	if !controllerutil.ContainsFinalizer(scope.cluster, FinalizerManagementCluster) {
+		return ctrl.Result{}, nil
+	}
+
 	logger := log.FromContext(ctx)
 
 	err := scope.transitGatewayClient.Delete(ctx, scope.cluster.Name)
