@@ -1,6 +1,6 @@
 version: 2.1
 orbs:
-  architect: giantswarm/architect@4.37.0
+  architect: giantswarm/architect@5.0.0
 
 jobs:
   unit-tests:
@@ -67,10 +67,6 @@ workflows:
           name: go-build
           binary: aws-resolver-rules-operator
           resource_class: xlarge
-          requires:
-            - unit-tests
-            - integration-tests
-            - acceptance-tests
           filters:
             tags:
               only: /^v.*/
@@ -80,6 +76,9 @@ workflows:
           name: push-to-registries
           requires:
             - go-build
+            - unit-tests
+            - integration-tests
+            - acceptance-tests
           filters:
             # Trigger the job also on git tag.
             tags:

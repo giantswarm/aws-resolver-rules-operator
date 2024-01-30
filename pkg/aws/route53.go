@@ -51,17 +51,24 @@ var (
 type Route53 struct {
 	client *route53.Route53
 
-	zoneNameToIdCache *gocache.Cache
+	upsertCache           *gocache.Cache
+	zoneIdToNSRecordCache *gocache.Cache
+	zoneNameToIdCache     *gocache.Cache
 }
 
 func NewRoute53(client *route53.Route53) *Route53 {
 	return &Route53{
 		client: client,
 
-		// Avoid Route53 rate limit by caching zone ID for a short time. This is particularly
+		// By remembering that we recently upserted certain resource records, we can avoid making excess Route53
+		// requests that lead to rate limiting
+		upsertCache: gocache.New(120*time.Second, 15*time.Second),
+
+		// Avoid Route53 rate limit by caching zone ID and NS for a short time. This is particularly
 		// helpful if the same object gets reconciled multiple times in a row. We don't want
 		// to repeat the same AWS API request each time.
-		zoneNameToIdCache: gocache.New(90*time.Second, 60*time.Second),
+		zoneIdToNSRecordCache: gocache.New(300*time.Second, 60*time.Second),
+		zoneNameToIdCache:     gocache.New(90*time.Second, 60*time.Second),
 	}
 }
 
@@ -186,22 +193,49 @@ func (r *Route53) DeleteHostedZone(ctx context.Context, logger logr.Logger, zone
 	return nil
 }
 
-func (r *Route53) GetHostedZoneNSRecords(ctx context.Context, zoneId string) (*resolver.DNSRecord, error) {
-	listResourceRecordSetsOutput, err := r.client.ListResourceRecordSetsWithContext(ctx, &route53.ListResourceRecordSetsInput{
-		HostedZoneId: awssdk.String(zoneId),
-		MaxItems:     awssdk.String("1"), // First entry is always NS record
-	})
-	if err != nil {
-		return nil, errors.WithStack(err)
+func (r *Route53) GetHostedZoneNSRecords(ctx context.Context, logger logr.Logger, zoneId string) (*resolver.DNSRecord, error) {
+	logger = logger.WithValues("zoneId", zoneId)
+
+	var resourceRecordSet *route53.ResourceRecordSet
+
+	if cachedValue, ok := r.zoneIdToNSRecordCache.Get(zoneId); ok {
+		logger.Info("Using NS record from cache")
+
+		resourceRecordSet = cachedValue.(*route53.ResourceRecordSet)
+	} else {
+		logger.Info("Requesting NS record")
+
+		listResourceRecordSetsOutput, err := r.client.ListResourceRecordSetsWithContext(ctx, &route53.ListResourceRecordSetsInput{
+			HostedZoneId: awssdk.String(zoneId),
+			MaxItems:     awssdk.String("1"), // First entry is always NS record
+		})
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		// Ensure the above assumptions for request behavior hold
+		if len(listResourceRecordSetsOutput.ResourceRecordSets) != 1 {
+			return nil, errors.New("logic error - did not receive exactly one resource record")
+		}
+		if *listResourceRecordSetsOutput.ResourceRecordSets[0].Type != route53.RRTypeNs {
+			return nil, errors.New("logic error - did not receive a resource record set of type NS")
+		}
+		if len(listResourceRecordSetsOutput.ResourceRecordSets[0].ResourceRecords) == 0 {
+			return nil, errors.New("did not receive any NS resource record")
+		}
+
+		resourceRecordSet = listResourceRecordSetsOutput.ResourceRecordSets[0]
+
+		r.zoneIdToNSRecordCache.SetDefault(zoneId, resourceRecordSet)
 	}
 
 	record := &resolver.DNSRecord{
-		Name:   *listResourceRecordSetsOutput.ResourceRecordSets[0].Name,
-		Kind:   resolver.DnsRecordType(*listResourceRecordSetsOutput.ResourceRecordSets[0].Type),
+		Name:   *resourceRecordSet.Name,
+		Kind:   resolver.DnsRecordType(*resourceRecordSet.Type),
 		Values: []string{},
 	}
 
-	for _, resourceRecord := range listResourceRecordSetsOutput.ResourceRecordSets[0].ResourceRecords {
+	for _, resourceRecord := range resourceRecordSet.ResourceRecords {
 		record.Values = append(record.Values, *resourceRecord.Value)
 	}
 
@@ -258,7 +292,13 @@ func (r *Route53) GetHostedZoneIdByName(ctx context.Context, logger logr.Logger,
 
 // AddDelegationToParentZone adds a NS record (or updates if it already exists) to the parent hosted zone with the NS records of the subdomain.
 func (r *Route53) AddDelegationToParentZone(ctx context.Context, logger logr.Logger, parentZoneId string, resourceRecord *resolver.DNSRecord) error {
-	logger.Info("Adding delegation to parent hosted zone", "parentHostedZoneId", parentZoneId)
+	logger = logger.WithValues("parentHostedZoneId", parentZoneId, "dnsRecordName", resourceRecord.Name)
+
+	logger.Info("Adding delegation to parent hosted zone")
+
+	if len(resourceRecord.Values) == 0 {
+		return errors.New("logic error - no NS resource records")
+	}
 
 	var awsResourceRecords []*route53.ResourceRecord
 	for _, value := range resourceRecord.Values {
@@ -266,6 +306,16 @@ func (r *Route53) AddDelegationToParentZone(ctx context.Context, logger logr.Log
 			Value: awssdk.String(value),
 		})
 	}
+
+	cacheKey := fmt.Sprintf("parentZoneId=%q/name=%q/values=%q", parentZoneId, resourceRecord.Name, strings.Join(resourceRecord.Values, ","))
+
+	if _, ok := r.upsertCache.Get(cacheKey); ok {
+		// Avoid making excess Route53 requests that lead to rate limiting if we recently
+		// upserted those exact resource records
+		logger.Info("NS record in parent zone was recently upserted, skipping")
+		return nil
+	}
+
 	_, err := r.client.ChangeResourceRecordSetsWithContext(ctx, &route53.ChangeResourceRecordSetsInput{
 		HostedZoneId: awssdk.String(parentZoneId),
 		ChangeBatch: &route53.ChangeBatch{
@@ -285,13 +335,37 @@ func (r *Route53) AddDelegationToParentZone(ctx context.Context, logger logr.Log
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	logger.Info("Added delegation to parent hosted zone", "parentHostedZoneId", parentZoneId, "dnsRecordName", resourceRecord.Name)
+
+	r.upsertCache.SetDefault(cacheKey, true)
+
+	logger.Info("Added delegation to parent hosted zone")
 
 	return nil
 }
 
 func (r *Route53) AddDnsRecordsToHostedZone(ctx context.Context, logger logr.Logger, hostedZoneId string, dnsRecords []resolver.DNSRecord) error {
-	logger.Info("Creating DNS records", "dnsRecords", dnsRecords)
+	logger = logger.WithValues("dnsRecords", dnsRecords, "zoneId", hostedZoneId)
+
+	logger.Info("Creating DNS records")
+
+	if len(dnsRecords) == 0 {
+		return errors.New("logic error - no DNS records given")
+	}
+
+	var hash string
+	for _, dnsRecord := range dnsRecords {
+		hash += fmt.Sprintf("%q,%q,%q", dnsRecord.Kind, dnsRecord.Name, strings.Join(dnsRecord.Values, ","))
+	}
+
+	cacheKey := fmt.Sprintf("zoneId=%q/hash=%s", hostedZoneId, hash)
+
+	if _, ok := r.upsertCache.Get(cacheKey); ok {
+		// Avoid making excess Route53 requests that lead to rate limiting if we recently
+		// upserted those exact resource records
+		logger.Info("DNS records were recently upserted, skipping")
+		return nil
+	}
+
 	_, err := r.client.ChangeResourceRecordSetsWithContext(ctx, &route53.ChangeResourceRecordSetsInput{
 		ChangeBatch: &route53.ChangeBatch{
 			Changes: getAWSSdkChangesFromDnsRecords(logger, dnsRecords),
@@ -301,7 +375,10 @@ func (r *Route53) AddDnsRecordsToHostedZone(ctx context.Context, logger logr.Log
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	logger.Info("DNS records created", "dnsRecords", dnsRecords)
+
+	r.upsertCache.SetDefault(cacheKey, true)
+
+	logger.Info("DNS records created")
 
 	return nil
 }

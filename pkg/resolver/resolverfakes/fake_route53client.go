@@ -108,11 +108,12 @@ type FakeRoute53Client struct {
 		result1 string
 		result2 error
 	}
-	GetHostedZoneNSRecordsStub        func(context.Context, string) (*resolver.DNSRecord, error)
+	GetHostedZoneNSRecordsStub        func(context.Context, logr.Logger, string) (*resolver.DNSRecord, error)
 	getHostedZoneNSRecordsMutex       sync.RWMutex
 	getHostedZoneNSRecordsArgsForCall []struct {
 		arg1 context.Context
-		arg2 string
+		arg2 logr.Logger
+		arg3 string
 	}
 	getHostedZoneNSRecordsReturns struct {
 		result1 *resolver.DNSRecord
@@ -581,19 +582,20 @@ func (fake *FakeRoute53Client) GetHostedZoneIdByNameReturnsOnCall(i int, result1
 	}{result1, result2}
 }
 
-func (fake *FakeRoute53Client) GetHostedZoneNSRecords(arg1 context.Context, arg2 string) (*resolver.DNSRecord, error) {
+func (fake *FakeRoute53Client) GetHostedZoneNSRecords(arg1 context.Context, arg2 logr.Logger, arg3 string) (*resolver.DNSRecord, error) {
 	fake.getHostedZoneNSRecordsMutex.Lock()
 	ret, specificReturn := fake.getHostedZoneNSRecordsReturnsOnCall[len(fake.getHostedZoneNSRecordsArgsForCall)]
 	fake.getHostedZoneNSRecordsArgsForCall = append(fake.getHostedZoneNSRecordsArgsForCall, struct {
 		arg1 context.Context
-		arg2 string
-	}{arg1, arg2})
+		arg2 logr.Logger
+		arg3 string
+	}{arg1, arg2, arg3})
 	stub := fake.GetHostedZoneNSRecordsStub
 	fakeReturns := fake.getHostedZoneNSRecordsReturns
-	fake.recordInvocation("GetHostedZoneNSRecords", []interface{}{arg1, arg2})
+	fake.recordInvocation("GetHostedZoneNSRecords", []interface{}{arg1, arg2, arg3})
 	fake.getHostedZoneNSRecordsMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2)
+		return stub(arg1, arg2, arg3)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -607,17 +609,17 @@ func (fake *FakeRoute53Client) GetHostedZoneNSRecordsCallCount() int {
 	return len(fake.getHostedZoneNSRecordsArgsForCall)
 }
 
-func (fake *FakeRoute53Client) GetHostedZoneNSRecordsCalls(stub func(context.Context, string) (*resolver.DNSRecord, error)) {
+func (fake *FakeRoute53Client) GetHostedZoneNSRecordsCalls(stub func(context.Context, logr.Logger, string) (*resolver.DNSRecord, error)) {
 	fake.getHostedZoneNSRecordsMutex.Lock()
 	defer fake.getHostedZoneNSRecordsMutex.Unlock()
 	fake.GetHostedZoneNSRecordsStub = stub
 }
 
-func (fake *FakeRoute53Client) GetHostedZoneNSRecordsArgsForCall(i int) (context.Context, string) {
+func (fake *FakeRoute53Client) GetHostedZoneNSRecordsArgsForCall(i int) (context.Context, logr.Logger, string) {
 	fake.getHostedZoneNSRecordsMutex.RLock()
 	defer fake.getHostedZoneNSRecordsMutex.RUnlock()
 	argsForCall := fake.getHostedZoneNSRecordsArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
 func (fake *FakeRoute53Client) GetHostedZoneNSRecordsReturns(result1 *resolver.DNSRecord, result2 error) {
