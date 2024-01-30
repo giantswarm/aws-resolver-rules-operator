@@ -90,7 +90,7 @@ func (d *Zoner) CreateHostedZone(ctx context.Context, logger logr.Logger, cluste
 			return errors.WithStack(err)
 		}
 
-		nsRecord, err := route53Client.GetHostedZoneNSRecords(ctx, hostedZoneId)
+		nsRecord, err := route53Client.GetHostedZoneNSRecords(ctx, logger, hostedZoneId)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -132,7 +132,7 @@ func (d *Zoner) DeleteHostedZone(ctx context.Context, logger logr.Logger, cluste
 			return errors.WithStack(err)
 		}
 
-		nsRecord, err := route53Client.GetHostedZoneNSRecords(ctx, hostedZoneId)
+		nsRecord, err := route53Client.GetHostedZoneNSRecords(ctx, logger, hostedZoneId)
 		if err != nil {
 			return errors.WithStack(err)
 		}

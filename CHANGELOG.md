@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Further avoidance for Route53 rate limiting
+
+  - Cache `ListResourceRecordSets` responses for NS record of a zone
+  - Only upsert DNS records if not recently done
+
 ## [0.14.2] - 2024-01-29
 
 ### Changed
