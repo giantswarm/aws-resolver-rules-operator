@@ -78,6 +78,9 @@ var _ = Describe("Dns Zone reconciler", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ClusterName,
 				Namespace: ClusterNamespace,
+				Finalizers: []string{
+					controllers.DnsFinalizer,
+				},
 			},
 			Spec: capa.AWSClusterSpec{
 				IdentityRef: &capa.AWSIdentityReference{

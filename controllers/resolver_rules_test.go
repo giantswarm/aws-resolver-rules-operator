@@ -76,6 +76,9 @@ var _ = Describe("Resolver rules reconciler", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ClusterName,
 				Namespace: "bar",
+				Finalizers: []string{
+					controllers.ResolverRulesFinalizer,
+				},
 			},
 			Spec: capa.AWSClusterSpec{
 				AdditionalTags: map[string]string{
@@ -463,7 +466,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 									resolverClient.GetResolverRuleByNameReturns(resolver.ResolverRule{}, errors.New("failed trying to fetch resolver rule"))
 								})
 
-								It("does not tries to delete the resolver rule", func() {
+								It("does not try to delete the resolver rule", func() {
 									Expect(reconcileErr).To(HaveOccurred())
 								})
 
@@ -477,7 +480,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 									resolverClient.GetResolverRuleByNameReturns(resolver.ResolverRule{}, &resolver.ResolverRuleNotFoundError{})
 								})
 
-								It("does not tries to delete the resolver rule", func() {
+								It("does not try to delete the resolver rule", func() {
 									Expect(dnsServerResolverClient.DisassociateResolverRuleWithContextCallCount()).To(BeZero())
 									Expect(resolverClient.DeleteResolverRuleCallCount()).To(BeZero())
 									Expect(reconcileErr).NotTo(HaveOccurred())

@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/cluster-api/util/conditions"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -150,6 +151,10 @@ func (r *ResolverRulesReconciler) reconcileNormal(ctx context.Context, awsCluste
 // reconcileDelete disassociates the Resolver Rules in the specified AWS account from the AWSCluster VPC, and deletes
 // the Resolver Rule created for the workload cluster k8s API endpoint.
 func (r *ResolverRulesReconciler) reconcileDelete(ctx context.Context, awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity) (ctrl.Result, error) {
+	if !controllerutil.ContainsFinalizer(awsCluster, ResolverRulesFinalizer) {
+		return ctrl.Result{}, nil
+	}
+
 	logger := log.FromContext(ctx)
 
 	cluster := buildClusterFromAWSCluster(awsCluster, identity, nil)
