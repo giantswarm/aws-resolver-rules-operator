@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix finding NS record of the DNS zone. This only happens in rare cases.
+
 ## [0.14.4] - 2024-01-31
 
 ### Changed
