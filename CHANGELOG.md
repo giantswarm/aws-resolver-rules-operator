@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.5] - 2024-02-07
+
 ### Fixed
 
 - Fix finding NS record of the DNS zone. This only happens in rare cases.
@@ -204,7 +206,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
 
-[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.14.4...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.14.5...HEAD
+[0.14.5]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.14.4...v0.14.5
 [0.14.4]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.14.3...v0.14.4
 [0.14.3]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.14.2...v0.14.3
 [0.14.2]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.14.1...v0.14.2
