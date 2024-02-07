@@ -193,8 +193,8 @@ func (r *Route53) DeleteHostedZone(ctx context.Context, logger logr.Logger, zone
 	return nil
 }
 
-func (r *Route53) GetHostedZoneNSRecords(ctx context.Context, logger logr.Logger, zoneId string) (*resolver.DNSRecord, error) {
-	logger = logger.WithValues("zoneId", zoneId)
+func (r *Route53) GetHostedZoneNSRecord(ctx context.Context, logger logr.Logger, zoneId string, zoneName string) (*resolver.DNSRecord, error) {
+	logger = logger.WithValues("zoneId", zoneId, "zoneName", zoneName)
 
 	var resourceRecordSet *route53.ResourceRecordSet
 
@@ -206,19 +206,25 @@ func (r *Route53) GetHostedZoneNSRecords(ctx context.Context, logger logr.Logger
 		logger.Info("Requesting NS record")
 
 		listResourceRecordSetsOutput, err := r.client.ListResourceRecordSetsWithContext(ctx, &route53.ListResourceRecordSetsInput{
-			HostedZoneId: awssdk.String(zoneId),
-			MaxItems:     awssdk.String("1"), // First entry is always NS record
+			HostedZoneId:    awssdk.String(zoneId),
+			MaxItems:        awssdk.String("1"),
+			StartRecordType: awssdk.String(route53.RRTypeNs),
+
+			// `StartRecordType` must be specified together with `StartRecordName`, so we specify the zone domain
+			StartRecordName: awssdk.String(zoneName),
 		})
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
 
-		// Ensure the above assumptions for request behavior hold
 		if len(listResourceRecordSetsOutput.ResourceRecordSets) != 1 {
-			return nil, errors.New("logic error - did not receive exactly one resource record")
+			return nil, errors.New("logic error - did not receive exactly one resource record set")
 		}
 		if *listResourceRecordSetsOutput.ResourceRecordSets[0].Type != route53.RRTypeNs {
-			return nil, errors.New("logic error - did not receive a resource record set of type NS")
+			return nil, errors.Errorf(
+				"logic error - did not receive a resource record set of type NS (got name %q and type %q)",
+				*listResourceRecordSetsOutput.ResourceRecordSets[0].Name,
+				*listResourceRecordSetsOutput.ResourceRecordSets[0].Type)
 		}
 		if len(listResourceRecordSetsOutput.ResourceRecordSets[0].ResourceRecords) == 0 {
 			return nil, errors.New("did not receive any NS resource record")

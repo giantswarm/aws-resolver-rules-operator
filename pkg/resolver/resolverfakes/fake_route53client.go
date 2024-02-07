@@ -108,18 +108,19 @@ type FakeRoute53Client struct {
 		result1 string
 		result2 error
 	}
-	GetHostedZoneNSRecordsStub        func(context.Context, logr.Logger, string) (*resolver.DNSRecord, error)
-	getHostedZoneNSRecordsMutex       sync.RWMutex
-	getHostedZoneNSRecordsArgsForCall []struct {
+	GetHostedZoneNSRecordStub        func(context.Context, logr.Logger, string, string) (*resolver.DNSRecord, error)
+	getHostedZoneNSRecordMutex       sync.RWMutex
+	getHostedZoneNSRecordArgsForCall []struct {
 		arg1 context.Context
 		arg2 logr.Logger
 		arg3 string
+		arg4 string
 	}
-	getHostedZoneNSRecordsReturns struct {
+	getHostedZoneNSRecordReturns struct {
 		result1 *resolver.DNSRecord
 		result2 error
 	}
-	getHostedZoneNSRecordsReturnsOnCall map[int]struct {
+	getHostedZoneNSRecordReturnsOnCall map[int]struct {
 		result1 *resolver.DNSRecord
 		result2 error
 	}
@@ -582,20 +583,21 @@ func (fake *FakeRoute53Client) GetHostedZoneIdByNameReturnsOnCall(i int, result1
 	}{result1, result2}
 }
 
-func (fake *FakeRoute53Client) GetHostedZoneNSRecords(arg1 context.Context, arg2 logr.Logger, arg3 string) (*resolver.DNSRecord, error) {
-	fake.getHostedZoneNSRecordsMutex.Lock()
-	ret, specificReturn := fake.getHostedZoneNSRecordsReturnsOnCall[len(fake.getHostedZoneNSRecordsArgsForCall)]
-	fake.getHostedZoneNSRecordsArgsForCall = append(fake.getHostedZoneNSRecordsArgsForCall, struct {
+func (fake *FakeRoute53Client) GetHostedZoneNSRecord(arg1 context.Context, arg2 logr.Logger, arg3 string, arg4 string) (*resolver.DNSRecord, error) {
+	fake.getHostedZoneNSRecordMutex.Lock()
+	ret, specificReturn := fake.getHostedZoneNSRecordReturnsOnCall[len(fake.getHostedZoneNSRecordArgsForCall)]
+	fake.getHostedZoneNSRecordArgsForCall = append(fake.getHostedZoneNSRecordArgsForCall, struct {
 		arg1 context.Context
 		arg2 logr.Logger
 		arg3 string
-	}{arg1, arg2, arg3})
-	stub := fake.GetHostedZoneNSRecordsStub
-	fakeReturns := fake.getHostedZoneNSRecordsReturns
-	fake.recordInvocation("GetHostedZoneNSRecords", []interface{}{arg1, arg2, arg3})
-	fake.getHostedZoneNSRecordsMutex.Unlock()
+		arg4 string
+	}{arg1, arg2, arg3, arg4})
+	stub := fake.GetHostedZoneNSRecordStub
+	fakeReturns := fake.getHostedZoneNSRecordReturns
+	fake.recordInvocation("GetHostedZoneNSRecord", []interface{}{arg1, arg2, arg3, arg4})
+	fake.getHostedZoneNSRecordMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3)
+		return stub(arg1, arg2, arg3, arg4)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -603,46 +605,46 @@ func (fake *FakeRoute53Client) GetHostedZoneNSRecords(arg1 context.Context, arg2
 	return fakeReturns.result1, fakeReturns.result2
 }
 
-func (fake *FakeRoute53Client) GetHostedZoneNSRecordsCallCount() int {
-	fake.getHostedZoneNSRecordsMutex.RLock()
-	defer fake.getHostedZoneNSRecordsMutex.RUnlock()
-	return len(fake.getHostedZoneNSRecordsArgsForCall)
+func (fake *FakeRoute53Client) GetHostedZoneNSRecordCallCount() int {
+	fake.getHostedZoneNSRecordMutex.RLock()
+	defer fake.getHostedZoneNSRecordMutex.RUnlock()
+	return len(fake.getHostedZoneNSRecordArgsForCall)
 }
 
-func (fake *FakeRoute53Client) GetHostedZoneNSRecordsCalls(stub func(context.Context, logr.Logger, string) (*resolver.DNSRecord, error)) {
-	fake.getHostedZoneNSRecordsMutex.Lock()
-	defer fake.getHostedZoneNSRecordsMutex.Unlock()
-	fake.GetHostedZoneNSRecordsStub = stub
+func (fake *FakeRoute53Client) GetHostedZoneNSRecordCalls(stub func(context.Context, logr.Logger, string, string) (*resolver.DNSRecord, error)) {
+	fake.getHostedZoneNSRecordMutex.Lock()
+	defer fake.getHostedZoneNSRecordMutex.Unlock()
+	fake.GetHostedZoneNSRecordStub = stub
 }
 
-func (fake *FakeRoute53Client) GetHostedZoneNSRecordsArgsForCall(i int) (context.Context, logr.Logger, string) {
-	fake.getHostedZoneNSRecordsMutex.RLock()
-	defer fake.getHostedZoneNSRecordsMutex.RUnlock()
-	argsForCall := fake.getHostedZoneNSRecordsArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+func (fake *FakeRoute53Client) GetHostedZoneNSRecordArgsForCall(i int) (context.Context, logr.Logger, string, string) {
+	fake.getHostedZoneNSRecordMutex.RLock()
+	defer fake.getHostedZoneNSRecordMutex.RUnlock()
+	argsForCall := fake.getHostedZoneNSRecordArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
 }
 
-func (fake *FakeRoute53Client) GetHostedZoneNSRecordsReturns(result1 *resolver.DNSRecord, result2 error) {
-	fake.getHostedZoneNSRecordsMutex.Lock()
-	defer fake.getHostedZoneNSRecordsMutex.Unlock()
-	fake.GetHostedZoneNSRecordsStub = nil
-	fake.getHostedZoneNSRecordsReturns = struct {
+func (fake *FakeRoute53Client) GetHostedZoneNSRecordReturns(result1 *resolver.DNSRecord, result2 error) {
+	fake.getHostedZoneNSRecordMutex.Lock()
+	defer fake.getHostedZoneNSRecordMutex.Unlock()
+	fake.GetHostedZoneNSRecordStub = nil
+	fake.getHostedZoneNSRecordReturns = struct {
 		result1 *resolver.DNSRecord
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeRoute53Client) GetHostedZoneNSRecordsReturnsOnCall(i int, result1 *resolver.DNSRecord, result2 error) {
-	fake.getHostedZoneNSRecordsMutex.Lock()
-	defer fake.getHostedZoneNSRecordsMutex.Unlock()
-	fake.GetHostedZoneNSRecordsStub = nil
-	if fake.getHostedZoneNSRecordsReturnsOnCall == nil {
-		fake.getHostedZoneNSRecordsReturnsOnCall = make(map[int]struct {
+func (fake *FakeRoute53Client) GetHostedZoneNSRecordReturnsOnCall(i int, result1 *resolver.DNSRecord, result2 error) {
+	fake.getHostedZoneNSRecordMutex.Lock()
+	defer fake.getHostedZoneNSRecordMutex.Unlock()
+	fake.GetHostedZoneNSRecordStub = nil
+	if fake.getHostedZoneNSRecordReturnsOnCall == nil {
+		fake.getHostedZoneNSRecordReturnsOnCall = make(map[int]struct {
 			result1 *resolver.DNSRecord
 			result2 error
 		})
 	}
-	fake.getHostedZoneNSRecordsReturnsOnCall[i] = struct {
+	fake.getHostedZoneNSRecordReturnsOnCall[i] = struct {
 		result1 *resolver.DNSRecord
 		result2 error
 	}{result1, result2}
@@ -665,8 +667,8 @@ func (fake *FakeRoute53Client) Invocations() map[string][][]interface{} {
 	defer fake.deleteHostedZoneMutex.RUnlock()
 	fake.getHostedZoneIdByNameMutex.RLock()
 	defer fake.getHostedZoneIdByNameMutex.RUnlock()
-	fake.getHostedZoneNSRecordsMutex.RLock()
-	defer fake.getHostedZoneNSRecordsMutex.RUnlock()
+	fake.getHostedZoneNSRecordMutex.RLock()
+	defer fake.getHostedZoneNSRecordMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value
