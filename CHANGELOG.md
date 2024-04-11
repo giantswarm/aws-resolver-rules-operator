@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Add toleration for `node.cluster.x-k8s.io/uninitialized` taint.
+- Add node affinity to prefer scheduling CAPI pods to control-plane nodes.
+
 ## [0.14.5] - 2024-02-07
 
 ### Fixed
