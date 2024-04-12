@@ -27,7 +27,7 @@ spec:
               matchExpressions:
               - key: node-role.kubernetes.io/control-plane
                 operator: Exists
-            weight: 10    
+            weight: 10
       serviceAccountName: {{ include "resource.default.name"  . }}
       securityContext:
         runAsUser: {{ .Values.pod.user.id }}
