@@ -15,7 +15,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	k8stypes "k8s.io/apimachinery/pkg/types"
-	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
+	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -304,7 +304,7 @@ var _ = Describe("TransitGatewayAttachment", func() {
 			})
 
 			It("returns an error", func() {
-				Expect(reconcileErr).To(MatchError(ContainSubstring("support for newer CAPA versions' ResourceID field not implemented yet")))
+				Expect(reconcileErr).To(MatchError(ContainSubstring("invalid subnet ID 12346")))
 				Expect(transitGatewayClient.ApplyAttachmentCallCount()).To(Equal(0))
 			})
 		})
