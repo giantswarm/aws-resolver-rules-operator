@@ -3,6 +3,6 @@ name: aws-resolver-rules-operator
 description: Operator for reconciling the Route53 hosted zone and basic records for a cluster, and resolver rules for private clusters.
 home: https://github.com/giantswarm/aws-resolver-rules-operator
 icon: https://s.giantswarm.io/app-icons/aws/2/dark.svg
-version: "0.14.5"
+version: "0.14.6"
 annotations:
   application.giantswarm.io/team: "phoenix"
