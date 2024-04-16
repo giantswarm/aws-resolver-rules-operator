@@ -24,6 +24,8 @@ require (
 	sigs.k8s.io/controller-runtime v0.13.0
 )
 
+replace google.golang.org/protobuf v1.31.0 => google.golang.org/protobuf v1.33.0
+
 require (
 	cloud.google.com/go/compute v1.23.0 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
