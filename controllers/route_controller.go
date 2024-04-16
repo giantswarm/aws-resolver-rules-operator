@@ -30,10 +30,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	gsannotation "github.com/giantswarm/k8smetadata/pkg/annotation"
+
 	"github.com/aws-resolver-rules-operator/pkg/aws"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 	"github.com/aws-resolver-rules-operator/pkg/util/annotations"
-	gsannotation "github.com/giantswarm/k8smetadata/pkg/annotation"
 )
 
 const (
@@ -123,7 +124,7 @@ func (r *RouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	subnets := []string{}
 	for _, s := range awsCluster.Spec.NetworkSpec.Subnets {
-		temp := s.ID
+		temp := s.ResourceID
 		subnets = append(subnets, temp)
 	}
 

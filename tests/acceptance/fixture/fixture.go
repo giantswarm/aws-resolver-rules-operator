@@ -222,9 +222,10 @@ func (f *Fixture) createCluster(network Network) Cluster {
 				},
 				Subnets: []capa.SubnetSpec{
 					{
-						CidrBlock: ClusterSubnetCIDR,
-						ID:        network.SubnetID,
-						IsPublic:  false,
+						ID:         "subnet-1",
+						CidrBlock:  ClusterSubnetCIDR,
+						ResourceID: network.SubnetID,
+						IsPublic:   false,
 					},
 				},
 			},

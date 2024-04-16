@@ -144,8 +144,9 @@ func newCluster(name string, annotationsKeyValues ...string) *capa.AWSCluster {
 				},
 				Subnets: capa.Subnets{
 					{
-						ID:       "sub-1",
-						IsPublic: false,
+						ID:         "sub-1",
+						ResourceID: "subnet-1",
+						IsPublic:   false,
 					},
 				},
 			},

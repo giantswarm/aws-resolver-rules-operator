@@ -200,6 +200,7 @@ func getSubnets(cluster *capa.AWSCluster) ([]string, error) {
 	subnetIDs := []string{}
 	availabilityZones := map[string]bool{}
 	for _, s := range subnets {
+
 		if s.ResourceID == "" {
 			return nil, fmt.Errorf("not all subnets have been created")
 		}

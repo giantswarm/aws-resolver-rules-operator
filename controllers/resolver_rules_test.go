@@ -91,11 +91,13 @@ var _ = Describe("Resolver rules reconciler", func() {
 					},
 					Subnets: []capa.SubnetSpec{
 						{
-							ID:   "subnet-1",
-							Tags: map[string]string{"subnet.giantswarm.io/endpoints": "true"},
+							ID:         "subnet-1",
+							ResourceID: "subnet-1",
+							Tags:       map[string]string{"subnet.giantswarm.io/endpoints": "true"},
 						},
 						{
-							ID: "subnet-2",
+							ID:         "subnet-2",
+							ResourceID: "subnet-2",
 						},
 					},
 				},

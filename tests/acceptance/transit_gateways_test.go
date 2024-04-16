@@ -102,7 +102,7 @@ var _ = Describe("Transit Gateways", func() {
 		getRouteTables := func() []*ec2.RouteTable {
 			subnets := []*string{}
 			for _, s := range managementAWSCluster.Spec.NetworkSpec.Subnets {
-				subnets = append(subnets, awssdk.String(s.ID))
+				subnets = append(subnets, awssdk.String(s.ResourceID))
 			}
 
 			routeTablesOutput, err := testFixture.EC2Client.DescribeRouteTables(&ec2.DescribeRouteTablesInput{

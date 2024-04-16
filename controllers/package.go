@@ -80,7 +80,7 @@ func getSubnetIds(subnets capa.Subnets) []string {
 	var subnetIds []string
 	for _, subnet := range subnets {
 		if _, ok := subnet.Tags["subnet.giantswarm.io/endpoints"]; ok {
-			subnetIds = append(subnetIds, subnet.ID)
+			subnetIds = append(subnetIds, subnet.ResourceID)
 		}
 	}
 
