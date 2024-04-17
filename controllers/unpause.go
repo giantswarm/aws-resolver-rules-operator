@@ -21,7 +21,7 @@ import (
 
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
 	"github.com/pkg/errors"
-	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
+	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	ctrl "sigs.k8s.io/controller-runtime"

@@ -10,7 +10,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gstruct"
-	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
+	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	gsannotation "github.com/giantswarm/k8smetadata/pkg/annotation"
@@ -102,7 +102,7 @@ var _ = Describe("Transit Gateways", func() {
 		getRouteTables := func() []*ec2.RouteTable {
 			subnets := []*string{}
 			for _, s := range managementAWSCluster.Spec.NetworkSpec.Subnets {
-				subnets = append(subnets, awssdk.String(s.ID))
+				subnets = append(subnets, awssdk.String(s.ResourceID))
 			}
 
 			routeTablesOutput, err := testFixture.EC2Client.DescribeRouteTables(&ec2.DescribeRouteTablesInput{

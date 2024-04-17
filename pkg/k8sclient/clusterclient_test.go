@@ -11,8 +11,8 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
-	eks "sigs.k8s.io/cluster-api-provider-aws/controlplane/eks/api/v1beta1"
+	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
+	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 
 	"github.com/aws-resolver-rules-operator/controllers"
