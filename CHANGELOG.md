@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.6] - 2024-04-16
+
 ### Changed
 
 - Add toleration for `node.cluster.x-k8s.io/uninitialized` taint.
@@ -213,7 +215,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
 
-[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.14.5...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.14.6...HEAD
+[0.14.6]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.14.5...v0.14.6
 [0.14.5]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.14.4...v0.14.5
 [0.14.4]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.14.3...v0.14.4
 [0.14.3]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.14.2...v0.14.3
