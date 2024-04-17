@@ -9,14 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.15.0] - 2024-04-17
 
+### Changed
+- Update capa to v2.3.0.
+- Use ResourceID instead of ID for CAPA Subnets.
+
 ## [0.14.6] - 2024-04-16
 
 ### Changed
 
 - Add toleration for `node.cluster.x-k8s.io/uninitialized` taint.
 - Add node affinity to prefer scheduling CAPI pods to control-plane nodes.
-- Update capa to v2.3.0.
-- Use ResourceID instead of ID for CAPA Subnets.
 
 ## [0.14.5] - 2024-02-07
 
