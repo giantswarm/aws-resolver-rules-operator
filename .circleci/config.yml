@@ -52,17 +52,30 @@ workflows:
             tags:
               only: /^v.*/
 
+      - hold:
+          type: approval
+          requires:
+            - unit-tests
+
       - integration-tests:
+          context: architect
+          requires:
+            - hold
           filters:
             tags:
               only: /^v.*/
 
       - acceptance-tests:
+          context: architect
+          requires:
+            - hold
           filters:
             tags:
               only: /^v.*/
 
       - architect/go-build:
+          requires:
+            - hold
           context: architect
           name: go-build
           binary: aws-resolver-rules-operator

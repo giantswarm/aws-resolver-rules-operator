@@ -1,6 +1,7 @@
 package fixture
 
 import (
+	"context"
 	"fmt"
 
 	awssdk "github.com/aws/aws-sdk-go/aws"
@@ -13,6 +14,62 @@ const (
 	ManagementClusterCIDR = "172.64.0.0"
 	WorkloadClusterCIDR   = "172.96.0.0"
 )
+
+func DetachTransitGateway(ec2Client *ec2.EC2, gatewayID, vpcID string) error {
+	if gatewayID == "" || vpcID == "" {
+		return nil
+	}
+
+	describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
+		Filters: []*ec2.Filter{
+			{
+				Name:   awssdk.String("transit-gateway-id"),
+				Values: awssdk.StringSlice([]string{gatewayID}),
+			},
+			{
+				Name:   awssdk.String("vpc-id"),
+				Values: awssdk.StringSlice([]string{vpcID}),
+			},
+		},
+	}
+	attachments, err := ec2Client.DescribeTransitGatewayVpcAttachments(describeTGWattachmentInput)
+	if err != nil {
+		return err
+	}
+
+	for _, attachment := range attachments.TransitGatewayVpcAttachments {
+		_, err = ec2Client.DeleteTransitGatewayVpcAttachmentWithContext(context.Background(), &ec2.DeleteTransitGatewayVpcAttachmentInput{
+			TransitGatewayAttachmentId: attachment.TransitGatewayAttachmentId,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func DeleteTransitGateway(ec2Client *ec2.EC2, gatewayID string) error {
+	if gatewayID == "" {
+		return nil
+	}
+
+	_, err := ec2Client.DeleteTransitGateway(&ec2.DeleteTransitGatewayInput{
+		TransitGatewayId: awssdk.String(gatewayID),
+	})
+	return err
+}
+
+func DeletePrefixList(ec2Client *ec2.EC2, prefixListID string) error {
+	if prefixListID == "" {
+		return nil
+	}
+
+	_, err := ec2Client.DeleteManagedPrefixList(&ec2.DeleteManagedPrefixListInput{
+		PrefixListId: awssdk.String(prefixListID),
+	})
+	return err
+}
 
 func DisassociateRouteTable(ec2Client *ec2.EC2, associationID string) error {
 	if associationID == "" {
