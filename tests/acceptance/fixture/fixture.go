@@ -3,29 +3,39 @@ package fixture
 import (
 	"context"
 	"fmt"
+	"time"
 
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ram"
+	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
+	"k8s.io/apimachinery/pkg/types"
+	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
 
 	"github.com/aws-resolver-rules-operator/controllers"
+	"github.com/aws-resolver-rules-operator/pkg/aws"
+	"github.com/aws-resolver-rules-operator/pkg/util/annotations"
 )
 
 const (
 	ClusterVCPCIDR    = "172.64.0.0/16"
 	ClusterSubnetCIDR = "172.64.0.0/20"
 )
+
+type Data struct {
+	Config  Config  `json:"config"`
+	Network Network `json:"network"`
+}
 
 func NewFixture(k8sClient client.Client, config Config) *Fixture {
 	session, err := session.NewSession(&awssdk.Config{
@@ -52,11 +62,12 @@ func NewFixture(k8sClient client.Client, config Config) *Fixture {
 	}
 }
 
-type Network struct {
-	AssociationID string
-	RouteTableID  string
-	SubnetID      string
-	VpcID         string
+func LoadFixture(k8sClient client.Client, data Data) *Fixture {
+	f := NewFixture(k8sClient, data.Config)
+	f.Network = data.Network
+	f.ManagementCluster = f.loadCluster(data.Network)
+
+	return f
 }
 
 type Cluster struct {
@@ -65,12 +76,19 @@ type Cluster struct {
 	ClusterRoleIdentity *capa.AWSClusterRoleIdentity
 }
 
+type Network struct {
+	AssociationID string `json:"associationID"`
+	RouteTableID  string `json:"routeTableID"`
+	SubnetID      string `json:"subnetID"`
+	VpcID         string `json:"vpcID"`
+}
+
 type Config struct {
-	AWSAccount                 string
-	AWSIAMRoleARN              string
-	AWSRegion                  string
-	ManagementClusterName      string
-	ManagementClusterNamespace string
+	AWSAccount                 string `json:"awsAccount"`
+	AWSIAMRoleARN              string `json:"awsIAMRoleARN"`
+	AWSRegion                  string `json:"awsRegion"`
+	ManagementClusterName      string `json:"managementClusterName"`
+	ManagementClusterNamespace string `json:"managementClusterNamespace"`
 }
 
 type Fixture struct {
@@ -78,10 +96,10 @@ type Fixture struct {
 	EC2Client *ec2.EC2
 	RamClient *ram.RAM
 
-	Network           Network
 	ManagementCluster Cluster
 
-	config Config
+	Network Network
+	config  Config
 }
 
 func (f *Fixture) Setup() error {
@@ -92,20 +110,34 @@ func (f *Fixture) Setup() error {
 }
 
 func (f *Fixture) Teardown() error {
-	f.deleteCluster()
-
-	err := DeleteKubernetesObject(f.K8sClient, f.ManagementCluster.AWSCluster)
+	actualCluster := &capa.AWSCluster{}
+	err := f.K8sClient.Get(context.Background(), client.ObjectKeyFromObject(f.ManagementCluster.Cluster), actualCluster)
 	Expect(err).NotTo(HaveOccurred())
 
-	Eventually(func() error {
-		return f.K8sClient.Get(context.Background(),
-			client.ObjectKeyFromObject(f.ManagementCluster.AWSCluster),
-			&capa.AWSCluster{},
-		)
-	}).ShouldNot(Succeed())
+	err = f.deleteCluster()
+	if err != nil {
+		defer ginkgo.Fail(fmt.Sprintf("failed to delete cluster: %v", err))
+	}
 
 	err = DeleteKubernetesObject(f.K8sClient, f.ManagementCluster.ClusterRoleIdentity)
 	Expect(err).NotTo(HaveOccurred())
+
+	transitGatewayAnnotation := annotations.GetNetworkTopologyTransitGateway(actualCluster)
+	prefixListAnnotation := annotations.GetNetworkTopologyPrefixList(actualCluster)
+
+	gatewayID := getARNID(transitGatewayAnnotation)
+	prefixListID := getARNID(prefixListAnnotation)
+
+	err = DeletePrefixList(f.EC2Client, prefixListID)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = DetachTransitGateway(f.EC2Client, gatewayID, f.Network.VpcID)
+	Expect(err).NotTo(HaveOccurred())
+
+	Eventually(func() error {
+		err := DeleteTransitGateway(f.EC2Client, gatewayID)
+		return err
+	}).Should(Succeed())
 
 	err = DisassociateRouteTable(f.EC2Client, f.Network.AssociationID)
 	Expect(err).NotTo(HaveOccurred())
@@ -186,13 +218,13 @@ func (f *Fixture) createCluster(network Network) Cluster {
 	cluster := &capi.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      f.config.ManagementClusterName,
-			Namespace: "test",
+			Namespace: f.config.ManagementClusterNamespace,
 		},
 		Spec: capi.ClusterSpec{
 			InfrastructureRef: &corev1.ObjectReference{
 				APIVersion: capa.GroupVersion.String(),
 				Kind:       "AWSCluster",
-				Namespace:  "test",
+				Namespace:  f.config.ManagementClusterNamespace,
 				Name:       f.config.ManagementClusterName,
 			},
 		},
@@ -204,7 +236,7 @@ func (f *Fixture) createCluster(network Network) Cluster {
 	awsCluster := &capa.AWSCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      f.config.ManagementClusterName,
-			Namespace: "test",
+			Namespace: f.config.ManagementClusterNamespace,
 			Annotations: map[string]string{
 				gsannotations.NetworkTopologyModeAnnotation: gsannotations.NetworkTopologyModeGiantSwarmManaged,
 			},
@@ -222,9 +254,10 @@ func (f *Fixture) createCluster(network Network) Cluster {
 				},
 				Subnets: []capa.SubnetSpec{
 					{
-						CidrBlock: ClusterSubnetCIDR,
-						ID:        network.SubnetID,
-						IsPublic:  false,
+						ID:         "subnet-1",
+						CidrBlock:  ClusterSubnetCIDR,
+						ResourceID: network.SubnetID,
+						IsPublic:   false,
 					},
 				},
 			},
@@ -241,22 +274,66 @@ func (f *Fixture) createCluster(network Network) Cluster {
 	}
 }
 
-func (f *Fixture) deleteCluster() {
-	cluster := f.ManagementCluster.Cluster
-	err := DeleteKubernetesObject(f.K8sClient, cluster)
+func (f *Fixture) loadCluster(network Network) Cluster {
+	ctx := context.Background()
+
+	clusterRoleIdentity := &capa.AWSClusterRoleIdentity{}
+	err := f.K8sClient.Get(ctx, types.NamespacedName{
+		Name: f.config.ManagementClusterName,
+	}, clusterRoleIdentity)
 	Expect(err).NotTo(HaveOccurred())
 
-	if cluster == nil {
-		return
+	cluster := &capi.Cluster{}
+	err = f.K8sClient.Get(ctx, types.NamespacedName{
+		Name:      f.config.ManagementClusterName,
+		Namespace: f.config.ManagementClusterNamespace,
+	}, cluster)
+	Expect(err).NotTo(HaveOccurred())
+
+	awsCluster := &capa.AWSCluster{}
+	err = f.K8sClient.Get(ctx, types.NamespacedName{
+		Name:      f.config.ManagementClusterName,
+		Namespace: f.config.ManagementClusterNamespace,
+	}, awsCluster)
+	Expect(err).NotTo(HaveOccurred())
+
+	return Cluster{
+		Cluster:             cluster,
+		AWSCluster:          awsCluster,
+		ClusterRoleIdentity: clusterRoleIdentity,
 	}
-	Eventually(func() []string {
-		actualCluster := &capi.Cluster{}
-		err := f.K8sClient.Get(context.Background(), client.ObjectKeyFromObject(cluster), actualCluster)
-		if k8serrors.IsNotFound(err) {
-			return []string{}
+}
+
+func (f *Fixture) deleteCluster() error {
+	err := DeleteKubernetesObject(f.K8sClient, f.ManagementCluster.Cluster)
+	Expect(err).NotTo(HaveOccurred())
+
+	awsCluster := f.ManagementCluster.AWSCluster
+	err = DeleteKubernetesObject(f.K8sClient, awsCluster)
+	Expect(err).NotTo(HaveOccurred())
+
+	if awsCluster == nil {
+		return nil
+	}
+
+	timeout := time.After(3 * time.Minute)
+	tick := time.NewTicker(5 * time.Second)
+
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("timeout waiting for cluster deletion")
+		case <-tick.C:
+			actualCluster := &capi.Cluster{}
+			err := f.K8sClient.Get(context.Background(), client.ObjectKeyFromObject(awsCluster), actualCluster)
+			if k8serrors.IsNotFound(err) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
 		}
-		return actualCluster.Finalizers
-	}).ShouldNot(ContainElement(controllers.FinalizerManagementCluster))
+	}
 }
 
 func getAvailabilityZone(region string) string {
@@ -281,4 +358,14 @@ func generateTagSpecifications(name string) []*ec2.TagSpecification {
 	tagSpecifications := make([]*ec2.TagSpecification, 0)
 	tagSpecifications = append(tagSpecifications, tagSpec)
 	return tagSpecifications
+}
+
+func getARNID(arn string) string {
+	if arn == "" {
+		return ""
+	}
+
+	resourceID, err := aws.GetARNResourceID(arn)
+	Expect(err).NotTo(HaveOccurred())
+	return resourceID
 }

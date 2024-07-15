@@ -7,7 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
-	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
+	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 	capiconditions "sigs.k8s.io/cluster-api/util/conditions"

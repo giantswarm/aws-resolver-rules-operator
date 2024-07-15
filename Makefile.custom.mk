@@ -7,8 +7,13 @@ IMAGE_REPO = $(word 1,$(subst :, ,$(IMG)))
 IMAGE_TAG = $(word 2,$(subst :, ,$(IMG)))
 
 CLUSTER ?= acceptance
-MANAGEMENT_CLUSTER_NAME ?= test-mc
-MANAGEMENT_CLUSTER_NAMESPACE ?= test
+
+# Basically black magic. This will generate the a new name exactly once. If you
+# don't do the eval and subsequent variable expansion, a new name will be
+# generated every time you reference it.
+# Look up "Deferred Simple Variable Expansion" for more info.
+MANAGEMENT_CLUSTER_NAME ?= $(eval MANAGEMENT_CLUSTER_NAME := $$(shell tr -dc a-z0-9 </dev/urandom | head -c 16; echo))$(MANAGEMENT_CLUSTER_NAME)
+MANAGEMENT_CLUSTER_NAMESPACE ?= $(eval MANAGEMENT_CLUSTER_NAMESPACE := $$(shell tr -dc a-z0-9 </dev/urandom | head -c 16; echo))$(MANAGEMENT_CLUSTER_NAMESPACE)
 
 DOCKER_COMPOSE = bin/docker-compose
 
@@ -59,7 +64,7 @@ run-acceptance-tests:
 	KUBECONFIG="$(KUBECONFIG)" \
 	MANAGEMENT_CLUSTER_NAME="$(MANAGEMENT_CLUSTER_NAME)" \
 	MANAGEMENT_CLUSTER_NAMESPACE="$(MANAGEMENT_CLUSTER_NAMESPACE)" \
-	$(GINKGO) -r -randomize-all --randomize-suites tests/acceptance
+	$(GINKGO) -p --nodes 4 -r -randomize-all --randomize-suites tests/acceptance
 
 .PHONY: test-acceptance
 test-acceptance: KUBECONFIG=$(HOME)/.kube/$(CLUSTER).yml
