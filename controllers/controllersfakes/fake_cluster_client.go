@@ -8,8 +8,8 @@ import (
 	"github.com/aws-resolver-rules-operator/controllers"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
-	"sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta1"
-	v1beta1a "sigs.k8s.io/cluster-api/api/v1beta1"
+	v1beta2a "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
+	"sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 type FakeClusterClient struct {
@@ -26,11 +26,11 @@ type FakeClusterClient struct {
 	addAWSClusterFinalizerReturnsOnCall map[int]struct {
 		result1 error
 	}
-	AddAWSManagedControlPlaneFinalizerStub        func(context.Context, *v1beta1.AWSManagedControlPlane, string) error
+	AddAWSManagedControlPlaneFinalizerStub        func(context.Context, *v1beta2a.AWSManagedControlPlane, string) error
 	addAWSManagedControlPlaneFinalizerMutex       sync.RWMutex
 	addAWSManagedControlPlaneFinalizerArgsForCall []struct {
 		arg1 context.Context
-		arg2 *v1beta1.AWSManagedControlPlane
+		arg2 *v1beta2a.AWSManagedControlPlane
 		arg3 string
 	}
 	addAWSManagedControlPlaneFinalizerReturns struct {
@@ -39,11 +39,11 @@ type FakeClusterClient struct {
 	addAWSManagedControlPlaneFinalizerReturnsOnCall map[int]struct {
 		result1 error
 	}
-	AddClusterFinalizerStub        func(context.Context, *v1beta1a.Cluster, string) error
+	AddClusterFinalizerStub        func(context.Context, *v1beta1.Cluster, string) error
 	addClusterFinalizerMutex       sync.RWMutex
 	addClusterFinalizerArgsForCall []struct {
 		arg1 context.Context
-		arg2 *v1beta1a.Cluster
+		arg2 *v1beta1.Cluster
 		arg3 string
 	}
 	addClusterFinalizerReturns struct {
@@ -66,32 +66,32 @@ type FakeClusterClient struct {
 		result1 *v1beta2.AWSCluster
 		result2 error
 	}
-	GetAWSManagedControlPlaneStub        func(context.Context, types.NamespacedName) (*v1beta1.AWSManagedControlPlane, error)
+	GetAWSManagedControlPlaneStub        func(context.Context, types.NamespacedName) (*v1beta2a.AWSManagedControlPlane, error)
 	getAWSManagedControlPlaneMutex       sync.RWMutex
 	getAWSManagedControlPlaneArgsForCall []struct {
 		arg1 context.Context
 		arg2 types.NamespacedName
 	}
 	getAWSManagedControlPlaneReturns struct {
-		result1 *v1beta1.AWSManagedControlPlane
+		result1 *v1beta2a.AWSManagedControlPlane
 		result2 error
 	}
 	getAWSManagedControlPlaneReturnsOnCall map[int]struct {
-		result1 *v1beta1.AWSManagedControlPlane
+		result1 *v1beta2a.AWSManagedControlPlane
 		result2 error
 	}
-	GetClusterStub        func(context.Context, types.NamespacedName) (*v1beta1a.Cluster, error)
+	GetClusterStub        func(context.Context, types.NamespacedName) (*v1beta1.Cluster, error)
 	getClusterMutex       sync.RWMutex
 	getClusterArgsForCall []struct {
 		arg1 context.Context
 		arg2 types.NamespacedName
 	}
 	getClusterReturns struct {
-		result1 *v1beta1a.Cluster
+		result1 *v1beta1.Cluster
 		result2 error
 	}
 	getClusterReturnsOnCall map[int]struct {
-		result1 *v1beta1a.Cluster
+		result1 *v1beta1.Cluster
 		result2 error
 	}
 	GetIdentityStub        func(context.Context, *v1beta2.AWSIdentityReference) (*v1beta2.AWSClusterRoleIdentity, error)
@@ -108,12 +108,12 @@ type FakeClusterClient struct {
 		result1 *v1beta2.AWSClusterRoleIdentity
 		result2 error
 	}
-	MarkConditionTrueStub        func(context.Context, *v1beta1a.Cluster, v1beta1a.ConditionType) error
+	MarkConditionTrueStub        func(context.Context, *v1beta1.Cluster, v1beta1.ConditionType) error
 	markConditionTrueMutex       sync.RWMutex
 	markConditionTrueArgsForCall []struct {
 		arg1 context.Context
-		arg2 *v1beta1a.Cluster
-		arg3 v1beta1a.ConditionType
+		arg2 *v1beta1.Cluster
+		arg3 v1beta1.ConditionType
 	}
 	markConditionTrueReturns struct {
 		result1 error
@@ -134,11 +134,11 @@ type FakeClusterClient struct {
 	removeAWSClusterFinalizerReturnsOnCall map[int]struct {
 		result1 error
 	}
-	RemoveAWSManagedControlPlaneFinalizerStub        func(context.Context, *v1beta1.AWSManagedControlPlane, string) error
+	RemoveAWSManagedControlPlaneFinalizerStub        func(context.Context, *v1beta2a.AWSManagedControlPlane, string) error
 	removeAWSManagedControlPlaneFinalizerMutex       sync.RWMutex
 	removeAWSManagedControlPlaneFinalizerArgsForCall []struct {
 		arg1 context.Context
-		arg2 *v1beta1.AWSManagedControlPlane
+		arg2 *v1beta2a.AWSManagedControlPlane
 		arg3 string
 	}
 	removeAWSManagedControlPlaneFinalizerReturns struct {
@@ -147,11 +147,11 @@ type FakeClusterClient struct {
 	removeAWSManagedControlPlaneFinalizerReturnsOnCall map[int]struct {
 		result1 error
 	}
-	RemoveClusterFinalizerStub        func(context.Context, *v1beta1a.Cluster, string) error
+	RemoveClusterFinalizerStub        func(context.Context, *v1beta1.Cluster, string) error
 	removeClusterFinalizerMutex       sync.RWMutex
 	removeClusterFinalizerArgsForCall []struct {
 		arg1 context.Context
-		arg2 *v1beta1a.Cluster
+		arg2 *v1beta1.Cluster
 		arg3 string
 	}
 	removeClusterFinalizerReturns struct {
@@ -160,12 +160,12 @@ type FakeClusterClient struct {
 	removeClusterFinalizerReturnsOnCall map[int]struct {
 		result1 error
 	}
-	UnpauseStub        func(context.Context, *v1beta2.AWSCluster, *v1beta1a.Cluster) error
+	UnpauseStub        func(context.Context, *v1beta2.AWSCluster, *v1beta1.Cluster) error
 	unpauseMutex       sync.RWMutex
 	unpauseArgsForCall []struct {
 		arg1 context.Context
 		arg2 *v1beta2.AWSCluster
-		arg3 *v1beta1a.Cluster
+		arg3 *v1beta1.Cluster
 	}
 	unpauseReturns struct {
 		result1 error
@@ -240,12 +240,12 @@ func (fake *FakeClusterClient) AddAWSClusterFinalizerReturnsOnCall(i int, result
 	}{result1}
 }
 
-func (fake *FakeClusterClient) AddAWSManagedControlPlaneFinalizer(arg1 context.Context, arg2 *v1beta1.AWSManagedControlPlane, arg3 string) error {
+func (fake *FakeClusterClient) AddAWSManagedControlPlaneFinalizer(arg1 context.Context, arg2 *v1beta2a.AWSManagedControlPlane, arg3 string) error {
 	fake.addAWSManagedControlPlaneFinalizerMutex.Lock()
 	ret, specificReturn := fake.addAWSManagedControlPlaneFinalizerReturnsOnCall[len(fake.addAWSManagedControlPlaneFinalizerArgsForCall)]
 	fake.addAWSManagedControlPlaneFinalizerArgsForCall = append(fake.addAWSManagedControlPlaneFinalizerArgsForCall, struct {
 		arg1 context.Context
-		arg2 *v1beta1.AWSManagedControlPlane
+		arg2 *v1beta2a.AWSManagedControlPlane
 		arg3 string
 	}{arg1, arg2, arg3})
 	stub := fake.AddAWSManagedControlPlaneFinalizerStub
@@ -267,13 +267,13 @@ func (fake *FakeClusterClient) AddAWSManagedControlPlaneFinalizerCallCount() int
 	return len(fake.addAWSManagedControlPlaneFinalizerArgsForCall)
 }
 
-func (fake *FakeClusterClient) AddAWSManagedControlPlaneFinalizerCalls(stub func(context.Context, *v1beta1.AWSManagedControlPlane, string) error) {
+func (fake *FakeClusterClient) AddAWSManagedControlPlaneFinalizerCalls(stub func(context.Context, *v1beta2a.AWSManagedControlPlane, string) error) {
 	fake.addAWSManagedControlPlaneFinalizerMutex.Lock()
 	defer fake.addAWSManagedControlPlaneFinalizerMutex.Unlock()
 	fake.AddAWSManagedControlPlaneFinalizerStub = stub
 }
 
-func (fake *FakeClusterClient) AddAWSManagedControlPlaneFinalizerArgsForCall(i int) (context.Context, *v1beta1.AWSManagedControlPlane, string) {
+func (fake *FakeClusterClient) AddAWSManagedControlPlaneFinalizerArgsForCall(i int) (context.Context, *v1beta2a.AWSManagedControlPlane, string) {
 	fake.addAWSManagedControlPlaneFinalizerMutex.RLock()
 	defer fake.addAWSManagedControlPlaneFinalizerMutex.RUnlock()
 	argsForCall := fake.addAWSManagedControlPlaneFinalizerArgsForCall[i]
@@ -303,12 +303,12 @@ func (fake *FakeClusterClient) AddAWSManagedControlPlaneFinalizerReturnsOnCall(i
 	}{result1}
 }
 
-func (fake *FakeClusterClient) AddClusterFinalizer(arg1 context.Context, arg2 *v1beta1a.Cluster, arg3 string) error {
+func (fake *FakeClusterClient) AddClusterFinalizer(arg1 context.Context, arg2 *v1beta1.Cluster, arg3 string) error {
 	fake.addClusterFinalizerMutex.Lock()
 	ret, specificReturn := fake.addClusterFinalizerReturnsOnCall[len(fake.addClusterFinalizerArgsForCall)]
 	fake.addClusterFinalizerArgsForCall = append(fake.addClusterFinalizerArgsForCall, struct {
 		arg1 context.Context
-		arg2 *v1beta1a.Cluster
+		arg2 *v1beta1.Cluster
 		arg3 string
 	}{arg1, arg2, arg3})
 	stub := fake.AddClusterFinalizerStub
@@ -330,13 +330,13 @@ func (fake *FakeClusterClient) AddClusterFinalizerCallCount() int {
 	return len(fake.addClusterFinalizerArgsForCall)
 }
 
-func (fake *FakeClusterClient) AddClusterFinalizerCalls(stub func(context.Context, *v1beta1a.Cluster, string) error) {
+func (fake *FakeClusterClient) AddClusterFinalizerCalls(stub func(context.Context, *v1beta1.Cluster, string) error) {
 	fake.addClusterFinalizerMutex.Lock()
 	defer fake.addClusterFinalizerMutex.Unlock()
 	fake.AddClusterFinalizerStub = stub
 }
 
-func (fake *FakeClusterClient) AddClusterFinalizerArgsForCall(i int) (context.Context, *v1beta1a.Cluster, string) {
+func (fake *FakeClusterClient) AddClusterFinalizerArgsForCall(i int) (context.Context, *v1beta1.Cluster, string) {
 	fake.addClusterFinalizerMutex.RLock()
 	defer fake.addClusterFinalizerMutex.RUnlock()
 	argsForCall := fake.addClusterFinalizerArgsForCall[i]
@@ -431,7 +431,7 @@ func (fake *FakeClusterClient) GetAWSClusterReturnsOnCall(i int, result1 *v1beta
 	}{result1, result2}
 }
 
-func (fake *FakeClusterClient) GetAWSManagedControlPlane(arg1 context.Context, arg2 types.NamespacedName) (*v1beta1.AWSManagedControlPlane, error) {
+func (fake *FakeClusterClient) GetAWSManagedControlPlane(arg1 context.Context, arg2 types.NamespacedName) (*v1beta2a.AWSManagedControlPlane, error) {
 	fake.getAWSManagedControlPlaneMutex.Lock()
 	ret, specificReturn := fake.getAWSManagedControlPlaneReturnsOnCall[len(fake.getAWSManagedControlPlaneArgsForCall)]
 	fake.getAWSManagedControlPlaneArgsForCall = append(fake.getAWSManagedControlPlaneArgsForCall, struct {
@@ -457,7 +457,7 @@ func (fake *FakeClusterClient) GetAWSManagedControlPlaneCallCount() int {
 	return len(fake.getAWSManagedControlPlaneArgsForCall)
 }
 
-func (fake *FakeClusterClient) GetAWSManagedControlPlaneCalls(stub func(context.Context, types.NamespacedName) (*v1beta1.AWSManagedControlPlane, error)) {
+func (fake *FakeClusterClient) GetAWSManagedControlPlaneCalls(stub func(context.Context, types.NamespacedName) (*v1beta2a.AWSManagedControlPlane, error)) {
 	fake.getAWSManagedControlPlaneMutex.Lock()
 	defer fake.getAWSManagedControlPlaneMutex.Unlock()
 	fake.GetAWSManagedControlPlaneStub = stub
@@ -470,33 +470,33 @@ func (fake *FakeClusterClient) GetAWSManagedControlPlaneArgsForCall(i int) (cont
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeClusterClient) GetAWSManagedControlPlaneReturns(result1 *v1beta1.AWSManagedControlPlane, result2 error) {
+func (fake *FakeClusterClient) GetAWSManagedControlPlaneReturns(result1 *v1beta2a.AWSManagedControlPlane, result2 error) {
 	fake.getAWSManagedControlPlaneMutex.Lock()
 	defer fake.getAWSManagedControlPlaneMutex.Unlock()
 	fake.GetAWSManagedControlPlaneStub = nil
 	fake.getAWSManagedControlPlaneReturns = struct {
-		result1 *v1beta1.AWSManagedControlPlane
+		result1 *v1beta2a.AWSManagedControlPlane
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeClusterClient) GetAWSManagedControlPlaneReturnsOnCall(i int, result1 *v1beta1.AWSManagedControlPlane, result2 error) {
+func (fake *FakeClusterClient) GetAWSManagedControlPlaneReturnsOnCall(i int, result1 *v1beta2a.AWSManagedControlPlane, result2 error) {
 	fake.getAWSManagedControlPlaneMutex.Lock()
 	defer fake.getAWSManagedControlPlaneMutex.Unlock()
 	fake.GetAWSManagedControlPlaneStub = nil
 	if fake.getAWSManagedControlPlaneReturnsOnCall == nil {
 		fake.getAWSManagedControlPlaneReturnsOnCall = make(map[int]struct {
-			result1 *v1beta1.AWSManagedControlPlane
+			result1 *v1beta2a.AWSManagedControlPlane
 			result2 error
 		})
 	}
 	fake.getAWSManagedControlPlaneReturnsOnCall[i] = struct {
-		result1 *v1beta1.AWSManagedControlPlane
+		result1 *v1beta2a.AWSManagedControlPlane
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeClusterClient) GetCluster(arg1 context.Context, arg2 types.NamespacedName) (*v1beta1a.Cluster, error) {
+func (fake *FakeClusterClient) GetCluster(arg1 context.Context, arg2 types.NamespacedName) (*v1beta1.Cluster, error) {
 	fake.getClusterMutex.Lock()
 	ret, specificReturn := fake.getClusterReturnsOnCall[len(fake.getClusterArgsForCall)]
 	fake.getClusterArgsForCall = append(fake.getClusterArgsForCall, struct {
@@ -522,7 +522,7 @@ func (fake *FakeClusterClient) GetClusterCallCount() int {
 	return len(fake.getClusterArgsForCall)
 }
 
-func (fake *FakeClusterClient) GetClusterCalls(stub func(context.Context, types.NamespacedName) (*v1beta1a.Cluster, error)) {
+func (fake *FakeClusterClient) GetClusterCalls(stub func(context.Context, types.NamespacedName) (*v1beta1.Cluster, error)) {
 	fake.getClusterMutex.Lock()
 	defer fake.getClusterMutex.Unlock()
 	fake.GetClusterStub = stub
@@ -535,28 +535,28 @@ func (fake *FakeClusterClient) GetClusterArgsForCall(i int) (context.Context, ty
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeClusterClient) GetClusterReturns(result1 *v1beta1a.Cluster, result2 error) {
+func (fake *FakeClusterClient) GetClusterReturns(result1 *v1beta1.Cluster, result2 error) {
 	fake.getClusterMutex.Lock()
 	defer fake.getClusterMutex.Unlock()
 	fake.GetClusterStub = nil
 	fake.getClusterReturns = struct {
-		result1 *v1beta1a.Cluster
+		result1 *v1beta1.Cluster
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeClusterClient) GetClusterReturnsOnCall(i int, result1 *v1beta1a.Cluster, result2 error) {
+func (fake *FakeClusterClient) GetClusterReturnsOnCall(i int, result1 *v1beta1.Cluster, result2 error) {
 	fake.getClusterMutex.Lock()
 	defer fake.getClusterMutex.Unlock()
 	fake.GetClusterStub = nil
 	if fake.getClusterReturnsOnCall == nil {
 		fake.getClusterReturnsOnCall = make(map[int]struct {
-			result1 *v1beta1a.Cluster
+			result1 *v1beta1.Cluster
 			result2 error
 		})
 	}
 	fake.getClusterReturnsOnCall[i] = struct {
-		result1 *v1beta1a.Cluster
+		result1 *v1beta1.Cluster
 		result2 error
 	}{result1, result2}
 }
@@ -626,13 +626,13 @@ func (fake *FakeClusterClient) GetIdentityReturnsOnCall(i int, result1 *v1beta2.
 	}{result1, result2}
 }
 
-func (fake *FakeClusterClient) MarkConditionTrue(arg1 context.Context, arg2 *v1beta1a.Cluster, arg3 v1beta1a.ConditionType) error {
+func (fake *FakeClusterClient) MarkConditionTrue(arg1 context.Context, arg2 *v1beta1.Cluster, arg3 v1beta1.ConditionType) error {
 	fake.markConditionTrueMutex.Lock()
 	ret, specificReturn := fake.markConditionTrueReturnsOnCall[len(fake.markConditionTrueArgsForCall)]
 	fake.markConditionTrueArgsForCall = append(fake.markConditionTrueArgsForCall, struct {
 		arg1 context.Context
-		arg2 *v1beta1a.Cluster
-		arg3 v1beta1a.ConditionType
+		arg2 *v1beta1.Cluster
+		arg3 v1beta1.ConditionType
 	}{arg1, arg2, arg3})
 	stub := fake.MarkConditionTrueStub
 	fakeReturns := fake.markConditionTrueReturns
@@ -653,13 +653,13 @@ func (fake *FakeClusterClient) MarkConditionTrueCallCount() int {
 	return len(fake.markConditionTrueArgsForCall)
 }
 
-func (fake *FakeClusterClient) MarkConditionTrueCalls(stub func(context.Context, *v1beta1a.Cluster, v1beta1a.ConditionType) error) {
+func (fake *FakeClusterClient) MarkConditionTrueCalls(stub func(context.Context, *v1beta1.Cluster, v1beta1.ConditionType) error) {
 	fake.markConditionTrueMutex.Lock()
 	defer fake.markConditionTrueMutex.Unlock()
 	fake.MarkConditionTrueStub = stub
 }
 
-func (fake *FakeClusterClient) MarkConditionTrueArgsForCall(i int) (context.Context, *v1beta1a.Cluster, v1beta1a.ConditionType) {
+func (fake *FakeClusterClient) MarkConditionTrueArgsForCall(i int) (context.Context, *v1beta1.Cluster, v1beta1.ConditionType) {
 	fake.markConditionTrueMutex.RLock()
 	defer fake.markConditionTrueMutex.RUnlock()
 	argsForCall := fake.markConditionTrueArgsForCall[i]
@@ -752,12 +752,12 @@ func (fake *FakeClusterClient) RemoveAWSClusterFinalizerReturnsOnCall(i int, res
 	}{result1}
 }
 
-func (fake *FakeClusterClient) RemoveAWSManagedControlPlaneFinalizer(arg1 context.Context, arg2 *v1beta1.AWSManagedControlPlane, arg3 string) error {
+func (fake *FakeClusterClient) RemoveAWSManagedControlPlaneFinalizer(arg1 context.Context, arg2 *v1beta2a.AWSManagedControlPlane, arg3 string) error {
 	fake.removeAWSManagedControlPlaneFinalizerMutex.Lock()
 	ret, specificReturn := fake.removeAWSManagedControlPlaneFinalizerReturnsOnCall[len(fake.removeAWSManagedControlPlaneFinalizerArgsForCall)]
 	fake.removeAWSManagedControlPlaneFinalizerArgsForCall = append(fake.removeAWSManagedControlPlaneFinalizerArgsForCall, struct {
 		arg1 context.Context
-		arg2 *v1beta1.AWSManagedControlPlane
+		arg2 *v1beta2a.AWSManagedControlPlane
 		arg3 string
 	}{arg1, arg2, arg3})
 	stub := fake.RemoveAWSManagedControlPlaneFinalizerStub
@@ -779,13 +779,13 @@ func (fake *FakeClusterClient) RemoveAWSManagedControlPlaneFinalizerCallCount() 
 	return len(fake.removeAWSManagedControlPlaneFinalizerArgsForCall)
 }
 
-func (fake *FakeClusterClient) RemoveAWSManagedControlPlaneFinalizerCalls(stub func(context.Context, *v1beta1.AWSManagedControlPlane, string) error) {
+func (fake *FakeClusterClient) RemoveAWSManagedControlPlaneFinalizerCalls(stub func(context.Context, *v1beta2a.AWSManagedControlPlane, string) error) {
 	fake.removeAWSManagedControlPlaneFinalizerMutex.Lock()
 	defer fake.removeAWSManagedControlPlaneFinalizerMutex.Unlock()
 	fake.RemoveAWSManagedControlPlaneFinalizerStub = stub
 }
 
-func (fake *FakeClusterClient) RemoveAWSManagedControlPlaneFinalizerArgsForCall(i int) (context.Context, *v1beta1.AWSManagedControlPlane, string) {
+func (fake *FakeClusterClient) RemoveAWSManagedControlPlaneFinalizerArgsForCall(i int) (context.Context, *v1beta2a.AWSManagedControlPlane, string) {
 	fake.removeAWSManagedControlPlaneFinalizerMutex.RLock()
 	defer fake.removeAWSManagedControlPlaneFinalizerMutex.RUnlock()
 	argsForCall := fake.removeAWSManagedControlPlaneFinalizerArgsForCall[i]
@@ -815,12 +815,12 @@ func (fake *FakeClusterClient) RemoveAWSManagedControlPlaneFinalizerReturnsOnCal
 	}{result1}
 }
 
-func (fake *FakeClusterClient) RemoveClusterFinalizer(arg1 context.Context, arg2 *v1beta1a.Cluster, arg3 string) error {
+func (fake *FakeClusterClient) RemoveClusterFinalizer(arg1 context.Context, arg2 *v1beta1.Cluster, arg3 string) error {
 	fake.removeClusterFinalizerMutex.Lock()
 	ret, specificReturn := fake.removeClusterFinalizerReturnsOnCall[len(fake.removeClusterFinalizerArgsForCall)]
 	fake.removeClusterFinalizerArgsForCall = append(fake.removeClusterFinalizerArgsForCall, struct {
 		arg1 context.Context
-		arg2 *v1beta1a.Cluster
+		arg2 *v1beta1.Cluster
 		arg3 string
 	}{arg1, arg2, arg3})
 	stub := fake.RemoveClusterFinalizerStub
@@ -842,13 +842,13 @@ func (fake *FakeClusterClient) RemoveClusterFinalizerCallCount() int {
 	return len(fake.removeClusterFinalizerArgsForCall)
 }
 
-func (fake *FakeClusterClient) RemoveClusterFinalizerCalls(stub func(context.Context, *v1beta1a.Cluster, string) error) {
+func (fake *FakeClusterClient) RemoveClusterFinalizerCalls(stub func(context.Context, *v1beta1.Cluster, string) error) {
 	fake.removeClusterFinalizerMutex.Lock()
 	defer fake.removeClusterFinalizerMutex.Unlock()
 	fake.RemoveClusterFinalizerStub = stub
 }
 
-func (fake *FakeClusterClient) RemoveClusterFinalizerArgsForCall(i int) (context.Context, *v1beta1a.Cluster, string) {
+func (fake *FakeClusterClient) RemoveClusterFinalizerArgsForCall(i int) (context.Context, *v1beta1.Cluster, string) {
 	fake.removeClusterFinalizerMutex.RLock()
 	defer fake.removeClusterFinalizerMutex.RUnlock()
 	argsForCall := fake.removeClusterFinalizerArgsForCall[i]
@@ -878,13 +878,13 @@ func (fake *FakeClusterClient) RemoveClusterFinalizerReturnsOnCall(i int, result
 	}{result1}
 }
 
-func (fake *FakeClusterClient) Unpause(arg1 context.Context, arg2 *v1beta2.AWSCluster, arg3 *v1beta1a.Cluster) error {
+func (fake *FakeClusterClient) Unpause(arg1 context.Context, arg2 *v1beta2.AWSCluster, arg3 *v1beta1.Cluster) error {
 	fake.unpauseMutex.Lock()
 	ret, specificReturn := fake.unpauseReturnsOnCall[len(fake.unpauseArgsForCall)]
 	fake.unpauseArgsForCall = append(fake.unpauseArgsForCall, struct {
 		arg1 context.Context
 		arg2 *v1beta2.AWSCluster
-		arg3 *v1beta1a.Cluster
+		arg3 *v1beta1.Cluster
 	}{arg1, arg2, arg3})
 	stub := fake.UnpauseStub
 	fakeReturns := fake.unpauseReturns
@@ -905,13 +905,13 @@ func (fake *FakeClusterClient) UnpauseCallCount() int {
 	return len(fake.unpauseArgsForCall)
 }
 
-func (fake *FakeClusterClient) UnpauseCalls(stub func(context.Context, *v1beta2.AWSCluster, *v1beta1a.Cluster) error) {
+func (fake *FakeClusterClient) UnpauseCalls(stub func(context.Context, *v1beta2.AWSCluster, *v1beta1.Cluster) error) {
 	fake.unpauseMutex.Lock()
 	defer fake.unpauseMutex.Unlock()
 	fake.UnpauseStub = stub
 }
 
-func (fake *FakeClusterClient) UnpauseArgsForCall(i int) (context.Context, *v1beta2.AWSCluster, *v1beta1a.Cluster) {
+func (fake *FakeClusterClient) UnpauseArgsForCall(i int) (context.Context, *v1beta2.AWSCluster, *v1beta1.Cluster) {
 	fake.unpauseMutex.RLock()
 	defer fake.unpauseMutex.RUnlock()
 	argsForCall := fake.unpauseArgsForCall[i]
