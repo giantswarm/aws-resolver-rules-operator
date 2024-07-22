@@ -44,8 +44,9 @@ func NewUnpauseReconciler(awsClusterClient AWSClusterClient) *UnpauseReconciler 
 }
 
 // Reconcile will unpause the reconciled cluster when certain conditions are marked as true.
-// It will unpause the Cluster and AWSCluster when VPC and Subnet conditions are marked as ready.
-// It also requires the ResolverRules condition to be ready if using the private dns mode.
+// It will unpause the Cluster and AWSCluster when VPC and Subnet conditions are marked as ready
+// (see aws-vpc-operator), *and* if using the private dns mode, it also requires the
+// ResolverRules condition to be ready.
 func (r *UnpauseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	logger.Info("Reconciling")
