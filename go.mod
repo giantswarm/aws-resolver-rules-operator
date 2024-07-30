@@ -5,7 +5,7 @@ go 1.22.0
 toolchain go1.22.5
 
 require (
-	github.com/aws/aws-sdk-go v1.55.3
+	github.com/aws/aws-sdk-go v1.55.4
 	github.com/giantswarm/k8smetadata v0.25.0
 	github.com/go-logr/logr v1.4.2
 	github.com/google/go-cmp v0.6.0
