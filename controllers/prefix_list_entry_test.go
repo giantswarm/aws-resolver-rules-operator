@@ -56,12 +56,12 @@ var _ = Describe("PrefixListEntryReconciler", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 		prefixListARN = fmt.Sprintf("arn:aws:iam::123456789012:managed-prefix-lists/%s", uuid.NewString())
-		identity, cluster = createRandomClusterWithIdentity(
+		cluster = createRandomCluster(
 			annotation.NetworkTopologyModeAnnotation,
 			annotation.NetworkTopologyModeGiantSwarmManaged,
 		)
 
-		managementCluster = createRandomCluster(
+		identity, managementCluster = createRandomClusterWithIdentity(
 			annotation.NetworkTopologyModeAnnotation,
 			annotation.NetworkTopologyModeGiantSwarmManaged,
 			annotation.NetworkTopologyPrefixListIDAnnotation,

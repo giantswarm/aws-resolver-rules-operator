@@ -219,7 +219,12 @@ func wireNetworkTopologyReconcilers(cfg reconcilerConfig, mgr manager.Manager) {
 		Name:      cfg.managementClusterName,
 	}
 
-	if err := (controllers.NewRouteReconciler(managementCluster, cfg.clusterClient, cfg.awsClients)).SetupWithManager(mgr); err != nil {
+	routeReconciler := controllers.NewRouteReconciler(
+		managementCluster,
+		cfg.clusterClient,
+		cfg.awsClients,
+	)
+	if err := routeReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Route")
 		os.Exit(1)
 	}
@@ -229,9 +234,8 @@ func wireNetworkTopologyReconcilers(cfg reconcilerConfig, mgr manager.Manager) {
 		cfg.awsClusterClient,
 		cfg.awsClients,
 	)
-
 	if err := mcTransitGatewayReconciler.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller")
+		setupLog.Error(err, "unable to create controller", "controller", "ManagementClusterTransitGateway")
 		os.Exit(1)
 	}
 
@@ -240,9 +244,8 @@ func wireNetworkTopologyReconcilers(cfg reconcilerConfig, mgr manager.Manager) {
 		cfg.awsClusterClient,
 		cfg.awsClients,
 	)
-
 	if err := tgwAttachmentReconciler.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller")
+		setupLog.Error(err, "unable to create controller", "controller", "TransitGatewayAttachment")
 		os.Exit(1)
 	}
 
@@ -251,9 +254,18 @@ func wireNetworkTopologyReconcilers(cfg reconcilerConfig, mgr manager.Manager) {
 		cfg.awsClusterClient,
 		cfg.awsClients,
 	)
-
 	if err := prefixListEntryReconciler.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller")
+		setupLog.Error(err, "unable to create controller", "controller", "PrefixListEntry")
+		os.Exit(1)
+	}
+
+	shareReconciler := controllers.NewShareReconciler(
+		managementCluster,
+		cfg.awsClusterClient,
+		cfg.awsClients,
+	)
+	if err := shareReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Share")
 		os.Exit(1)
 	}
 
