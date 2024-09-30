@@ -26,7 +26,7 @@ const (
 )
 
 type ShareReconciler struct {
-	ramClient         resolver.RAMClient
+	awsClients        resolver.AWSClients
 	clusterClient     AWSClusterClient
 	managementCluster k8stypes.NamespacedName
 }
@@ -34,10 +34,10 @@ type ShareReconciler struct {
 func NewShareReconciler(
 	managementCluster types.NamespacedName,
 	clusterClient AWSClusterClient,
-	ramClient resolver.RAMClient,
+	awsClients resolver.AWSClients,
 ) *ShareReconciler {
 	return &ShareReconciler{
-		ramClient:         ramClient,
+		awsClients:        awsClients,
 		clusterClient:     clusterClient,
 		managementCluster: managementCluster,
 	}
@@ -75,25 +75,59 @@ func (r *ShareReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	return r.reconcileNormal(ctx, cluster)
 }
 
+func (r *ShareReconciler) getRamClient(ctx context.Context) (resolver.RAMClient, error) {
+	logger := log.FromContext(ctx)
+
+	managementCluster, err := r.clusterClient.GetAWSCluster(ctx, r.managementCluster)
+	if err != nil {
+		logger.Error(err, "failed to get management cluster")
+		return nil, errors.WithStack(err)
+	}
+
+	return r.getRamClientFromCluster(ctx, managementCluster)
+}
+
+func (r *ShareReconciler) getRamClientFromCluster(ctx context.Context, cluster *capa.AWSCluster) (resolver.RAMClient, error) {
+	logger := log.FromContext(ctx)
+
+	identity, err := r.clusterClient.GetIdentity(ctx, cluster)
+	if err != nil {
+		logger.Error(err, "Failed to get cluster identity")
+		return nil, errors.WithStack(err)
+	}
+
+	ramClient, err := r.awsClients.NewRAMClient(cluster.Spec.Region, identity.Spec.RoleArn)
+	if err != nil {
+		logger.Error(err, "Failed to create ram client")
+		return nil, errors.WithStack(err)
+	}
+
+	return ramClient, err
+}
+
 func (r *ShareReconciler) reconcileDelete(ctx context.Context, cluster *capa.AWSCluster) (ctrl.Result, error) {
 	if !controllerutil.ContainsFinalizer(cluster, FinalizerResourceShare) {
 		return ctrl.Result{}, nil
 	}
 
 	logger := log.FromContext(ctx)
+	ramClient, err := r.getRamClient(ctx)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
 	if resourcesStillInUse(cluster) {
 		logger.Info("Transit gateway and prefix list not yet cleaned up. Skipping...")
 		return ctrl.Result{}, nil
 	}
 
-	err := r.ramClient.DeleteResourceShare(ctx, getTransitGatewayResourceShareName(cluster))
+	err = ramClient.DeleteResourceShare(ctx, getTransitGatewayResourceShareName(cluster))
 	if err != nil {
 		logger.Error(err, "failed to delete resource share")
 		return ctrl.Result{}, err
 	}
 
-	err = r.ramClient.DeleteResourceShare(ctx, getPrefixListResourceShareName(cluster))
+	err = ramClient.DeleteResourceShare(ctx, getPrefixListResourceShareName(cluster))
 	if err != nil {
 		logger.Error(err, "failed to delete resource share")
 		return ctrl.Result{}, err
@@ -108,6 +142,13 @@ func (r *ShareReconciler) reconcileDelete(ctx context.Context, cluster *capa.AWS
 	return ctrl.Result{}, nil
 }
 
+type shareScope struct {
+	cluster           *capa.AWSCluster
+	managementCluster *capa.AWSCluster
+	accountID         string
+	ramClient         resolver.RAMClient
+}
+
 func (r *ShareReconciler) reconcileNormal(ctx context.Context, cluster *capa.AWSCluster) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	accountID, err := r.getAccountId(ctx, cluster)
@@ -118,15 +159,26 @@ func (r *ShareReconciler) reconcileNormal(ctx context.Context, cluster *capa.AWS
 	managementCluster, err := r.clusterClient.GetAWSCluster(ctx, r.managementCluster)
 	if err != nil {
 		logger.Error(err, "failed to get management cluster")
-		return ctrl.Result{}, errors.WithStack(err)
+		return ctrl.Result{}, err
 	}
 
+	ramClient, err := r.getRamClientFromCluster(ctx, managementCluster)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	scope := shareScope{
+		cluster:           cluster,
+		managementCluster: managementCluster,
+		accountID:         accountID,
+		ramClient:         ramClient,
+	}
 	// We need to share the transit gateway separately from the prefix list, as
 	// the networktopology reconciler needs to attach the transit gateway
 	// first, before moving on to creating the prefix list. If the transit
 	// gateway isn't shared it won't be visible in the WC's account
 	result := ctrl.Result{}
-	requeue, err := r.shareTransitGateway(ctx, cluster, managementCluster, accountID)
+	requeue, err := r.shareTransitGateway(ctx, scope)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -134,7 +186,7 @@ func (r *ShareReconciler) reconcileNormal(ctx context.Context, cluster *capa.AWS
 		result.RequeueAfter = ResourceMissingRequeDuration
 	}
 
-	requeue, err = r.sharePrefixList(ctx, cluster, managementCluster, accountID)
+	requeue, err = r.sharePrefixList(ctx, scope)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -171,10 +223,10 @@ func getPrefixListResourceShareName(cluster *capa.AWSCluster) string {
 	return fmt.Sprintf("%s-%s", cluster.Name, "prefix-list")
 }
 
-func (r *ShareReconciler) shareTransitGateway(ctx context.Context, cluster, managementCluster *capa.AWSCluster, accountID string) (requeue bool, err error) {
+func (r *ShareReconciler) shareTransitGateway(ctx context.Context, scope shareScope) (requeue bool, err error) {
 	logger := log.FromContext(ctx)
 
-	transitGatewayARN := getTransitGatewayARN(cluster, managementCluster)
+	transitGatewayARN := getTransitGatewayARN(scope.cluster, scope.managementCluster)
 
 	if transitGatewayARN == "" {
 		logger.Info("transit gateway arn annotation not set yet")
@@ -183,18 +235,18 @@ func (r *ShareReconciler) shareTransitGateway(ctx context.Context, cluster, mana
 
 	logger = logger.WithValues("transit-gateway-annotation", transitGatewayARN)
 
-	err = r.clusterClient.AddFinalizer(ctx, cluster, FinalizerResourceShare)
+	err = r.clusterClient.AddFinalizer(ctx, scope.cluster, FinalizerResourceShare)
 	if err != nil {
 		logger.Error(err, "failed to add finalizer")
 		return false, err
 	}
 
-	err = r.ramClient.ApplyResourceShare(ctx, resolver.ResourceShare{
-		Name: getTransitGatewayResourceShareName(cluster),
+	err = scope.ramClient.ApplyResourceShare(ctx, resolver.ResourceShare{
+		Name: getTransitGatewayResourceShareName(scope.cluster),
 		ResourceArns: []string{
 			transitGatewayARN,
 		},
-		ExternalAccountID: accountID,
+		ExternalAccountID: scope.accountID,
 	})
 	if err != nil {
 		logger.Error(err, "failed to apply resource share")
@@ -204,9 +256,9 @@ func (r *ShareReconciler) shareTransitGateway(ctx context.Context, cluster, mana
 	return false, nil
 }
 
-func (r *ShareReconciler) sharePrefixList(ctx context.Context, cluster, managementCluster *capa.AWSCluster, accountID string) (requeue bool, err error) {
+func (r *ShareReconciler) sharePrefixList(ctx context.Context, scope shareScope) (requeue bool, err error) {
 	logger := log.FromContext(ctx)
-	prefixListARN := getPrefixListARN(cluster, managementCluster)
+	prefixListARN := getPrefixListARN(scope.cluster, scope.managementCluster)
 
 	if prefixListARN == "" {
 		logger.Info("prefix list arn annotation not set yet")
@@ -215,12 +267,12 @@ func (r *ShareReconciler) sharePrefixList(ctx context.Context, cluster, manageme
 
 	logger = logger.WithValues("prefix-list-annotation", prefixListARN)
 
-	err = r.ramClient.ApplyResourceShare(ctx, resolver.ResourceShare{
-		Name: getPrefixListResourceShareName(cluster),
+	err = scope.ramClient.ApplyResourceShare(ctx, resolver.ResourceShare{
+		Name: getPrefixListResourceShareName(scope.cluster),
 		ResourceArns: []string{
 			prefixListARN,
 		},
-		ExternalAccountID: accountID,
+		ExternalAccountID: scope.accountID,
 	})
 	if err != nil {
 		logger.Error(err, "failed to apply resource share")

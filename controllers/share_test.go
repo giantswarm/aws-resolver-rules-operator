@@ -20,6 +20,7 @@ import (
 	"github.com/aws-resolver-rules-operator/controllers"
 	"github.com/aws-resolver-rules-operator/controllers/controllersfakes"
 	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
+	"github.com/aws-resolver-rules-operator/pkg/resolver"
 	"github.com/aws-resolver-rules-operator/pkg/resolver/resolverfakes"
 )
 
@@ -54,7 +55,7 @@ var _ = Describe("Share", func() {
 		err := k8sClient.Patch(context.Background(), patchedIdentity, client.MergeFrom(identity))
 		Expect(err).NotTo(HaveOccurred())
 
-		managementCluster = createRandomCluster(
+		_, managementCluster = createRandomClusterWithIdentity(
 			annotation.NetworkTopologyModeAnnotation,
 			annotation.NetworkTopologyModeGiantSwarmManaged,
 			annotation.NetworkTopologyTransitGatewayIDAnnotation,
@@ -71,11 +72,14 @@ var _ = Describe("Share", func() {
 		}
 
 		ramClient = new(resolverfakes.FakeRAMClient)
+		clientsFactory := &resolver.FakeClients{
+			RAMClient: ramClient,
+		}
 		clusterClient := k8sclient.NewAWSClusterClient(k8sClient)
 		reconciler = controllers.NewShareReconciler(
 			client.ObjectKeyFromObject(managementCluster),
 			clusterClient,
-			ramClient,
+			clientsFactory,
 		)
 	})
 
@@ -300,7 +304,7 @@ var _ = Describe("Share", func() {
 			reconciler = controllers.NewShareReconciler(
 				client.ObjectKeyFromObject(managementCluster),
 				fakeClusterClient,
-				ramClient,
+				&resolver.FakeClients{},
 			)
 		})
 
