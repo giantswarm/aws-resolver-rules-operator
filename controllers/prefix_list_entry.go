@@ -94,7 +94,7 @@ func (r *PrefixListEntryReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	logger = logger.WithValues("prefix-list-arn", prefixListARN)
 	log.IntoContext(ctx, logger)
 
-	identity, err := r.clusterClient.GetIdentity(ctx, cluster)
+	identity, err := r.clusterClient.GetIdentity(ctx, managementCluster)
 	if err != nil {
 		logger.Error(err, "failed to get cluster identity")
 		return ctrl.Result{}, errors.WithStack(err)
