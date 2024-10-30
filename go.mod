@@ -1,8 +1,8 @@
 module github.com/aws-resolver-rules-operator
 
-go 1.22.0
+go 1.23
 
-toolchain go1.22.6
+toolchain go1.23.2
 
 require (
 	github.com/aws/aws-sdk-go v1.55.5
@@ -10,7 +10,7 @@ require (
 	github.com/go-logr/logr v1.4.2
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
-	github.com/maxbrunsfeld/counterfeiter/v6 v6.8.1
+	github.com/maxbrunsfeld/counterfeiter/v6 v6.10.0
 	github.com/onsi/ginkgo/v2 v2.21.0
 	github.com/onsi/gomega v1.35.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
