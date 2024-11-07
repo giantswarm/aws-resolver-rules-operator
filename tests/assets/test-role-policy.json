@@ -1,0 +1,42 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
+            "Action": [
+                "ec2:DeleteManagedPrefixList",
+                "ec2:DeleteSubnet",
+                "ec2:ModifyManagedPrefixList",
+                "ec2:DeleteTags",
+                "ec2:CreateVpc",
+                "ec2:DescribeTransitGateways",
+                "ec2:CreateTransitGateway",
+                "ec2:DeleteRouteTable",
+                "ec2:AssociateRouteTable",
+                "ec2:DeleteTransitGatewayVpcAttachment",
+                "ec2:CreateRoute",
+                "ec2:DescribeManagedPrefixLists",
+                "ec2:DescribeRouteTables",
+                "ec2:GetManagedPrefixListEntries",
+                "ec2:CreateTags",
+                "ec2:DeleteRoute",
+                "ec2:CreateRouteTable",
+                "ec2:DisassociateRouteTable",
+                "ec2:CreateManagedPrefixList",
+                "ec2:CreateTransitGatewayVpcAttachment",
+                "ec2:DeleteVpc",
+                "ec2:DescribeTransitGatewayVpcAttachments",
+                "ec2:CreateSubnet",
+                "ec2:DeleteTransitGateway",
+                "ec2:DescribeSubnets",
+                "ram:GetResourceShares",
+                "ram:CreateResourceShare",
+                "ram:DeleteResourceShare",
+                "ram:GetResourceShareAssociations",
+                "ram:ListResources"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
