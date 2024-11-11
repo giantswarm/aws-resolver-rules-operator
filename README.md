@@ -61,6 +61,7 @@ $ aws --endpoint=http://localhost:4566 route53 list-hosted-zones-by-name
 To run the integration and acceptance tests against an AWS account you need to create an IAM role. To do that, first source the `aws-resolver-rules-operator-test-secrets.sh` file from LastPass and then run the following commands:
 
 ```shell
+source aws-resolver-rules-operator-test-secrets.sh
 aws iam create-policy --policy-name tests-aws-network-topology-operator --policy-document file://tests/assets/test-role-policy.json
 
 policy_file=$(mktemp)
