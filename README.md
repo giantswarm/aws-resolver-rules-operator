@@ -58,7 +58,7 @@ $ aws --endpoint=http://localhost:4566 route53 list-hosted-zones-by-name
 
 ## AWS account setup
 
-To run the integration and acceptance tests against an AWS account you need to create an IAM role. To do that, first source the `aws-resolver-rules-operator-test-secrets.sh` file from LastPass and then run the following commands:
+To run the integration and acceptance tests against an AWS account you need to create an IAM role. To do that, first source the `aws-resolver-rules-operator-test-secrets.sh` file from LastPass and then run the following commands. Note that you also need to target the account you are setting up when using the aws cli and update the desired WC or MC account env var in the LastPass secret afterwards.
 
 ```shell
 source aws-resolver-rules-operator-test-secrets.sh
