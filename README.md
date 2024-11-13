@@ -62,10 +62,11 @@ To run the integration and acceptance tests against an AWS account you need to c
 
 ```shell
 source aws-resolver-rules-operator-test-secrets.sh
-aws iam create-policy --policy-name tests-aws-network-topology-operator --policy-document file://tests/assets/test-role-policy.json
+aws iam create-policy --policy-name tests-aws-resolver-rules-operator --policy-document file://tests/assets/test-role-policy.json
 
 policy_file=$(mktemp)
 envsubst <tests/assets/test-role-trust-policy.json >$policy_file
-aws iam create-role --role-name tests-aws-network-topology-operator --assume-role-policy-document file://$policy_file
+aws iam create-role --role-name tests-aws-resolver-rules-operator --assume-role-policy-document file://$policy_file
+aws iam attach-role-policy --role-name ttests-aws-resolver-rules-operator --policy-arn arn:aws:iam::$AWS_ACCOUNT:policy/tests-capi-migration-cli
 rm $policy_file
 ```
