@@ -67,6 +67,6 @@ aws iam create-policy --policy-name tests-aws-resolver-rules-operator --policy-d
 policy_file=$(mktemp)
 envsubst <tests/assets/test-role-trust-policy.json >$policy_file
 aws iam create-role --role-name tests-aws-resolver-rules-operator --assume-role-policy-document file://$policy_file
-aws iam attach-role-policy --role-name ttests-aws-resolver-rules-operator --policy-arn arn:aws:iam::$AWS_ACCOUNT:policy/tests-capi-migration-cli
+aws iam attach-role-policy --role-name ttests-aws-resolver-rules-operator --policy-arn arn:aws:iam::$AWS_ACCOUNT:policy/tests-aws-resolver-rules-operator
 rm $policy_file
 ```
