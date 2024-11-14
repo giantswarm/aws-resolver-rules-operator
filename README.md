@@ -55,3 +55,18 @@ This project uses [`LocalStack`](https://github.com/localstack/localstack) for i
 ```
 $ aws --endpoint=http://localhost:4566 route53 list-hosted-zones-by-name
 ```
+
+## AWS account setup
+
+To run the integration and acceptance tests against an AWS account you need to create an IAM role. To do that, first source the `aws-resolver-rules-operator-test-secrets.sh` file from LastPass and then run the following commands. Note that you also need to target the account you are setting up when using the aws cli and update the desired WC or MC account env var in the LastPass secret afterwards.
+
+```shell
+source aws-resolver-rules-operator-test-secrets.sh
+aws iam create-policy --policy-name tests-aws-resolver-rules-operator --policy-document file://tests/assets/test-role-policy.json
+
+policy_file=$(mktemp)
+envsubst <tests/assets/test-role-trust-policy.json >$policy_file
+aws iam create-role --role-name tests-aws-resolver-rules-operator --assume-role-policy-document file://$policy_file
+aws iam attach-role-policy --role-name ttests-aws-resolver-rules-operator --policy-arn arn:aws:iam::$AWS_ACCOUNT:policy/tests-aws-resolver-rules-operator
+rm $policy_file
+```
