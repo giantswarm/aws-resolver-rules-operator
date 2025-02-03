@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Dynamically calculate CAPI and CAPA versions from go cache, so that we use the right path when installing the CRDs during tests.
 
+### Added
+
+- Add controller to create node pool bootstrap data on S3.
+
 ## [0.17.0] - 2024-09-30
 
 ### Changed
