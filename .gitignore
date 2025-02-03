@@ -24,3 +24,5 @@ Dockerfile.cross
 *.swp
 *.swo
 *~
+
+aws-resolver-rules-operator-test-secrets.sh
