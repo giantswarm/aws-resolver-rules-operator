@@ -16,6 +16,7 @@ type AWSClients interface {
 	NewRAMClient(region, arn string) (RAMClient, error)
 	NewRAMClientWithExternalId(region, arn, externalId string) (RAMClient, error)
 	NewRoute53Client(region, arn string) (Route53Client, error)
+	NewS3Client(region, arn string) (S3Client, error)
 	NewTransitGatewayClient(region, arn string) (TransitGatewayClient, error)
 	NewPrefixListClient(region, arn string) (PrefixListClient, error)
 	NewRouteTableClient(region, arn string) (RouteTableClient, error)
@@ -25,6 +26,7 @@ type AWSClients interface {
 type EC2Client interface {
 	CreateSecurityGroupForResolverEndpoints(ctx context.Context, vpcId, groupName string, tags map[string]string) (string, error)
 	DeleteSecurityGroupForResolverEndpoints(ctx context.Context, logger logr.Logger, vpcId, groupName string) error
+	TerminateInstancesByTag(ctx context.Context, logger logr.Logger, tagKey, tagValue string) error
 }
 
 type ResourceShare struct {
@@ -102,4 +104,9 @@ type RouteRule struct {
 type RouteTableClient interface {
 	AddRoutes(ctx context.Context, routeRule RouteRule, filter Filter) error
 	RemoveRoutes(ctx context.Context, routeRule RouteRule, filter Filter) error
+}
+
+//counterfeiter:generate . S3Client
+type S3Client interface {
+	Put(ctx context.Context, bucket, path string, data []byte) error
 }
