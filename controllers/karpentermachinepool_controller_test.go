@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -23,7 +22,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	karpenterinfra "github.com/aws-resolver-rules-operator/api/v1alpha1"
 	"github.com/aws-resolver-rules-operator/controllers"
@@ -42,7 +40,6 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 		ctx                        context.Context
 		reconciler                 *controllers.KarpenterMachinePoolReconciler
 		reconcileErr               error
-		reconcileResult            reconcile.Result
 	)
 
 	const (
@@ -94,7 +91,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 				Name:      KarpenterMachinePoolName,
 			},
 		}
-		reconcileResult, reconcileErr = reconciler.Reconcile(ctx, request)
+		_, reconcileErr = reconciler.Reconcile(ctx, request)
 	})
 
 	When("the reconciled KarpenterMachinePool is gone", func() {
@@ -400,18 +397,6 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 								err := fakeCtrlClient.Get(ctx, types.NamespacedName{Namespace: KarpenterMachinePoolNamespace, Name: KarpenterMachinePoolName}, updatedKarpenterMachinePool)
 								Expect(err).NotTo(HaveOccurred())
 								Expect(updatedKarpenterMachinePool.Annotations).To(HaveKeyWithValue(controllers.BootstrapDataHashAnnotation, Equal(capiBootstrapSecretHash)))
-							})
-							When("there are no NodeClaim in the workload cluster yet", func() {
-								It("requeues to try again soon", func() {
-									Expect(reconcileErr).NotTo(HaveOccurred())
-									Expect(reconcileResult.RequeueAfter).To(Equal(1 * time.Minute))
-									updatedKarpenterMachinePool := &karpenterinfra.KarpenterMachinePool{}
-									err := fakeCtrlClient.Get(ctx, types.NamespacedName{Namespace: KarpenterMachinePoolNamespace, Name: KarpenterMachinePoolName}, updatedKarpenterMachinePool)
-									Expect(err).NotTo(HaveOccurred())
-									Expect(updatedKarpenterMachinePool.Status.Ready).To(BeFalse())
-									Expect(updatedKarpenterMachinePool.Status.Replicas).To(BeZero())
-									Expect(updatedKarpenterMachinePool.Spec.ProviderIDList).To(BeEmpty())
-								})
 							})
 							When("there are NodeClaim resources in the workload cluster", func() {
 								BeforeEach(func() {

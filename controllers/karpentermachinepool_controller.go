@@ -8,6 +8,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -15,13 +16,13 @@ import (
 	capalogger "sigs.k8s.io/cluster-api-provider-aws/v2/pkg/logger"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/controllers/remote"
+	capiexp "sigs.k8s.io/cluster-api/exp/api/v1beta1"
 	capiutilexp "sigs.k8s.io/cluster-api/exp/util"
 	capiutil "sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/predicates"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/aws-resolver-rules-operator/api/v1alpha1"
@@ -50,7 +51,7 @@ func NewKarpenterMachinepoolReconciler(client client.Client, clusterClientGetter
 }
 
 func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
-	logger := log.FromContext(ctx)
+	logger := capalogger.FromContext(ctx).GetLogger()
 	logger.Info("Reconciling")
 	defer logger.Info("Done reconciling")
 
@@ -59,7 +60,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 		return reconcile.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// We explicitly ignore deleted objects and don't do any clean up, because we rely on AWS cleaning up old archived S3 objects.
+	// We explicitly ignore deleted objects and don't do any clean up, because we rely on S3 cleaning up old archived objects.
 	if !karpenterMachinePool.GetDeletionTimestamp().IsZero() {
 		return reconcile.Result{}, nil
 	}
@@ -100,76 +101,33 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 		return reconcile.Result{}, fmt.Errorf("failed to get AWSCluster referenced in Cluster.spec.infrastructureRef: %w", err)
 	}
 
-	if annotations.IsPaused(cluster, awsCluster) {
-		logger.Info("Reconciliation is paused for this object")
-		return ctrl.Result{}, nil
-	}
-
 	if awsCluster.Spec.S3Bucket == nil {
 		return reconcile.Result{}, errors.New("a cluster wide object storage configured at `AWSCluster.spec.s3Bucket` is required")
 	}
 
-	bootstrapSecret := &v1.Secret{}
-	if err := r.client.Get(ctx, client.ObjectKey{Namespace: req.Namespace, Name: *machinePool.Spec.Template.Spec.Bootstrap.DataSecretName}, bootstrapSecret); err != nil {
-		return reconcile.Result{}, fmt.Errorf("bootstrap secret in MachinePool.spec.template.spec.bootstrap.dataSecretName is not found: %w", err)
-	}
-
-	bootstrapSecretValue, ok := bootstrapSecret.Data["value"]
-	if !ok {
-		return reconcile.Result{}, errors.New("error retrieving bootstrap data: secret value key is missing")
-	}
-
-	// Create deep copy of the reconciled object so we can change it
-	karpenterMachinePoolCopy := karpenterMachinePool.DeepCopy()
-
-	bootstrapUserDataHash := fmt.Sprintf("%x", sha256.Sum256(bootstrapSecretValue))
-	previousHash, annotationHashExists := karpenterMachinePool.Annotations[BootstrapDataHashAnnotation]
-	if !annotationHashExists || previousHash != bootstrapUserDataHash {
-		roleIdentity := &capa.AWSClusterRoleIdentity{}
-		if err = r.client.Get(ctx, client.ObjectKey{Name: awsCluster.Spec.IdentityRef.Name}, roleIdentity); err != nil {
-			return reconcile.Result{}, fmt.Errorf("failed to get AWSClusterRoleIdentity referenced in AWSCluster: %w", err)
-		}
-
-		s3Client, err := r.awsClients.NewS3Client(awsCluster.Spec.Region, roleIdentity.Spec.RoleArn)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-
-		key := path.Join(S3ObjectPrefix, req.Name)
-
-		logger.Info("Writing userdata to S3", "bucket", awsCluster.Spec.S3Bucket.Name, "key", key)
-		if err = s3Client.Put(ctx, awsCluster.Spec.S3Bucket.Name, key, bootstrapSecretValue); err != nil {
-			return reconcile.Result{}, err
-		}
-
-		if karpenterMachinePool.Annotations == nil {
-			karpenterMachinePool.Annotations = make(map[string]string)
-		}
-		karpenterMachinePool.Annotations[BootstrapDataHashAnnotation] = bootstrapUserDataHash
-
-		if err := r.client.Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy)); err != nil {
-			logger.Error(err, "failed to patch karpenterMachinePool.annotations with user data hash", "annotation", BootstrapDataHashAnnotation)
-			return reconcile.Result{}, err
-		}
-	}
-
-	providerIDList, numberOfNodeClaims, err := r.computeProviderIDListFromNodeClaimsInWorkloadCluster(ctx, cluster)
+	err = r.putUserDataToS3IfNeeded(ctx, logger, karpenterMachinePool, awsCluster, client.ObjectKey{Namespace: req.Namespace, Name: *machinePool.Spec.Template.Spec.Bootstrap.DataSecretName})
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	if numberOfNodeClaims == 0 {
-		// Karpenter has not reacted yet, let's requeue
-		return reconcile.Result{RequeueAfter: 1 * time.Minute}, nil
+	return r.saveObservedStateInStatusField(ctx, logger, machinePool, karpenterMachinePool, cluster)
+}
+
+func (r *KarpenterMachinePoolReconciler) saveObservedStateInStatusField(ctx context.Context, logger logr.Logger, machinePool *capiexp.MachinePool, karpenterMachinePool *v1alpha1.KarpenterMachinePool, cluster *capi.Cluster) (reconcile.Result, error) {
+	providerIDList, numberOfNodeClaims, err := r.computeProviderIDListFromNodeClaimsInWorkloadCluster(ctx, logger, cluster)
+	if err != nil {
+		return reconcile.Result{}, err
 	}
+
+	karpenterMachinePoolCopy := karpenterMachinePool.DeepCopy()
 
 	karpenterMachinePool.Status.Replicas = numberOfNodeClaims
 	karpenterMachinePool.Status.Ready = true
 
-	logger.Info("Found NodeClaims in workload cluster, patching KarpenterMachinePool", "numberOfNodeClaims", numberOfNodeClaims)
+	logger.Info("Patching KarpenterMachinePool with found NodeClaims in workload cluster", "numberOfNodeClaims", numberOfNodeClaims)
 
 	if err := r.client.Status().Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy), client.FieldOwner("karpentermachinepool-controller")); err != nil {
-		logger.Error(err, "failed to patch karpenterMachinePool.status.Replicas")
+		logger.Error(err, "failed to patch karpenterMachinePool.status.Replicas and karpenterMachinePool.status.Ready")
 		return reconcile.Result{}, err
 	}
 
@@ -192,8 +150,59 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	return reconcile.Result{}, nil
 }
 
-func (r *KarpenterMachinePoolReconciler) computeProviderIDListFromNodeClaimsInWorkloadCluster(ctx context.Context, cluster *capi.Cluster) ([]string, int32, error) {
-	logger := log.FromContext(ctx)
+func (r *KarpenterMachinePoolReconciler) putUserDataToS3IfNeeded(ctx context.Context, logger logr.Logger, karpenterMachinePool *v1alpha1.KarpenterMachinePool, awsCluster *capa.AWSCluster, secretObjectKey client.ObjectKey) error {
+	bootstrapSecret := &v1.Secret{}
+	if err := r.client.Get(ctx, secretObjectKey, bootstrapSecret); err != nil {
+		return fmt.Errorf("bootstrap secret in MachinePool.spec.template.spec.bootstrap.dataSecretName is not found: %w", err)
+	}
+
+	bootstrapSecretValue, ok := bootstrapSecret.Data["value"]
+	if !ok {
+		return errors.New("error retrieving bootstrap data: secret value key is missing")
+	}
+
+	// Create deep copy of the reconciled object so we can change it
+	karpenterMachinePoolCopy := karpenterMachinePool.DeepCopy()
+
+	bootstrapUserDataHash := fmt.Sprintf("%x", sha256.Sum256(bootstrapSecretValue))
+	previousHash, annotationHashExists := karpenterMachinePool.Annotations[BootstrapDataHashAnnotation]
+	if annotationHashExists && previousHash == bootstrapUserDataHash {
+		logger.Info("user data is up to date, no need to call S3", "annotation", BootstrapDataHashAnnotation)
+		return nil
+	}
+
+	s3Client, err := GetS3ClientForAWSCluster(ctx, r.client, r.awsClients, awsCluster)
+	if err != nil {
+		return err
+	}
+
+	key := path.Join(S3ObjectPrefix, karpenterMachinePool.Name)
+
+	logger.Info("Writing userdata to S3", "bucket", awsCluster.Spec.S3Bucket.Name, "key", key)
+	if err = s3Client.Put(ctx, awsCluster.Spec.S3Bucket.Name, key, bootstrapSecretValue); err != nil {
+		return err
+	}
+
+	logger.Info("patching karpenterMachinePool.annotations with user data hash", "annotation", BootstrapDataHashAnnotation)
+	err = r.saveUserDataHashInAnnotation(ctx, karpenterMachinePoolCopy, bootstrapUserDataHash)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *KarpenterMachinePoolReconciler) saveUserDataHashInAnnotation(ctx context.Context, karpenterMachinePool *v1alpha1.KarpenterMachinePool, bootstrapUserDataHash string) error {
+	karpenterMachinePoolCopy := karpenterMachinePool.DeepCopy()
+	if karpenterMachinePool.Annotations == nil {
+		karpenterMachinePool.Annotations = make(map[string]string)
+	}
+	karpenterMachinePool.Annotations[BootstrapDataHashAnnotation] = bootstrapUserDataHash
+
+	return r.client.Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy), client.FieldOwner("karpentermachinepool-controller"))
+}
+
+func (r *KarpenterMachinePoolReconciler) computeProviderIDListFromNodeClaimsInWorkloadCluster(ctx context.Context, logger logr.Logger, cluster *capi.Cluster) ([]string, int32, error) {
 	var providerIDList []string
 
 	workloadClusterClient, err := r.clusterClientGetter(ctx, "", r.client, client.ObjectKeyFromObject(cluster))
