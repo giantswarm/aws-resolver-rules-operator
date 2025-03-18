@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
@@ -10,6 +11,7 @@ import (
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
@@ -157,4 +159,14 @@ func getPrefixListARN(cluster, managementCluster *capa.AWSCluster) string {
 	}
 
 	return annotations.GetNetworkTopologyPrefixList(managementCluster)
+}
+
+func GetS3ClientForAWSCluster(ctx context.Context, ctrClient client.Client, awsClients resolver.AWSClients, awsCluster *capa.AWSCluster) (resolver.S3Client, error) {
+	roleIdentity := &capa.AWSClusterRoleIdentity{}
+	err := ctrClient.Get(ctx, client.ObjectKey{Name: awsCluster.Spec.IdentityRef.Name}, roleIdentity)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get AWSClusterRoleIdentity referenced in AWSCluster: %w", err)
+	}
+
+	return awsClients.NewS3Client(awsCluster.Spec.Region, roleIdentity.Spec.RoleArn)
 }
