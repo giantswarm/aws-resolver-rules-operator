@@ -90,8 +90,6 @@ workflows:
         requires:
         - go-build
         - unit-tests
-        - integration-tests
-        - acceptance-tests
         filters:
             # Trigger the job also on git tag.
           tags:
