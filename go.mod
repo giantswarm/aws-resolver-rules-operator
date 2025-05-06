@@ -2,7 +2,7 @@ module github.com/aws-resolver-rules-operator
 
 go 1.22.0
 
-toolchain go1.22.6
+toolchain go1.24.3
 
 require (
 	github.com/aws/aws-sdk-go v1.55.5
