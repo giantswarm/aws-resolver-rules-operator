@@ -116,8 +116,8 @@ func predicateToFilterAWSClusterResourceVersionChanges(e event.UpdateEvent) bool
 	oldCluster.Status = capa.AWSClusterStatus{}
 	newCluster.Status = capa.AWSClusterStatus{}
 
-	oldCluster.ObjectMeta.ResourceVersion = ""
-	newCluster.ObjectMeta.ResourceVersion = ""
+	oldCluster.ResourceVersion = ""
+	newCluster.ResourceVersion = ""
 
 	return !cmp.Equal(oldCluster, newCluster)
 }
@@ -135,8 +135,8 @@ func predicateToFilterAWSManagedControlPlaneResourceVersionChanges(e event.Updat
 	oldCluster.Status = eks.AWSManagedControlPlaneStatus{}
 	newCluster.Status = eks.AWSManagedControlPlaneStatus{}
 
-	oldCluster.ObjectMeta.ResourceVersion = ""
-	newCluster.ObjectMeta.ResourceVersion = ""
+	oldCluster.ResourceVersion = ""
+	newCluster.ResourceVersion = ""
 
 	return !cmp.Equal(oldCluster, newCluster)
 }
