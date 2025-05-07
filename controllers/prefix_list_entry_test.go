@@ -13,7 +13,6 @@ import (
 	. "github.com/onsi/gomega/gstruct"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -83,7 +82,7 @@ var _ = Describe("PrefixListEntryReconciler", func() {
 
 	JustBeforeEach(func() {
 		request = ctrl.Request{
-			NamespacedName: types.NamespacedName{
+			NamespacedName: k8stypes.NamespacedName{
 				Name:      requestResourceName,
 				Namespace: namespace,
 			},
@@ -218,7 +217,7 @@ var _ = Describe("PrefixListEntryReconciler", func() {
 			})
 
 			It("removes the finalizer", func() {
-				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: cluster.Name, Namespace: namespace}, cluster)
+				err := k8sClient.Get(context.Background(), k8stypes.NamespacedName{Name: cluster.Name, Namespace: namespace}, cluster)
 				Expect(k8serrors.IsNotFound(err)).To(BeTrue())
 			})
 

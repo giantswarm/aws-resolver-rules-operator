@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
@@ -116,8 +114,8 @@ func (t *TransitGateways) get(ctx context.Context, name string) (*ec2.TransitGat
 	input := &ec2.DescribeTransitGatewaysInput{
 		Filters: []*ec2.Filter{
 			{
-				Name:   aws.String(nameTag),
-				Values: aws.StringSlice([]string{clusterTagValue}),
+				Name:   awssdk.String(nameTag),
+				Values: awssdk.StringSlice([]string{clusterTagValue}),
 			},
 		},
 	}
@@ -156,11 +154,11 @@ func (t *TransitGateways) create(ctx context.Context, name string, tags map[stri
 	input := &ec2.CreateTransitGatewayInput{
 		Description: awssdk.String(fmt.Sprintf("Transit Gateway for cluster %s", name)),
 		Options: &ec2.TransitGatewayRequestOptions{
-			AutoAcceptSharedAttachments: aws.String(ec2.AutoAcceptSharedAttachmentsValueEnable),
+			AutoAcceptSharedAttachments: awssdk.String(ec2.AutoAcceptSharedAttachmentsValueEnable),
 		},
 		TagSpecifications: []*ec2.TagSpecification{
 			{
-				ResourceType: aws.String(ec2.ResourceTypeTransitGateway),
+				ResourceType: awssdk.String(ec2.ResourceTypeTransitGateway),
 				Tags:         ec2tags,
 			},
 		},

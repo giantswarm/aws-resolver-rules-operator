@@ -9,7 +9,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -65,7 +64,7 @@ var _ = Describe("RouteReconciler", func() {
 			annotation.NetworkTopologyModeGiantSwarmManaged,
 		)
 
-		reconciler = controllers.NewRouteReconciler(types.NamespacedName{Namespace: managementCluster.Namespace, Name: managementCluster.Name}, clusterClient, clientsFactory)
+		reconciler = controllers.NewRouteReconciler(k8stypes.NamespacedName{Namespace: managementCluster.Namespace, Name: managementCluster.Name}, clusterClient, clientsFactory)
 
 		awsClusterRoleIdentity, awsCluster = createRandomClusterWithIdentity(
 			annotation.NetworkTopologyModeAnnotation,
@@ -183,7 +182,7 @@ var _ = Describe("RouteReconciler", func() {
 					routeTableClient.RemoveRoutesReturns(nil)
 				})
 				It("It removes the finalizer", func() {
-					err := k8sClient.Get(context.Background(), types.NamespacedName{Name: awsCluster.Name, Namespace: namespace}, awsCluster)
+					err := k8sClient.Get(context.Background(), k8stypes.NamespacedName{Name: awsCluster.Name, Namespace: namespace}, awsCluster)
 					Expect(k8serrors.IsNotFound(err)).To(BeTrue())
 				})
 			})
