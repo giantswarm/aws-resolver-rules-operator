@@ -126,13 +126,13 @@ func getPodLogs() {
 	maxLogLines := getMaxLogLines()
 	config, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
 	if err != nil {
-		fmt.Fprintf(GinkgoWriter, "Failed to build client config: %v", err)
+		GinkgoWriter.Printf("Failed to build client config: %v", err)
 		return
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		fmt.Fprintf(GinkgoWriter, "Failed to build client: %v", err)
+		GinkgoWriter.Printf("Failed to build client: %v", err)
 		return
 	}
 
@@ -142,12 +142,12 @@ func getPodLogs() {
 		LabelSelector: "app.kubernetes.io/name=aws-resolver-rules-operator",
 	})
 	if err != nil {
-		fmt.Fprintf(GinkgoWriter, "Failed to list pods: %v", err)
+		GinkgoWriter.Printf("Failed to list pods: %v", err)
 		return
 	}
 
 	if len(pods.Items) == 0 {
-		fmt.Fprintf(GinkgoWriter, "No pods found: %v", err)
+		GinkgoWriter.Printf("No pods found: %v", err)
 		return
 	}
 	pod := pods.Items[0]
@@ -156,18 +156,22 @@ func getPodLogs() {
 	req := podsClient.GetLogs(pod.Name, &logOptions)
 	logStream, err := req.Stream(context.Background())
 	if err != nil {
-		fmt.Fprintf(GinkgoWriter, "Failed to get log stream: %v", err)
+		GinkgoWriter.Printf("Failed to get log stream: %v", err)
 		return
 	}
-	defer logStream.Close()
+	defer func() {
+		if err := logStream.Close(); err != nil {
+			GinkgoWriter.Printf("failed to close log stream: %v", err)
+		}
+	}()
 
 	logBytes, err := io.ReadAll(logStream)
 	if err != nil {
-		fmt.Fprintf(GinkgoWriter, "Failed to read logs: %v", err)
+		GinkgoWriter.Printf("Failed to read logs: %v", err)
 		return
 	}
 
-	fmt.Fprintf(GinkgoWriter,
+	GinkgoWriter.Printf(
 		"\n\n---------------- Last %d log lines for %q pod ----------------\n%s\n--------------------------------\n\n",
 		maxLogLines,
 		pod.Name,

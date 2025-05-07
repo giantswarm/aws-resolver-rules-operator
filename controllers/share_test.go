@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/giantswarm/k8smetadata/pkg/annotation"
 	gsannotation "github.com/giantswarm/k8smetadata/pkg/annotation"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
@@ -56,11 +55,11 @@ var _ = Describe("Share", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		_, managementCluster = createRandomClusterWithIdentity(
-			annotation.NetworkTopologyModeAnnotation,
-			annotation.NetworkTopologyModeGiantSwarmManaged,
-			annotation.NetworkTopologyTransitGatewayIDAnnotation,
+			gsannotation.NetworkTopologyModeAnnotation,
+			gsannotation.NetworkTopologyModeGiantSwarmManaged,
+			gsannotation.NetworkTopologyTransitGatewayIDAnnotation,
 			transitGatewayARN,
-			annotation.NetworkTopologyPrefixListIDAnnotation,
+			gsannotation.NetworkTopologyPrefixListIDAnnotation,
 			prefixListARN,
 		)
 
@@ -247,8 +246,8 @@ var _ = Describe("Share", func() {
 			wcTransitGatewayARN = fmt.Sprintf("arn:aws:iam::123456789012:transit-gateways/%s", uuid.NewString())
 			wcPrefixListARN = fmt.Sprintf("arn:aws:iam::123456789012:prefix-lists/%s", uuid.NewString())
 			patchedCluster := cluster.DeepCopy()
-			patchedCluster.Annotations[annotation.NetworkTopologyTransitGatewayIDAnnotation] = wcTransitGatewayARN
-			patchedCluster.Annotations[annotation.NetworkTopologyPrefixListIDAnnotation] = wcPrefixListARN
+			patchedCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation] = wcTransitGatewayARN
+			patchedCluster.Annotations[gsannotation.NetworkTopologyPrefixListIDAnnotation] = wcPrefixListARN
 			err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
 			Expect(err).NotTo(HaveOccurred())
 		})

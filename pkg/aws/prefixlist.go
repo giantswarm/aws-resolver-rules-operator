@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/aws/aws-sdk-go/aws"
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
@@ -106,8 +105,8 @@ func (t *PrefixLists) getByName(ctx context.Context, name string) (*ec2.ManagedP
 	input := &ec2.DescribeManagedPrefixListsInput{
 		Filters: []*ec2.Filter{
 			{
-				Name:   aws.String(prefixListNameFilter),
-				Values: aws.StringSlice([]string{GetPrefixListName(name)}),
+				Name:   awssdk.String(prefixListNameFilter),
+				Values: awssdk.StringSlice([]string{GetPrefixListName(name)}),
 			},
 		},
 	}
@@ -151,7 +150,7 @@ func (t *PrefixLists) create(ctx context.Context, name string, tags map[string]s
 	if len(ec2Tags) != 0 {
 		input.TagSpecifications = []*ec2.TagSpecification{
 			{
-				ResourceType: aws.String(ec2.ResourceTypePrefixList),
+				ResourceType: awssdk.String(ec2.ResourceTypePrefixList),
 				Tags:         ec2Tags,
 			},
 		}

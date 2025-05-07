@@ -1,3 +1,15 @@
+version: 2
+linters:
+  exclusions:
+    rules:
+    - path: _test\.go
+      linters:
+      - gosec
+      - goconst
+    - path: tests/
+      # ST1001: should not use dot imports  # gomega is designed to be dot-imported.
+      text: ST1001
+# v1 config, remove when golangci-lint v2 is active
 issues:
   exclude-rules:
     - path: _test\.go

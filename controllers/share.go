@@ -8,7 +8,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/giantswarm/k8smetadata/pkg/annotation"
 	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/types"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -32,7 +31,7 @@ type ShareReconciler struct {
 }
 
 func NewShareReconciler(
-	managementCluster types.NamespacedName,
+	managementCluster k8stypes.NamespacedName,
 	clusterClient AWSClusterClient,
 	awsClients resolver.AWSClients,
 ) *ShareReconciler {
