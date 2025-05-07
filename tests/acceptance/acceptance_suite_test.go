@@ -159,7 +159,11 @@ func getPodLogs() {
 		GinkgoWriter.Printf("Failed to get log stream: %v", err)
 		return
 	}
-	defer logStream.Close()
+	defer func() {
+		if err := logStream.Close(); err != nil {
+			GinkgoWriter.Printf("failed to close log stream: %v", err)
+		}
+	}()
 
 	logBytes, err := io.ReadAll(logStream)
 	if err != nil {
