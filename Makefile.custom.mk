@@ -17,8 +17,13 @@ MANAGEMENT_CLUSTER_NAMESPACE ?= $(eval MANAGEMENT_CLUSTER_NAMESPACE := $$(shell 
 
 DOCKER_COMPOSE = bin/docker-compose
 
+.PHONY: crds
+crds: controller-gen ## Generate CustomResourceDefinition.
+	$(CONTROLLER_GEN) crd paths="./..." output:crd:artifacts:config=config/crd/bases
+	cp config/crd/bases/* helm/aws-resolver-rules-operator/templates/
+
 .PHONY: generate
-generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+generate: controller-gen crds ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	go generate ./...
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 

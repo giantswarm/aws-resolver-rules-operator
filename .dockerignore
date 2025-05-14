@@ -2,3 +2,4 @@
 # Ignore build and test binaries.
 bin/
 testbin/
+aws-resolver-rules-operator-test-secrets.sh
