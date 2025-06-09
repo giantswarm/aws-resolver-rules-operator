@@ -16,10 +16,10 @@ require (
 	github.com/prometheus/client_golang v1.22.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/tools v0.34.0
-	k8s.io/api v0.31.2
-	k8s.io/apimachinery v0.31.2
-	k8s.io/client-go v0.31.2
-	k8s.io/kubectl v0.31.2
+	k8s.io/api v0.33.1
+	k8s.io/apimachinery v0.33.1
+	k8s.io/client-go v0.33.1
+	k8s.io/kubectl v0.33.1
 	sigs.k8s.io/cluster-api v1.8.3
 	sigs.k8s.io/cluster-api-provider-aws/v2 v2.6.1
 	sigs.k8s.io/controller-runtime v0.19.3
