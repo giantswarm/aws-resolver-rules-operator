@@ -157,6 +157,17 @@ func (f *Fixture) Teardown() error {
 func (f *Fixture) createNetwork() Network {
 	createVpcOutput, err := f.EC2Client.CreateVpc(&ec2.CreateVpcInput{
 		CidrBlock: awssdk.String(ClusterVCPCIDR),
+		TagSpecifications: []*ec2.TagSpecification{
+			{
+				ResourceType: awssdk.String(ec2.ResourceTypeVpc),
+				Tags: []*ec2.Tag{
+					{
+						Key:   awssdk.String("aws-resolver-rules-operator.giantswarm.io/tests"),
+						Value: awssdk.String("acceptance"),
+					},
+				},
+			},
+		},
 	})
 	Expect(err).NotTo(HaveOccurred())
 
