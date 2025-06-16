@@ -170,3 +170,54 @@ func getEc2Tags(t map[string]string) []*ec2.Tag {
 	}
 	return tags
 }
+
+// TerminateInstancesByTag terminates all EC2 instances that have the specified tag key and value.
+func (a *AWSEC2) TerminateInstancesByTag(ctx context.Context, logger logr.Logger, tagKey, tagValue string) error {
+	logger.Info("Finding EC2 instances with tag", "tagKey", tagKey, "tagValue", tagValue)
+
+	// Create filter for the tag
+	filter := []*ec2.Filter{
+		{
+			Name:   aws.String("tag:" + tagKey),
+			Values: []*string{aws.String(tagValue)},
+		},
+	}
+
+	// Describe instances with the tag
+	resp, err := a.client.DescribeInstancesWithContext(ctx, &ec2.DescribeInstancesInput{
+		Filters: filter,
+	})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	// Collect instance IDs
+	var instanceIds []*string
+	for _, reservation := range resp.Reservations {
+		for _, instance := range reservation.Instances {
+			// Only include running or pending instances
+			if *instance.State.Name == ec2.InstanceStateNameRunning || *instance.State.Name == ec2.InstanceStateNamePending {
+				logger.Info("Found instance to terminate", "instanceId", *instance.InstanceId)
+				instanceIds = append(instanceIds, instance.InstanceId)
+			}
+		}
+	}
+
+	// If no instances found, return
+	if len(instanceIds) == 0 {
+		logger.Info("No instances found with the specified tag")
+		return nil
+	}
+
+	// Terminate the instances
+	logger.Info("Terminating instances", "count", len(instanceIds))
+	_, err = a.client.TerminateInstancesWithContext(ctx, &ec2.TerminateInstancesInput{
+		InstanceIds: instanceIds,
+	})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	logger.Info("Successfully requested termination of instances", "count", len(instanceIds), "tagKey", tagKey, "tagValue", tagValue)
+	return nil
+}

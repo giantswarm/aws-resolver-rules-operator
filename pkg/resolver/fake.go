@@ -9,6 +9,7 @@ type FakeClients struct {
 	PrefixListClient       PrefixListClient
 	TransitGatewayClient   TransitGatewayClient
 	RouteTableClient       RouteTableClient
+	S3Client               S3Client
 }
 
 func (f *FakeClients) NewResolverClient(region, roleToAssume string) (ResolverClient, error) {
@@ -37,6 +38,10 @@ func (f *FakeClients) NewRAMClientWithExternalId(region, arn, externalId string)
 
 func (f *FakeClients) NewRoute53Client(region, arn string) (Route53Client, error) {
 	return f.Route53Client, nil
+}
+
+func (f *FakeClients) NewS3Client(region, arn string) (S3Client, error) {
+	return f.S3Client, nil
 }
 
 func (f *FakeClients) NewTransitGatewayClient(region, arn string) (TransitGatewayClient, error) {

@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ram"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/aws/aws-sdk-go/service/route53resolver"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
@@ -149,6 +150,15 @@ func (c *Clients) NewRoute53Client(region, arn string) (resolver.Route53Client, 
 	return NewRoute53(client), nil
 }
 
+func (c *Clients) NewS3Client(region, arn string) (resolver.S3Client, error) {
+	client, err := c.newS3Client(region, arn, "")
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return &S3Client{client: client}, nil
+}
+
 func (c *Clients) NewTransitGatewayClient(region, rolearn string) (resolver.TransitGatewayClient, error) {
 	session, err := c.sessionForRole(rolearn)
 	if err != nil {
@@ -205,6 +215,19 @@ func (c *Clients) newRoute53Client(region, arn, externalId string) (*route53.Rou
 	route53Client.Handlers.CompleteAttempt.PushFront(captureRequestMetrics(controllerName))
 
 	return route53Client, nil
+}
+
+func (c *Clients) newS3Client(region, arn, externalId string) (*s3.S3, error) {
+	session, err := c.sessionFromRegion(region)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	s3Client := s3.New(session, &aws.Config{Credentials: stscreds.NewCredentials(session, arn, configureExternalId(arn, externalId))})
+	s3Client.Handlers.Build.PushFront(request.MakeAddToUserAgentHandler(controllerName, currentCommit))
+	s3Client.Handlers.CompleteAttempt.PushFront(captureRequestMetrics(controllerName))
+
+	return s3Client, nil
 }
 
 func configureExternalId(roleArn, externalId string) func(provider *stscreds.AssumeRoleProvider) {

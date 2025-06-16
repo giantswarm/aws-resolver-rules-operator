@@ -12,6 +12,9 @@ rules:
       - awsclusters
       - awsclusters/status
       - clusters
+      - machinepools
+      - karpentermachinepools
+      - karpentermachinepools/status
     verbs:
       - get
       - list
@@ -25,6 +28,14 @@ rules:
       - get
       - list
       - patch
+      - watch
+  - apiGroups:
+      - bootstrap.cluster.x-k8s.io
+    resources:
+      - kubeadmconfigs
+    verbs:
+      - get
+      - list
       - watch
   - apiGroups:
       - cluster.x-k8s.io
@@ -50,6 +61,14 @@ rules:
       - events
     verbs:
       - create
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
