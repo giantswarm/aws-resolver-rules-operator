@@ -7,12 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add crossplane controller to create crossplane provider cluster config.
+
 ## [0.18.0] - 2025-06-16
 
 ### Added
 
 - Add controller to create node pool bootstrap data on S3.
-- Add crossplane controller to create crossplane provider config.
 
 ### Changed
 

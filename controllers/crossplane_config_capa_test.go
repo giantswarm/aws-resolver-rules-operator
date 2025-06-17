@@ -24,7 +24,7 @@ import (
 
 const ManagementClusterName = "mcname"
 
-var _ = Describe("ConfigMapReconcilerCAPA", func() {
+var _ = Describe("CrossplaneClusterConfigMapReconcilerCAPA", func() {
 	var (
 		ctx context.Context
 
@@ -34,7 +34,7 @@ var _ = Describe("ConfigMapReconcilerCAPA", func() {
 		cluster    *capi.Cluster
 
 		request    ctrl.Request
-		reconciler *controllers.ConfigMapReconciler
+		reconciler *controllers.CrossplaneClusterConfigReconciler
 	)
 
 	verifyConfigMap := func() {
@@ -90,7 +90,7 @@ var _ = Describe("ConfigMapReconcilerCAPA", func() {
 		ctx = context.Background()
 
 		identity, awsCluster, cluster = createRandomCapaClusterWithIdentity()
-		reconciler = &controllers.ConfigMapReconciler{
+		reconciler = &controllers.CrossplaneClusterConfigReconciler{
 			Client:                k8sClient,
 			BaseDomain:            "base.domain.io",
 			ManagementClusterName: ManagementClusterName,

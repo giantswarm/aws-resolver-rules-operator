@@ -23,7 +23,7 @@ import (
 	"github.com/aws-resolver-rules-operator/controllers"
 )
 
-var _ = Describe("ConfigMapReconcilerEKS", func() {
+var _ = Describe("CrossplaneClusterConfigMapReconcilerEKS", func() {
 	var (
 		ctx context.Context
 
@@ -33,7 +33,7 @@ var _ = Describe("ConfigMapReconcilerEKS", func() {
 		cluster                *capi.Cluster
 
 		request    ctrl.Request
-		reconciler *controllers.ConfigMapReconciler
+		reconciler *controllers.CrossplaneClusterConfigReconciler
 	)
 
 	verifyConfigMap := func() {
@@ -88,7 +88,7 @@ var _ = Describe("ConfigMapReconcilerEKS", func() {
 		ctx = context.Background()
 
 		identity, awsManagedControlplane, cluster = createRandomAwsManagedControlplaneWithIdentity()
-		reconciler = &controllers.ConfigMapReconciler{
+		reconciler = &controllers.CrossplaneClusterConfigReconciler{
 			Client:                k8sClient,
 			BaseDomain:            "base.domain.io",
 			ManagementClusterName: ManagementClusterName,

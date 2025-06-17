@@ -34,7 +34,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
+	capalogger "sigs.k8s.io/cluster-api-provider-aws/v2/pkg/logger"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/util/predicates"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -44,7 +46,7 @@ import (
 
 const Finalizer = "crossplane-config-operator.finalizers.giantswarm.io/config-map-controller"
 
-type ConfigMapReconciler struct {
+type CrossplaneClusterConfigReconciler struct {
 	Client                client.Client
 	BaseDomain            string
 	ManagementClusterName string
@@ -68,13 +70,17 @@ type ClusterInfo struct {
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ConfigMapReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *CrossplaneClusterConfigReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	logger := capalogger.FromContext(ctx).GetLogger()
+
 	return ctrl.NewControllerManagedBy(mgr).
+		Named("crossplane-cluster-config").
 		For(&capi.Cluster{}).
+		WithEventFilter(predicates.ResourceNotPaused(logger)).
 		Complete(r)
 }
 
-func (r *ConfigMapReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *CrossplaneClusterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	clusterInfo := &ClusterInfo{}
@@ -210,7 +216,7 @@ func getIRSATrustDomains(awsCluster *capa.AWSCluster, fallbackComputedDomain str
 	return []string{fallbackComputedDomain}
 }
 
-func (r *ConfigMapReconciler) getRoleArn(ctx context.Context, idRef string, namespace string) (arn.ARN, error) {
+func (r *CrossplaneClusterConfigReconciler) getRoleArn(ctx context.Context, idRef string, namespace string) (arn.ARN, error) {
 	logger := log.FromContext(ctx)
 	identity := &capa.AWSClusterRoleIdentity{}
 	err := r.Client.Get(
@@ -234,7 +240,7 @@ func (r *ConfigMapReconciler) getRoleArn(ctx context.Context, idRef string, name
 	return roleARN, nil
 }
 
-func (r *ConfigMapReconciler) reconcileNormal(ctx context.Context, clusterInfo *ClusterInfo) (ctrl.Result, error) {
+func (r *CrossplaneClusterConfigReconciler) reconcileNormal(ctx context.Context, clusterInfo *ClusterInfo) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	logger.Info("Reconciling")
 	defer logger.Info("Done reconciling")
@@ -305,7 +311,7 @@ type crossplaneConfigValuesAWSClusterSecurityGroup struct {
 	ID string `json:"id"`
 }
 
-func (r *ConfigMapReconciler) reconcileConfigMap(ctx context.Context, clusterInfo *ClusterInfo, accountID, baseDomain string) error {
+func (r *CrossplaneClusterConfigReconciler) reconcileConfigMap(ctx context.Context, clusterInfo *ClusterInfo, accountID, baseDomain string) error {
 	config := &corev1.ConfigMap{}
 	err := r.Client.Get(ctx,
 		types.NamespacedName{
@@ -322,7 +328,7 @@ func (r *ConfigMapReconciler) reconcileConfigMap(ctx context.Context, clusterInf
 	return r.updateConfigMap(ctx, clusterInfo, config, accountID, baseDomain)
 }
 
-func (r *ConfigMapReconciler) reconcileProviderConfig(ctx context.Context, clusterInfo *ClusterInfo, accountID, providerRole string) error {
+func (r *CrossplaneClusterConfigReconciler) reconcileProviderConfig(ctx context.Context, clusterInfo *ClusterInfo, accountID, providerRole string) error {
 	logger := log.FromContext(ctx)
 
 	providerConfig := getProviderConfig(clusterInfo.Name, clusterInfo.Namespace)
@@ -346,7 +352,7 @@ func (r *ConfigMapReconciler) reconcileProviderConfig(ctx context.Context, clust
 	return r.updateProviderConfig(ctx, providerConfig, accountID, clusterInfo.Region, providerRole)
 }
 
-func (r *ConfigMapReconciler) reconcileDelete(ctx context.Context, cluster *capi.Cluster) (ctrl.Result, error) {
+func (r *CrossplaneClusterConfigReconciler) reconcileDelete(ctx context.Context, cluster *capi.Cluster) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	logger.Info("Reconcile delete")
 	defer logger.Info("Done deleting")
@@ -386,13 +392,13 @@ func (r *ConfigMapReconciler) reconcileDelete(ctx context.Context, cluster *capi
 	return ctrl.Result{}, nil
 }
 
-func (r *ConfigMapReconciler) AddFinalizer(ctx context.Context, cluster *capi.Cluster) error {
+func (r *CrossplaneClusterConfigReconciler) AddFinalizer(ctx context.Context, cluster *capi.Cluster) error {
 	originalCluster := cluster.DeepCopy()
 	controllerutil.AddFinalizer(cluster, Finalizer)
 	return r.Client.Patch(ctx, cluster, client.MergeFrom(originalCluster))
 }
 
-func (r *ConfigMapReconciler) RemoveFinalizer(ctx context.Context, cluster *capi.Cluster) error {
+func (r *CrossplaneClusterConfigReconciler) RemoveFinalizer(ctx context.Context, cluster *capi.Cluster) error {
 
 	// Check if there is an AWSCluster with the same name and namespace, and remove the finalizer. This enables the migration of the finalizer from `AWSCluster` to `Cluster`.
 	awsCluster := &capa.AWSCluster{}
@@ -422,7 +428,7 @@ func (r *ConfigMapReconciler) RemoveFinalizer(ctx context.Context, cluster *capi
 	return err
 }
 
-func (r *ConfigMapReconciler) createConfigMap(ctx context.Context, clusterInfo *ClusterInfo, accountID, baseDomain string) error {
+func (r *CrossplaneClusterConfigReconciler) createConfigMap(ctx context.Context, clusterInfo *ClusterInfo, accountID, baseDomain string) error {
 	logger := log.FromContext(ctx)
 
 	logger.Info("Creating config map")
@@ -457,7 +463,7 @@ func (r *ConfigMapReconciler) createConfigMap(ctx context.Context, clusterInfo *
 	return nil
 }
 
-func (r *ConfigMapReconciler) updateConfigMap(ctx context.Context,
+func (r *CrossplaneClusterConfigReconciler) updateConfigMap(ctx context.Context,
 	clusterInfo *ClusterInfo,
 	config *corev1.ConfigMap,
 	accountID, baseDomain string,
@@ -480,7 +486,7 @@ func (r *ConfigMapReconciler) updateConfigMap(ctx context.Context,
 	return nil
 }
 
-func (r *ConfigMapReconciler) createProviderConfig(ctx context.Context, providerConfig *unstructured.Unstructured, accountID, region, providerRole string) error {
+func (r *CrossplaneClusterConfigReconciler) createProviderConfig(ctx context.Context, providerConfig *unstructured.Unstructured, accountID, region, providerRole string) error {
 	logger := log.FromContext(ctx)
 
 	providerConfig.Object["spec"] = r.getProviderConfigSpec(accountID, region, providerRole)
@@ -498,7 +504,7 @@ func (r *ConfigMapReconciler) createProviderConfig(ctx context.Context, provider
 	return nil
 }
 
-func (r *ConfigMapReconciler) updateProviderConfig(ctx context.Context, providerConfig *unstructured.Unstructured, accountID, region, providerRole string) error {
+func (r *CrossplaneClusterConfigReconciler) updateProviderConfig(ctx context.Context, providerConfig *unstructured.Unstructured, accountID, region, providerRole string) error {
 	logger := log.FromContext(ctx)
 
 	patchedConfig := providerConfig.DeepCopy()
@@ -512,7 +518,7 @@ func (r *ConfigMapReconciler) updateProviderConfig(ctx context.Context, provider
 	return nil
 }
 
-func (r *ConfigMapReconciler) getProviderConfigSpec(accountID, region, providerRole string) map[string]interface{} {
+func (r *CrossplaneClusterConfigReconciler) getProviderConfigSpec(accountID, region, providerRole string) map[string]interface{} {
 	partition := getPartition(region)
 	return map[string]interface{}{
 		"credentials": map[string]interface{}{
