@@ -442,7 +442,7 @@ func (r *CrossplaneClusterConfigReconciler) createConfigMap(ctx context.Context,
 			Name:      fmt.Sprintf("%s-crossplane-config", clusterInfo.Name),
 			Namespace: clusterInfo.Namespace,
 			Labels: map[string]string{
-				"app.kubernetes.io/managed-by": "aws-crossplane-cluster-config-operator",
+				"app.kubernetes.io/managed-by": "aws-resolver-rules-operator",
 			},
 		},
 		Data: map[string]string{
