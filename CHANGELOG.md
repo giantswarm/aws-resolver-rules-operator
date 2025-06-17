@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add controller to create node pool bootstrap data on S3.
+- Add crossplane controller to create crossplane provider config.
 
 ### Changed
 

@@ -97,6 +97,7 @@ func main() {
 	var dnsServerVpcId string
 	var managementClusterName string
 	var managementClusterNamespace string
+	var crossplaneProviderRoleARN string
 	var workloadClusterBaseDomain string
 	var syncPeriod time.Duration
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
@@ -114,6 +115,7 @@ func main() {
 	flag.StringVar(&managementClusterName, "management-cluster-name", "", "Management cluster CR name.")
 	flag.StringVar(&managementClusterNamespace, "management-cluster-namespace", "", "Management cluster CR namespace.")
 	flag.StringVar(&workloadClusterBaseDomain, "basedomain", "", "Domain for workload cluster, e.g. installation.eu-west-1.aws.domain.tld")
+	flag.StringVar(&crossplaneProviderRoleARN, "crossplane-provider-role", "", "The role used by the aws crossplane provider.")
 	flag.DurationVar(&syncPeriod, "sync-period", 10*time.Minute, "The minimum interval at which watched resources are reconciled.")
 
 	opts := zap.Options{
@@ -193,6 +195,15 @@ func main() {
 
 	if err := (controllers.NewKarpenterMachinepoolReconciler(mgr.GetClient(), remote.NewClusterClient, cfg.awsClients)).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "userdata")
+		os.Exit(1)
+	}
+
+	if err = (&controllers.ConfigMapReconciler{
+		Client:       mgr.GetClient(),
+		BaseDomain:   workloadClusterBaseDomain,
+		ProviderRole: crossplaneProviderRoleARN,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Frigate")
 		os.Exit(1)
 	}
 

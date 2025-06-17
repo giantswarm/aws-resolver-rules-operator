@@ -33,7 +33,7 @@
                 }
             }
         },
-	"managementClusterName": {
+        "managementClusterName": {
             "type": "string"
         },
         "managementClusterNamespace": {
@@ -103,7 +103,7 @@
                         }
                     }
                 },
-                "capabilities":{
+                "capabilities": {
                     "type": "object",
                     "properties": {
                         "drop": {
@@ -111,7 +111,9 @@
                             "items": {
                                 "type": "string"
                             },
-                            "default": ["ALL"]
+                            "default": [
+                                "ALL"
+                            ]
                         }
                     }
                 }
@@ -129,6 +131,10 @@
                     }
                 }
             }
+        },
+        "crossplaneProviderRole": {
+            "type": "string",
+            "description": "The IAM role ARN used by the AWS crossplane provider"
         }
     }
 }
