@@ -129,27 +129,27 @@ func (f *Fixture) Teardown() error {
 	prefixListID := getARNID(prefixListAnnotation)
 
 	err = DeletePrefixList(f.EC2Client, prefixListID)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).To(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidPrefixListId.NotFound"))))
 
 	err = DetachTransitGateway(f.EC2Client, gatewayID, f.Network.VpcID)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).To(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidTransitGatewayID.NotFound"))))
 
 	Eventually(func() error {
 		err := DeleteTransitGateway(f.EC2Client, gatewayID)
 		return err
-	}).Should(Succeed())
+	}).Should(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidTransitGatewayID.NotFound"))))
 
 	err = DisassociateRouteTable(f.EC2Client, f.Network.AssociationID)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).To(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidRouteTableAssociationID.NotFound"))))
 
 	err = DeleteRouteTable(f.EC2Client, f.Network.RouteTableID)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).To(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidRouteTableID.NotFound"))))
 
 	err = DeleteSubnet(f.EC2Client, f.Network.SubnetID)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).To(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidSubnetID.NotFound"))))
 
 	err = DeleteVPC(f.EC2Client, f.Network.VpcID)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).To(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidVpcID.NotFound"))))
 
 	return nil
 }

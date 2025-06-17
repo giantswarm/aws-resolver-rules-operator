@@ -23,6 +23,7 @@ require (
 	sigs.k8s.io/cluster-api v1.8.3
 	sigs.k8s.io/cluster-api-provider-aws/v2 v2.6.1
 	sigs.k8s.io/controller-runtime v0.19.3
+	sigs.k8s.io/yaml v1.4.0
 )
 
 replace google.golang.org/protobuf v1.31.0 => google.golang.org/protobuf v1.33.0
@@ -87,5 +88,4 @@ require (
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
-	sigs.k8s.io/yaml v1.4.0 // indirect
 )

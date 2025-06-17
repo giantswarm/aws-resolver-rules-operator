@@ -69,6 +69,19 @@ rules:
       - get
       - list
       - watch
+  - apiGroups:
+      - ""
+      - aws.upbound.io
+    resources:
+      - configmaps
+      - providerconfigs
+    verbs:
+      - get
+      - list
+      - create
+      - delete
+      - patch
+      - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
