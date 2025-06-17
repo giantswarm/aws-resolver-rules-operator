@@ -131,10 +131,6 @@
                     }
                 }
             }
-        },
-        "crossplaneProviderRole": {
-            "type": "string",
-            "description": "The IAM role ARN used by the AWS crossplane provider"
         }
     }
 }

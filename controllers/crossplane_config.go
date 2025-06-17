@@ -45,9 +45,9 @@ import (
 const Finalizer = "crossplane-config-operator.finalizers.giantswarm.io/config-map-controller"
 
 type ConfigMapReconciler struct {
-	Client       client.Client
-	BaseDomain   string
-	ProviderRole string
+	Client                client.Client
+	BaseDomain            string
+	ManagementClusterName string
 }
 
 type ClusterInfo struct {
@@ -262,7 +262,7 @@ func (r *ConfigMapReconciler) reconcileNormal(ctx context.Context, clusterInfo *
 
 	}
 
-	err = r.reconcileProviderConfig(ctx, clusterInfo, clusterInfo.RoleArn.AccountID)
+	err = r.reconcileProviderConfig(ctx, clusterInfo, clusterInfo.RoleArn.AccountID, getProviderRole(r.ManagementClusterName))
 	if err != nil {
 		logger.Error(err, "failed to reconcile provider config")
 		return ctrl.Result{}, errors.WithStack(err)
@@ -270,6 +270,10 @@ func (r *ConfigMapReconciler) reconcileNormal(ctx context.Context, clusterInfo *
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func getProviderRole(managementClusterName string) string {
+	return fmt.Sprintf("giantswarm-%s-capa-controller", managementClusterName)
 }
 
 type crossplaneConfigValues struct {
@@ -318,7 +322,7 @@ func (r *ConfigMapReconciler) reconcileConfigMap(ctx context.Context, clusterInf
 	return r.updateConfigMap(ctx, clusterInfo, config, accountID, baseDomain)
 }
 
-func (r *ConfigMapReconciler) reconcileProviderConfig(ctx context.Context, clusterInfo *ClusterInfo, accountID string) error {
+func (r *ConfigMapReconciler) reconcileProviderConfig(ctx context.Context, clusterInfo *ClusterInfo, accountID, providerRole string) error {
 	logger := log.FromContext(ctx)
 
 	providerConfig := getProviderConfig(clusterInfo.Name, clusterInfo.Namespace)
@@ -332,14 +336,14 @@ func (r *ConfigMapReconciler) reconcileProviderConfig(ctx context.Context, clust
 		return nil
 	}
 	if k8serrors.IsNotFound(err) {
-		return r.createProviderConfig(ctx, providerConfig, accountID, clusterInfo.Region)
+		return r.createProviderConfig(ctx, providerConfig, accountID, clusterInfo.Region, providerRole)
 	}
 	if err != nil {
 		logger.Error(err, "Failed to get provider config")
 		return errors.WithStack(err)
 	}
 
-	return r.updateProviderConfig(ctx, providerConfig, accountID, clusterInfo.Region)
+	return r.updateProviderConfig(ctx, providerConfig, accountID, clusterInfo.Region, providerRole)
 }
 
 func (r *ConfigMapReconciler) reconcileDelete(ctx context.Context, cluster *capi.Cluster) (ctrl.Result, error) {
@@ -476,10 +480,10 @@ func (r *ConfigMapReconciler) updateConfigMap(ctx context.Context,
 	return nil
 }
 
-func (r *ConfigMapReconciler) createProviderConfig(ctx context.Context, providerConfig *unstructured.Unstructured, accountID, region string) error {
+func (r *ConfigMapReconciler) createProviderConfig(ctx context.Context, providerConfig *unstructured.Unstructured, accountID, region, providerRole string) error {
 	logger := log.FromContext(ctx)
 
-	providerConfig.Object["spec"] = r.getProviderConfigSpec(accountID, region)
+	providerConfig.Object["spec"] = r.getProviderConfigSpec(accountID, region, providerRole)
 
 	err := r.Client.Create(ctx, providerConfig)
 	if k8serrors.IsAlreadyExists(err) {
@@ -494,11 +498,11 @@ func (r *ConfigMapReconciler) createProviderConfig(ctx context.Context, provider
 	return nil
 }
 
-func (r *ConfigMapReconciler) updateProviderConfig(ctx context.Context, providerConfig *unstructured.Unstructured, accountID, region string) error {
+func (r *ConfigMapReconciler) updateProviderConfig(ctx context.Context, providerConfig *unstructured.Unstructured, accountID, region, providerRole string) error {
 	logger := log.FromContext(ctx)
 
 	patchedConfig := providerConfig.DeepCopy()
-	patchedConfig.Object["spec"] = r.getProviderConfigSpec(accountID, region)
+	patchedConfig.Object["spec"] = r.getProviderConfigSpec(accountID, region, providerRole)
 	err := r.Client.Patch(ctx, patchedConfig, client.MergeFrom(providerConfig))
 	if err != nil {
 		logger.Error(err, "Failed to patch provider config")
@@ -508,13 +512,13 @@ func (r *ConfigMapReconciler) updateProviderConfig(ctx context.Context, provider
 	return nil
 }
 
-func (r *ConfigMapReconciler) getProviderConfigSpec(accountID, region string) map[string]interface{} {
+func (r *ConfigMapReconciler) getProviderConfigSpec(accountID, region, providerRole string) map[string]interface{} {
 	partition := getPartition(region)
 	return map[string]interface{}{
 		"credentials": map[string]interface{}{
 			"source": "WebIdentity",
 			"webIdentity": map[string]interface{}{
-				"roleARN": fmt.Sprintf("arn:%s:iam::%s:role/%s", partition, accountID, r.ProviderRole),
+				"roleARN": fmt.Sprintf("arn:%s:iam::%s:role/%s", partition, accountID, providerRole),
 			},
 		},
 	}

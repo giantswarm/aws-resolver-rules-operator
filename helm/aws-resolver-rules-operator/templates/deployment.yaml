@@ -55,7 +55,6 @@ spec:
             - --management-cluster-namespace={{ .Values.managementClusterNamespace }}
             - --management-cluster-name={{ .Values.managementClusterName  }}
             - --basedomain={{ .Values.baseDomain }}
-            - --crossplane-provider-role={{ .Values.crossplaneProviderRole }}
             {{- if .Values.disableResolverControllers }}
             - --disable-resolver-controllers
             {{- end }}

@@ -78,7 +78,7 @@ var _ = Describe("ConfigMapReconcilerEKS", func() {
 			"credentials": MatchKeys(IgnoreExtras, Keys{
 				"source": Equal("WebIdentity"),
 				"webIdentity": MatchKeys(IgnoreExtras, Keys{
-					"roleARN": Equal(fmt.Sprintf("arn:aws:iam::%s:role/the-provider-role", accountID)),
+					"roleARN": Equal(fmt.Sprintf("arn:aws:iam::%s:role/giantswarm-%s-capa-controller", accountID, ManagementClusterName)),
 				}),
 			}),
 		})))
@@ -89,9 +89,9 @@ var _ = Describe("ConfigMapReconcilerEKS", func() {
 
 		identity, awsManagedControlplane, cluster = createRandomAwsManagedControlplaneWithIdentity()
 		reconciler = &controllers.ConfigMapReconciler{
-			Client:       k8sClient,
-			BaseDomain:   "base.domain.io",
-			ProviderRole: "the-provider-role",
+			Client:                k8sClient,
+			BaseDomain:            "base.domain.io",
+			ManagementClusterName: ManagementClusterName,
 		}
 		roleARN, err := arn.Parse(identity.Spec.RoleArn)
 		Expect(err).NotTo(HaveOccurred())
@@ -286,7 +286,7 @@ var _ = Describe("ConfigMapReconcilerEKS", func() {
 				"credentials": MatchKeys(IgnoreExtras, Keys{
 					"source": Equal("WebIdentity"),
 					"webIdentity": MatchKeys(IgnoreExtras, Keys{
-						"roleARN": Equal(fmt.Sprintf("arn:aws-cn:iam::%s:role/the-provider-role", accountID)),
+						"roleARN": Equal(fmt.Sprintf("arn:aws-cn:iam::%s:role/giantswarm-%s-capa-controller", accountID, ManagementClusterName)),
 					}),
 				}),
 			})))
