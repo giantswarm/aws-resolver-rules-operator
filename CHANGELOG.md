@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Don't reconcile the `ShareReconciler` if only the status field has changed.
+
 ## [0.19.0] - 2025-06-17
 
 ### Added
