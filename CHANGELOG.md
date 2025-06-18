@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Change `renovate` configuration to only get upgrades for CAPA compatible versions of k8s dependencies.
+
 ## [0.19.0] - 2025-06-17
 
 ### Added

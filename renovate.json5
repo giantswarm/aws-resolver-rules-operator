@@ -5,4 +5,14 @@
     // Go specific config - https://github.com/giantswarm/renovate-presets/blob/main/lang-go.json5
     "github>giantswarm/renovate-presets:lang-go.json5",
   ],
+  "packageRules": [
+    // Disable kubernetes and controller-runtime dependencies updates, because they will be updated to compatible versions when upgrading CAPA
+    {
+      "matchDepNames": [
+        "/^k8s\\.io\\//",
+        "/^sigs\\.k8s\\.io\\/controller-runtime$/"
+      ],
+      "enabled": false
+    }
+  ]
 }
