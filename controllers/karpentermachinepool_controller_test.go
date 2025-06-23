@@ -261,15 +261,42 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 				err = fakeCtrlClient.Delete(ctx, cluster)
 				Expect(err).NotTo(HaveOccurred())
 			})
+			// This test is a bit cumbersome because we are deleting CRs, so we can't use different `It` blocks or the CRs would be gone.
+			// We first mock the call to `TerminateInstancesByTag` to return some instances so that we can test
+			// the behavior when there are pending instances to remove.
+			// Then we manually/explicitly call the reconciler inside the test again, to be able to test the behavior
+			// when there are no instances to remove.
+			When("there are ec2 instances from karpenter", func() {
+				BeforeEach(func() {
+					ec2Client.TerminateInstancesByTagReturnsOnCall(0, []string{"i-abc123", "i-def456"}, nil)
+				})
 
-			It("deletes KarpenterMachinePool ec2 instances and finalizer", func() {
-				Expect(reconcileErr).NotTo(HaveOccurred())
-				Expect(ec2Client.TerminateInstancesByTagCallCount()).To(Equal(1))
+				It("deletes KarpenterMachinePool ec2 instances and finalizer", func() {
+					Expect(reconcileErr).NotTo(HaveOccurred())
+					Expect(ec2Client.TerminateInstancesByTagCallCount()).To(Equal(1))
+					Expect(reconcileResult.RequeueAfter).To(Equal(30 * time.Second))
 
-				karpenterMachinePoolList := &karpenterinfra.KarpenterMachinePoolList{}
-				err := fakeCtrlClient.List(ctx, karpenterMachinePoolList)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(karpenterMachinePoolList.Items).To(HaveLen(0))
+					karpenterMachinePoolList := &karpenterinfra.KarpenterMachinePoolList{}
+					err := fakeCtrlClient.List(ctx, karpenterMachinePoolList)
+					Expect(err).NotTo(HaveOccurred())
+					// Finalizer should be there blocking the deletion of the CR
+					Expect(karpenterMachinePoolList.Items).To(HaveLen(1))
+
+					ec2Client.TerminateInstancesByTagReturnsOnCall(0, nil, nil)
+
+					reconcileResult, reconcileErr = reconciler.Reconcile(ctx, ctrl.Request{
+						NamespacedName: types.NamespacedName{
+							Namespace: KarpenterMachinePoolNamespace,
+							Name:      KarpenterMachinePoolName,
+						},
+					})
+
+					karpenterMachinePoolList = &karpenterinfra.KarpenterMachinePoolList{}
+					err = fakeCtrlClient.List(ctx, karpenterMachinePoolList)
+					Expect(err).NotTo(HaveOccurred())
+					// Finalizer should've been removed and the CR should be gone
+					Expect(karpenterMachinePoolList.Items).To(HaveLen(0))
+				})
 			})
 		})
 	})

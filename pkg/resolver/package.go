@@ -26,7 +26,7 @@ type AWSClients interface {
 type EC2Client interface {
 	CreateSecurityGroupForResolverEndpoints(ctx context.Context, vpcId, groupName string, tags map[string]string) (string, error)
 	DeleteSecurityGroupForResolverEndpoints(ctx context.Context, logger logr.Logger, vpcId, groupName string) error
-	TerminateInstancesByTag(ctx context.Context, logger logr.Logger, tagKey, tagValue string) error
+	TerminateInstancesByTag(ctx context.Context, logger logr.Logger, tagKey, tagValue string) ([]string, error)
 }
 
 type ResourceShare struct {
