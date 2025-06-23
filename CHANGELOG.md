@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2025-06-23
+
 ### Changed
 
 - Change `renovate` configuration to only get upgrades for CAPA compatible versions of k8s dependencies.
@@ -266,7 +268,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
 
-[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.16.0...v0.17.0
