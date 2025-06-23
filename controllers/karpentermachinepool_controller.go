@@ -213,9 +213,17 @@ func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, lo
 
 		// Terminate EC2 instances with the karpenter.sh/nodepool tag matching the KarpenterMachinePool name
 		logger.Info("Terminating EC2 instances for KarpenterMachinePool", "karpenterMachinePoolName", karpenterMachinePool.Name)
-		err = ec2Client.TerminateInstancesByTag(ctx, logger, "karpenter.sh/nodepool", karpenterMachinePool.Name)
+		instanceIDs, err := ec2Client.TerminateInstancesByTag(ctx, logger, "karpenter.sh/nodepool", karpenterMachinePool.Name)
 		if err != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to terminate EC2 instances: %w", err)
+		}
+
+		logger.Info("Found instances", "instanceIDs", instanceIDs)
+
+		// Requeue if we find instances to terminate. Once there are no instances to terminate, we proceed to remove the finalizer.
+		// We do this when the cluster is being deleted, to avoid removing the finalizer before karpenter launches a new instance that would be left over.
+		if len(instanceIDs) > 0 {
+			return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
 		}
 	}
 

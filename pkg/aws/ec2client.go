@@ -172,7 +172,9 @@ func getEc2Tags(t map[string]string) []*ec2.Tag {
 }
 
 // TerminateInstancesByTag terminates all EC2 instances that have the specified tag key and value.
-func (a *AWSEC2) TerminateInstancesByTag(ctx context.Context, logger logr.Logger, tagKey, tagValue string) error {
+func (a *AWSEC2) TerminateInstancesByTag(ctx context.Context, logger logr.Logger, tagKey, tagValue string) ([]string, error) {
+	ids := []string{}
+
 	logger.Info("Finding EC2 instances with tag", "tagKey", tagKey, "tagValue", tagValue)
 
 	// Create filter for the tag
@@ -188,7 +190,7 @@ func (a *AWSEC2) TerminateInstancesByTag(ctx context.Context, logger logr.Logger
 		Filters: filter,
 	})
 	if err != nil {
-		return errors.WithStack(err)
+		return ids, errors.WithStack(err)
 	}
 
 	// Collect instance IDs
@@ -206,7 +208,7 @@ func (a *AWSEC2) TerminateInstancesByTag(ctx context.Context, logger logr.Logger
 	// If no instances found, return
 	if len(instanceIds) == 0 {
 		logger.Info("No instances found with the specified tag")
-		return nil
+		return ids, nil
 	}
 
 	// Terminate the instances
@@ -215,9 +217,13 @@ func (a *AWSEC2) TerminateInstancesByTag(ctx context.Context, logger logr.Logger
 		InstanceIds: instanceIds,
 	})
 	if err != nil {
-		return errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
-	logger.Info("Successfully requested termination of instances", "count", len(instanceIds), "tagKey", tagKey, "tagValue", tagValue)
-	return nil
+	for _, id := range instanceIds {
+		ids = append(ids, *id)
+	}
+
+	logger.Info("Successfully requested termination of instances", "count", len(ids), "instances", ids, "tagKey", tagKey, "tagValue", tagValue)
+	return ids, nil
 }
