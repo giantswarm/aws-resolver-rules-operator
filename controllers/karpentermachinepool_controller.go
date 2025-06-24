@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
@@ -27,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/aws-resolver-rules-operator/api/v1alpha1"
+	"github.com/aws-resolver-rules-operator/pkg/conditions"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
 
@@ -38,6 +41,14 @@ const (
 	KarpenterNodePoolReadyCondition capi.ConditionType = "KarpenterNodePoolReadyCondition"
 	// WaitingForBootstrapDataReason used when machine is waiting for bootstrap data to be ready before proceeding.
 	WaitingForBootstrapDataReason = "WaitingForBootstrapData"
+	// NodePoolCreatedReason indicates that the NodePool was successfully created
+	NodePoolCreatedReason = "NodePoolCreated"
+	// NodePoolCreationFailedReason indicates that the NodePool creation failed
+	NodePoolCreationFailedReason = "NodePoolCreationFailed"
+	// EC2NodeClassCreatedReason indicates that the EC2NodeClass was successfully created
+	EC2NodeClassCreatedReason = "EC2NodeClassCreated"
+	// EC2NodeClassCreationFailedReason indicates that the EC2NodeClass creation failed
+	EC2NodeClassCreationFailedReason = "EC2NodeClassCreationFailed"
 )
 
 type KarpenterMachinePoolReconciler struct {
@@ -165,6 +176,12 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 		}
 	}
 
+	// Create or update Karpenter resources in the workload cluster
+	if err := r.createOrUpdateKarpenterResources(ctx, logger, cluster, awsCluster, karpenterMachinePool, bootstrapSecretValue); err != nil {
+		logger.Error(err, "failed to create or update Karpenter resources")
+		return reconcile.Result{}, err
+	}
+
 	providerIDList, numberOfNodeClaims, err := r.computeProviderIDListFromNodeClaimsInWorkloadCluster(ctx, logger, cluster)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -212,13 +229,10 @@ func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, lo
 		}
 
 		// Terminate EC2 instances with the karpenter.sh/nodepool tag matching the KarpenterMachinePool name
-		logger.Info("Terminating EC2 instances for KarpenterMachinePool", "karpenterMachinePoolName", karpenterMachinePool.Name)
 		instanceIDs, err := ec2Client.TerminateInstancesByTag(ctx, logger, "karpenter.sh/nodepool", karpenterMachinePool.Name)
 		if err != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to terminate EC2 instances: %w", err)
 		}
-
-		logger.Info("Found instances", "instanceIDs", instanceIDs)
 
 		// Requeue if we find instances to terminate. Once there are no instances to terminate, we proceed to remove the finalizer.
 		// We do this when the cluster is being deleted, to avoid removing the finalizer before karpenter launches a new instance that would be left over.
@@ -227,9 +241,16 @@ func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, lo
 		}
 	}
 
+	// Delete Karpenter resources from the workload cluster
+	if err := r.deleteKarpenterResources(ctx, logger, cluster, karpenterMachinePool); err != nil {
+		logger.Error(err, "failed to delete Karpenter resources")
+		return reconcile.Result{}, err
+	}
+
 	// Create deep copy of the reconciled object so we can change it
 	karpenterMachinePoolCopy := karpenterMachinePool.DeepCopy()
 
+	logger.Info("Removing finalizer", "finalizer", KarpenterFinalizer)
 	controllerutil.RemoveFinalizer(karpenterMachinePool, KarpenterFinalizer)
 	if err := r.client.Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy)); err != nil {
 		logger.Error(err, "failed to remove finalizer", "finalizer", KarpenterFinalizer)
@@ -278,6 +299,307 @@ func (r *KarpenterMachinePoolReconciler) computeProviderIDListFromNodeClaimsInWo
 
 	// #nosec G115 -- len(nodeClaimList.Items) is guaranteed to be small in this context.
 	return providerIDList, int32(len(nodeClaimList.Items)), nil
+}
+
+// createOrUpdateKarpenterResources creates or updates the Karpenter NodePool and EC2NodeClass resources in the workload cluster
+func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, bootstrapSecretValue []byte) error {
+	workloadClusterClient, err := r.clusterClientGetter(ctx, "", r.client, client.ObjectKeyFromObject(cluster))
+	if err != nil {
+		return fmt.Errorf("failed to get workload cluster client: %w", err)
+	}
+
+	// Create or update EC2NodeClass
+	if err := r.createOrUpdateEC2NodeClass(ctx, logger, workloadClusterClient, cluster, awsCluster, karpenterMachinePool, bootstrapSecretValue); err != nil {
+		conditions.MarkEC2NodeClassNotReady(karpenterMachinePool, EC2NodeClassCreationFailedReason, err.Error())
+		return fmt.Errorf("failed to create or update EC2NodeClass: %w", err)
+	}
+
+	// Create or update NodePool
+	if err := r.createOrUpdateNodePool(ctx, logger, workloadClusterClient, karpenterMachinePool); err != nil {
+		conditions.MarkNodePoolNotReady(karpenterMachinePool, NodePoolCreationFailedReason, err.Error())
+		return fmt.Errorf("failed to create or update NodePool: %w", err)
+	}
+
+	// Mark both resources as ready
+	conditions.MarkEC2NodeClassReady(karpenterMachinePool)
+	conditions.MarkNodePoolReady(karpenterMachinePool)
+
+	return nil
+}
+
+// createOrUpdateEC2NodeClass creates or updates the EC2NodeClass resource in the workload cluster
+func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, cluster *capi.Cluster, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, bootstrapSecretValue []byte) error {
+	ec2NodeClassGVR := schema.GroupVersionResource{
+		Group:    "karpenter.k8s.aws",
+		Version:  "v1beta1",
+		Resource: "ec2nodeclasses",
+	}
+
+	ec2NodeClass := &unstructured.Unstructured{}
+	ec2NodeClass.SetGroupVersionKind(ec2NodeClassGVR.GroupVersion().WithKind("EC2NodeClass"))
+	ec2NodeClass.SetName(karpenterMachinePool.Name)
+	ec2NodeClass.SetNamespace("default")
+
+	// Check if the EC2NodeClass already exists
+	err := workloadClusterClient.Get(ctx, client.ObjectKey{Name: karpenterMachinePool.Name, Namespace: "default"}, ec2NodeClass)
+	if err != nil && !k8serrors.IsNotFound(err) {
+		return fmt.Errorf("failed to get existing EC2NodeClass: %w", err)
+	}
+
+	// Generate user data for Ignition
+	userData := r.generateUserData(awsCluster.Spec.Region, cluster.Name, karpenterMachinePool.Name)
+
+	// Build the EC2NodeClass spec
+	spec := map[string]interface{}{
+		"amiFamily": "AL2",
+		"role":      karpenterMachinePool.Spec.IamInstanceProfile,
+		"userData":  userData,
+	}
+
+	// Add AMI ID if specified
+	if karpenterMachinePool.Spec.EC2NodeClass != nil && karpenterMachinePool.Spec.EC2NodeClass.AMIID != nil {
+		spec["amiSelectorTerms"] = []map[string]interface{}{
+			{
+				"id": *karpenterMachinePool.Spec.EC2NodeClass.AMIID,
+			},
+		}
+	}
+
+	// Add security groups if specified
+	if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups) > 0 {
+		spec["securityGroupSelectorTerms"] = []map[string]interface{}{
+			{
+				"tags": map[string]string{
+					"Name": karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups[0], // Using first security group for now
+				},
+			},
+		}
+	}
+
+	// Add subnets if specified
+	if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.Subnets) > 0 {
+		subnetSelectorTerms := []map[string]interface{}{}
+		for _, subnet := range karpenterMachinePool.Spec.EC2NodeClass.Subnets {
+			subnetSelectorTerms = append(subnetSelectorTerms, map[string]interface{}{
+				"id": subnet,
+			})
+		}
+		spec["subnetSelectorTerms"] = subnetSelectorTerms
+	}
+
+	// Add tags if specified
+	if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.Tags) > 0 {
+		spec["tags"] = karpenterMachinePool.Spec.EC2NodeClass.Tags
+	}
+
+	ec2NodeClass.Object["spec"] = spec
+
+	// Create or update the EC2NodeClass
+	if k8serrors.IsNotFound(err) {
+		logger.Info("Creating EC2NodeClass", "name", karpenterMachinePool.Name)
+		if err := workloadClusterClient.Create(ctx, ec2NodeClass); err != nil {
+			return fmt.Errorf("failed to create EC2NodeClass: %w", err)
+		}
+	} else {
+		logger.Info("Updating EC2NodeClass", "name", karpenterMachinePool.Name)
+		if err := workloadClusterClient.Update(ctx, ec2NodeClass); err != nil {
+			return fmt.Errorf("failed to update EC2NodeClass: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// createOrUpdateNodePool creates or updates the NodePool resource in the workload cluster
+func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, karpenterMachinePool *v1alpha1.KarpenterMachinePool) error {
+	nodePoolGVR := schema.GroupVersionResource{
+		Group:    "karpenter.sh",
+		Version:  "v1beta1",
+		Resource: "nodepools",
+	}
+
+	nodePool := &unstructured.Unstructured{}
+	nodePool.SetGroupVersionKind(nodePoolGVR.GroupVersion().WithKind("NodePool"))
+	nodePool.SetName(karpenterMachinePool.Name)
+	nodePool.SetNamespace("default")
+
+	// Check if the NodePool already exists
+	err := workloadClusterClient.Get(ctx, client.ObjectKey{Name: karpenterMachinePool.Name, Namespace: "default"}, nodePool)
+	if err != nil && !k8serrors.IsNotFound(err) {
+		return fmt.Errorf("failed to get existing NodePool: %w", err)
+	}
+
+	// Build the NodePool spec
+	spec := map[string]interface{}{
+		"disruption": map[string]interface{}{
+			"consolidateAfter": "30s",
+		},
+		"template": map[string]interface{}{
+			"spec": map[string]interface{}{
+				"nodeClassRef": map[string]interface{}{
+					"apiVersion": "karpenter.k8s.aws/v1beta1",
+					"kind":       "EC2NodeClass",
+					"name":       karpenterMachinePool.Name,
+				},
+			},
+		},
+	}
+
+	// Add NodePool configuration if specified
+	if karpenterMachinePool.Spec.NodePool != nil {
+		if karpenterMachinePool.Spec.NodePool.Disruption != nil {
+			if karpenterMachinePool.Spec.NodePool.Disruption.ConsolidateAfter != nil {
+				spec["disruption"].(map[string]interface{})["consolidateAfter"] = karpenterMachinePool.Spec.NodePool.Disruption.ConsolidateAfter.Duration.String()
+			}
+			if karpenterMachinePool.Spec.NodePool.Disruption.ConsolidationPolicy != nil {
+				spec["disruption"].(map[string]interface{})["consolidationPolicy"] = *karpenterMachinePool.Spec.NodePool.Disruption.ConsolidationPolicy
+			}
+		}
+
+		if karpenterMachinePool.Spec.NodePool.Limits != nil {
+			limits := map[string]interface{}{}
+			if karpenterMachinePool.Spec.NodePool.Limits.CPU != nil {
+				limits["cpu"] = karpenterMachinePool.Spec.NodePool.Limits.CPU.String()
+			}
+			if karpenterMachinePool.Spec.NodePool.Limits.Memory != nil {
+				limits["memory"] = karpenterMachinePool.Spec.NodePool.Limits.Memory.String()
+			}
+			if len(limits) > 0 {
+				spec["limits"] = limits
+			}
+		}
+
+		if len(karpenterMachinePool.Spec.NodePool.Requirements) > 0 {
+			requirements := []map[string]interface{}{}
+			for _, req := range karpenterMachinePool.Spec.NodePool.Requirements {
+				requirement := map[string]interface{}{
+					"key":      req.Key,
+					"operator": req.Operator,
+				}
+				if len(req.Values) > 0 {
+					requirement["values"] = req.Values
+				}
+				requirements = append(requirements, requirement)
+			}
+			spec["requirements"] = requirements
+		}
+
+		if len(karpenterMachinePool.Spec.NodePool.Taints) > 0 {
+			taints := []map[string]interface{}{}
+			for _, taint := range karpenterMachinePool.Spec.NodePool.Taints {
+				taintMap := map[string]interface{}{
+					"key":    taint.Key,
+					"effect": taint.Effect,
+				}
+				if taint.Value != nil {
+					taintMap["value"] = *taint.Value
+				}
+				taints = append(taints, taintMap)
+			}
+			spec["taints"] = taints
+		}
+
+		if len(karpenterMachinePool.Spec.NodePool.Labels) > 0 {
+			spec["labels"] = karpenterMachinePool.Spec.NodePool.Labels
+		}
+
+		if karpenterMachinePool.Spec.NodePool.Weight != nil {
+			spec["weight"] = *karpenterMachinePool.Spec.NodePool.Weight
+		}
+	}
+
+	nodePool.Object["spec"] = spec
+
+	// Create or update the NodePool
+	if k8serrors.IsNotFound(err) {
+		logger.Info("Creating NodePool", "name", karpenterMachinePool.Name)
+		if err := workloadClusterClient.Create(ctx, nodePool); err != nil {
+			return fmt.Errorf("failed to create NodePool: %w", err)
+		}
+	} else {
+		logger.Info("Updating NodePool", "name", karpenterMachinePool.Name)
+		if err := workloadClusterClient.Update(ctx, nodePool); err != nil {
+			return fmt.Errorf("failed to update NodePool: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// deleteKarpenterResources deletes the Karpenter NodePool and EC2NodeClass resources from the workload cluster
+func (r *KarpenterMachinePoolReconciler) deleteKarpenterResources(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool) error {
+	workloadClusterClient, err := r.clusterClientGetter(ctx, "", r.client, client.ObjectKeyFromObject(cluster))
+	if err != nil {
+		return fmt.Errorf("failed to get workload cluster client: %w", err)
+	}
+
+	// Delete NodePool
+	nodePoolGVR := schema.GroupVersionResource{
+		Group:    "karpenter.sh",
+		Version:  "v1beta1",
+		Resource: "nodepools",
+	}
+
+	nodePool := &unstructured.Unstructured{}
+	nodePool.SetGroupVersionKind(nodePoolGVR.GroupVersion().WithKind("NodePool"))
+	nodePool.SetName(karpenterMachinePool.Name)
+	nodePool.SetNamespace("default")
+
+	if err := workloadClusterClient.Delete(ctx, nodePool); err != nil && !k8serrors.IsNotFound(err) {
+		logger.Error(err, "failed to delete NodePool", "name", karpenterMachinePool.Name)
+		return fmt.Errorf("failed to delete NodePool: %w", err)
+	}
+
+	// Delete EC2NodeClass
+	ec2NodeClassGVR := schema.GroupVersionResource{
+		Group:    "karpenter.k8s.aws",
+		Version:  "v1beta1",
+		Resource: "ec2nodeclasses",
+	}
+
+	ec2NodeClass := &unstructured.Unstructured{}
+	ec2NodeClass.SetGroupVersionKind(ec2NodeClassGVR.GroupVersion().WithKind("EC2NodeClass"))
+	ec2NodeClass.SetName(karpenterMachinePool.Name)
+	ec2NodeClass.SetNamespace("default")
+
+	if err := workloadClusterClient.Delete(ctx, ec2NodeClass); err != nil && !k8serrors.IsNotFound(err) {
+		logger.Error(err, "failed to delete EC2NodeClass", "name", karpenterMachinePool.Name)
+		return fmt.Errorf("failed to delete EC2NodeClass: %w", err)
+	}
+
+	return nil
+}
+
+// generateUserData generates the user data for Ignition configuration
+func (r *KarpenterMachinePoolReconciler) generateUserData(region, clusterName, karpenterMachinePoolName string) string {
+	userData := map[string]interface{}{
+		"ignition": map[string]interface{}{
+			"config": map[string]interface{}{
+				"merge": []map[string]interface{}{
+					{
+						"source":       fmt.Sprintf("s3://%s-capa-%s/%s/%s", region, clusterName, S3ObjectPrefix, karpenterMachinePoolName),
+						"verification": map[string]interface{}{},
+					},
+				},
+				"replace": map[string]interface{}{
+					"verification": map[string]interface{}{},
+				},
+			},
+			"proxy": map[string]interface{}{},
+			"security": map[string]interface{}{
+				"tls": map[string]interface{}{},
+			},
+			"timeouts": map[string]interface{}{},
+			"version":  "3.4.0",
+		},
+		"kernelArguments": map[string]interface{}{},
+		"passwd":          map[string]interface{}{},
+		"storage":         map[string]interface{}{},
+		"systemd":         map[string]interface{}{},
+	}
+
+	userDataBytes, _ := json.Marshal(userData)
+	return string(userDataBytes)
 }
 
 // SetupWithManager sets up the controller with the Manager.
