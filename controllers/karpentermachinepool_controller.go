@@ -178,11 +178,12 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	karpenterMachinePool.Status.Replicas = numberOfNodeClaims
 	karpenterMachinePool.Status.Ready = true
 
-	logger.Info("Found NodeClaims in workload cluster, patching KarpenterMachinePool", "numberOfNodeClaims", numberOfNodeClaims)
-
-	if err := r.client.Status().Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy), client.FieldOwner("karpentermachinepool-controller")); err != nil {
-		logger.Error(err, "failed to patch karpenterMachinePool.status.Replicas")
-		return reconcile.Result{}, err
+	if !karpenterMachinePoolCopy.Status.Ready || karpenterMachinePoolCopy.Status.Replicas != numberOfNodeClaims {
+		logger.Info("Found NodeClaims in workload cluster, patching KarpenterMachinePool.status field", "numberOfNodeClaims", numberOfNodeClaims)
+		if err := r.client.Status().Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy), client.FieldOwner("karpentermachinepool-controller")); err != nil {
+			logger.Error(err, "failed to patch karpenterMachinePool.status.Replicas")
+			return reconcile.Result{}, err
+		}
 	}
 
 	karpenterMachinePool.Spec.ProviderIDList = providerIDList
@@ -193,6 +194,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	}
 
 	if machinePool.Spec.Replicas == nil || *machinePool.Spec.Replicas != numberOfNodeClaims {
+		logger.Info("Patching MachinePool.spec.replicas field", "numberOfNodeClaims", numberOfNodeClaims)
 		machinePoolCopy := machinePool.DeepCopy()
 		machinePool.Spec.Replicas = &numberOfNodeClaims
 		if err := r.client.Patch(ctx, machinePool, client.MergeFrom(machinePoolCopy), client.FieldOwner("karpenter-machinepool-controller")); err != nil {
@@ -212,22 +214,34 @@ func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, lo
 		}
 
 		// Terminate EC2 instances with the karpenter.sh/nodepool tag matching the KarpenterMachinePool name
-		logger.Info("Terminating EC2 instances for KarpenterMachinePool", "karpenterMachinePoolName", karpenterMachinePool.Name)
-		instanceIDs, err := ec2Client.TerminateInstancesByTag(ctx, logger, "karpenter.sh/nodepool", karpenterMachinePool.Name)
+		_, err = ec2Client.TerminateInstancesByTag(ctx, logger, "karpenter.sh/nodepool", karpenterMachinePool.Name)
 		if err != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to terminate EC2 instances: %w", err)
 		}
-
-		logger.Info("Found instances", "instanceIDs", instanceIDs)
-
-		// Requeue if we find instances to terminate. Once there are no instances to terminate, we proceed to remove the finalizer.
-		// We do this when the cluster is being deleted, to avoid removing the finalizer before karpenter launches a new instance that would be left over.
-		if len(instanceIDs) > 0 {
-			return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
-		}
 	}
 
-	// Create deep copy of the reconciled object so we can change it
+	workloadClusterClient, err := r.clusterClientGetter(ctx, "", r.client, client.ObjectKeyFromObject(cluster))
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	nodePool := &unstructured.Unstructured{}
+	nodePool.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "karpenter.sh",
+		Kind:    "NodePool",
+		Version: "v1",
+	})
+	err = workloadClusterClient.Get(ctx, client.ObjectKey{Name: karpenterMachinePool.Name}, nodePool)
+	if client.IgnoreNotFound(err) != nil {
+		return reconcile.Result{}, err
+	}
+
+	// Requeue if we find the karpenter NodePool CR, otherwise `karpenter` may launch new instances for it
+	if err == nil {
+		return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
+	// Create a deep copy of the reconciled object so we can change it
 	karpenterMachinePoolCopy := karpenterMachinePool.DeepCopy()
 
 	controllerutil.RemoveFinalizer(karpenterMachinePool, KarpenterFinalizer)

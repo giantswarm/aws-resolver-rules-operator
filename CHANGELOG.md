@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Only remove `finalizer` after the karpenter NodePool CR in the workload cluster has been removed.
+
 ## [0.20.0] - 2025-06-23
 
 ### Changed
