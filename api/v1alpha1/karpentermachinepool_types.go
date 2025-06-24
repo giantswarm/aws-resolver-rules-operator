@@ -17,8 +17,123 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
+
+// NodePoolSpec defines the configuration for a Karpenter NodePool
+type NodePoolSpec struct {
+	// Disruption specifies the disruption behavior for the node pool
+	// +optional
+	Disruption *DisruptionSpec `json:"disruption,omitempty"`
+
+	// Limits specifies the limits for the node pool
+	// +optional
+	Limits *LimitsSpec `json:"limits,omitempty"`
+
+	// Requirements specifies the requirements for the node pool
+	// +optional
+	Requirements []RequirementSpec `json:"requirements,omitempty"`
+
+	// Taints specifies the taints to apply to nodes in this pool
+	// +optional
+	Taints []TaintSpec `json:"taints,omitempty"`
+
+	// Labels specifies the labels to apply to nodes in this pool
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Weight specifies the weight of this node pool
+	// +optional
+	Weight *int32 `json:"weight,omitempty"`
+}
+
+// DisruptionSpec defines the disruption behavior for a NodePool
+type DisruptionSpec struct {
+	// ConsolidateAfter specifies when to consolidate nodes
+	// +optional
+	ConsolidateAfter *metav1.Duration `json:"consolidateAfter,omitempty"`
+
+	// ConsolidationPolicy specifies the consolidation policy
+	// +optional
+	ConsolidationPolicy *string `json:"consolidationPolicy,omitempty"`
+
+	// ConsolidateUnder specifies when to consolidate under
+	// +optional
+	ConsolidateUnder *ConsolidateUnderSpec `json:"consolidateUnder,omitempty"`
+}
+
+// ConsolidateUnderSpec defines when to consolidate under
+type ConsolidateUnderSpec struct {
+	// CPUUtilization specifies the CPU utilization threshold
+	// +optional
+	CPUUtilization *string `json:"cpuUtilization,omitempty"`
+
+	// MemoryUtilization specifies the memory utilization threshold
+	// +optional
+	MemoryUtilization *string `json:"memoryUtilization,omitempty"`
+}
+
+// LimitsSpec defines the limits for a NodePool
+type LimitsSpec struct {
+	// CPU specifies the CPU limit
+	// +optional
+	CPU *resource.Quantity `json:"cpu,omitempty"`
+
+	// Memory specifies the memory limit
+	// +optional
+	Memory *resource.Quantity `json:"memory,omitempty"`
+}
+
+// RequirementSpec defines a requirement for a NodePool
+type RequirementSpec struct {
+	// Key specifies the requirement key
+	Key string `json:"key"`
+
+	// Operator specifies the requirement operator
+	Operator string `json:"operator"`
+
+	// Values specifies the requirement values
+	// +optional
+	Values []string `json:"values,omitempty"`
+}
+
+// TaintSpec defines a taint for a NodePool
+type TaintSpec struct {
+	// Key specifies the taint key
+	Key string `json:"key"`
+
+	// Value specifies the taint value
+	// +optional
+	Value *string `json:"value,omitempty"`
+
+	// Effect specifies the taint effect
+	Effect string `json:"effect"`
+}
+
+// EC2NodeClassSpec defines the configuration for a Karpenter EC2NodeClass
+type EC2NodeClassSpec struct {
+	// AMIID specifies the AMI ID to use
+	// +optional
+	AMIID *string `json:"amiId,omitempty"`
+
+	// SecurityGroups specifies the security groups to use
+	// +optional
+	SecurityGroups []string `json:"securityGroups,omitempty"`
+
+	// Subnets specifies the subnets to use
+	// +optional
+	Subnets []string `json:"subnets,omitempty"`
+
+	// UserData specifies the user data to use
+	// +optional
+	UserData *string `json:"userData,omitempty"`
+
+	// Tags specifies the tags to apply to EC2 instances
+	// +optional
+	Tags map[string]string `json:"tags,omitempty"`
+}
 
 // KarpenterMachinePoolSpec defines the desired state of KarpenterMachinePool.
 type KarpenterMachinePoolSpec struct {
@@ -26,6 +141,15 @@ type KarpenterMachinePoolSpec struct {
 	// with the IAM role for the instance. The instance profile contains the IAM
 	// role.
 	IamInstanceProfile string `json:"iamInstanceProfile,omitempty"`
+
+	// NodePool specifies the configuration for the Karpenter NodePool
+	// +optional
+	NodePool *NodePoolSpec `json:"nodePool,omitempty"`
+
+	// EC2NodeClass specifies the configuration for the Karpenter EC2NodeClass
+	// +optional
+	EC2NodeClass *EC2NodeClassSpec `json:"ec2NodeClass,omitempty"`
+
 	// ProviderIDList are the identification IDs of machine instances provided by the provider.
 	// This field must match the provider IDs as seen on the node objects corresponding to a machine pool's machine instances.
 	// +optional
@@ -41,6 +165,18 @@ type KarpenterMachinePoolStatus struct {
 	// Replicas is the most recently observed number of replicas
 	// +optional
 	Replicas int32 `json:"replicas"`
+
+	// Conditions defines current service state of the KarpenterMachinePool.
+	// +optional
+	Conditions capi.Conditions `json:"conditions,omitempty"`
+
+	// NodePoolReady indicates whether the NodePool is ready
+	// +optional
+	NodePoolReady bool `json:"nodePoolReady"`
+
+	// EC2NodeClassReady indicates whether the EC2NodeClass is ready
+	// +optional
+	EC2NodeClassReady bool `json:"ec2NodeClassReady"`
 }
 
 // +kubebuilder:object:root=true
@@ -71,4 +207,12 @@ type KarpenterMachinePoolList struct {
 
 func init() {
 	SchemeBuilder.Register(&KarpenterMachinePool{}, &KarpenterMachinePoolList{})
+}
+
+func (in *KarpenterMachinePool) GetConditions() capi.Conditions {
+	return in.Status.Conditions
+}
+
+func (in *KarpenterMachinePool) SetConditions(conditions capi.Conditions) {
+	in.Status.Conditions = conditions
 }
