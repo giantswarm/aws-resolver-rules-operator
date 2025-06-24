@@ -179,7 +179,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	karpenterMachinePool.Status.Ready = true
 
 	if !karpenterMachinePoolCopy.Status.Ready || karpenterMachinePoolCopy.Status.Replicas != numberOfNodeClaims {
-		logger.Info("Found NodeClaims in workload cluster, patching KarpenterMachinePool.status field", "numberOfNodeClaims", numberOfNodeClaims)
+		logger.Info("Found NodeClaims in workload cluster, patching KarpenterMachinePool.status field", "numberOfNodeClaims", numberOfNodeClaims, "currentNumberOfReplicas", karpenterMachinePoolCopy.Status.Replicas)
 		if err := r.client.Status().Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy), client.FieldOwner("karpentermachinepool-controller")); err != nil {
 			logger.Error(err, "failed to patch karpenterMachinePool.status.Replicas")
 			return reconcile.Result{}, err
@@ -245,6 +245,7 @@ func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, lo
 	karpenterMachinePoolCopy := karpenterMachinePool.DeepCopy()
 
 	controllerutil.RemoveFinalizer(karpenterMachinePool, KarpenterFinalizer)
+	logger.Info("Removing finalizer", "finalizer", KarpenterFinalizer)
 	if err := r.client.Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy)); err != nil {
 		logger.Error(err, "failed to remove finalizer", "finalizer", KarpenterFinalizer)
 		return reconcile.Result{}, err
