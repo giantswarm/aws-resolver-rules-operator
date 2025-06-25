@@ -820,6 +820,78 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 			Expect(reconcileErr).NotTo(HaveOccurred())
 		})
 	})
+
+	Describe("CompareKubernetesVersions", func() {
+		It("should correctly compare versions", func() {
+			// Test cases: (version1, version2, expected_result)
+			testCases := []struct {
+				v1, v2 string
+				want   int
+			}{
+				{"v1.20.0", "v1.20.0", 0},
+				{"v1.20.0", "v1.21.0", -1},
+				{"v1.21.0", "v1.20.0", 1},
+				{"v1.20.1", "v1.20.0", 1},
+				{"v1.20.0", "v1.20.1", -1},
+				{"1.20.0", "v1.20.0", 0},
+				{"v1.20.0", "1.20.0", 0},
+			}
+
+			for _, tc := range testCases {
+				result, err := controllers.CompareKubernetesVersions(tc.v1, tc.v2)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).To(Equal(tc.want), "comparing %s with %s", tc.v1, tc.v2)
+			}
+		})
+
+		It("should handle invalid version formats", func() {
+			_, err := controllers.CompareKubernetesVersions("invalid", "v1.20.0")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid version format"))
+		})
+	})
+
+	Describe("IsVersionSkewAllowed", func() {
+		It("should allow updates when control plane is older or equal", func() {
+			testCases := []struct {
+				controlPlane, worker string
+				allowed              bool
+			}{
+				{"v1.20.0", "v1.20.0", true}, // Same version
+				{"v1.20.0", "v1.21.0", true}, // Worker newer
+				{"v1.20.0", "v1.22.0", true}, // Worker newer
+			}
+
+			for _, tc := range testCases {
+				allowed, err := controllers.IsVersionSkewAllowed(tc.controlPlane, tc.worker)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(allowed).To(Equal(tc.allowed), "control plane %s, worker %s", tc.controlPlane, tc.worker)
+			}
+		})
+
+		It("should allow updates within 2 minor versions", func() {
+			testCases := []struct {
+				controlPlane, worker string
+				allowed              bool
+			}{
+				{"v1.22.0", "v1.20.0", true},  // 2 versions behind
+				{"v1.22.0", "v1.21.0", true},  // 1 version behind
+				{"v1.22.0", "v1.19.0", false}, // 3 versions behind
+				{"v1.23.0", "v1.20.0", false}, // 3 versions behind
+			}
+
+			for _, tc := range testCases {
+				allowed, err := controllers.IsVersionSkewAllowed(tc.controlPlane, tc.worker)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(allowed).To(Equal(tc.allowed), "control plane %s, worker %s", tc.controlPlane, tc.worker)
+			}
+		})
+
+		It("should handle invalid version formats", func() {
+			_, err := controllers.IsVersionSkewAllowed("invalid", "v1.20.0")
+			Expect(err).To(HaveOccurred())
+		})
+	})
 })
 
 // Helper function to create string pointers
