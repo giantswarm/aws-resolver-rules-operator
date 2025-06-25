@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -18,6 +20,7 @@ import (
 	capalogger "sigs.k8s.io/cluster-api-provider-aws/v2/pkg/logger"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/controllers/remote"
+	capiexp "sigs.k8s.io/cluster-api/exp/api/v1beta1"
 	capiutilexp "sigs.k8s.io/cluster-api/exp/util"
 	capiutil "sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
@@ -49,6 +52,8 @@ const (
 	EC2NodeClassCreatedReason = "EC2NodeClassCreated"
 	// EC2NodeClassCreationFailedReason indicates that the EC2NodeClass creation failed
 	EC2NodeClassCreationFailedReason = "EC2NodeClassCreationFailed"
+	// VersionSkewBlockedReason indicates that the update was blocked due to version skew policy
+	VersionSkewBlockedReason = "VersionSkewBlocked"
 )
 
 type KarpenterMachinePoolReconciler struct {
@@ -177,7 +182,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	}
 
 	// Create or update Karpenter resources in the workload cluster
-	if err := r.createOrUpdateKarpenterResources(ctx, logger, cluster, awsCluster, karpenterMachinePool, bootstrapSecretValue); err != nil {
+	if err := r.createOrUpdateKarpenterResources(ctx, logger, cluster, awsCluster, karpenterMachinePool, machinePool, bootstrapSecretValue); err != nil {
 		logger.Error(err, "failed to create or update Karpenter resources")
 		return reconcile.Result{}, err
 	}
@@ -301,8 +306,79 @@ func (r *KarpenterMachinePoolReconciler) computeProviderIDListFromNodeClaimsInWo
 	return providerIDList, int32(len(nodeClaimList.Items)), nil
 }
 
+// getControlPlaneVersion retrieves the Kubernetes version from the control plane
+func (r *KarpenterMachinePoolReconciler) getControlPlaneVersion(ctx context.Context, cluster *capi.Cluster) (string, error) {
+	if cluster.Spec.ControlPlaneRef == nil {
+		return "", fmt.Errorf("cluster has no control plane reference")
+	}
+
+	// Parse the API version to get group and version
+	apiVersion := cluster.Spec.ControlPlaneRef.APIVersion
+	groupVersion, err := schema.ParseGroupVersion(apiVersion)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse control plane API version %s: %w", apiVersion, err)
+	}
+
+	// Create the GVR using the parsed group and version
+	controlPlaneGVR := schema.GroupVersionResource{
+		Group:    groupVersion.Group,
+		Version:  groupVersion.Version,
+		Resource: strings.ToLower(cluster.Spec.ControlPlaneRef.Kind) + "s", // Convert Kind to resource name
+	}
+
+	controlPlane := &unstructured.Unstructured{}
+	controlPlane.SetGroupVersionKind(controlPlaneGVR.GroupVersion().WithKind(cluster.Spec.ControlPlaneRef.Kind))
+	controlPlane.SetName(cluster.Spec.ControlPlaneRef.Name)
+	controlPlane.SetNamespace(cluster.Spec.ControlPlaneRef.Namespace)
+
+	if err := r.client.Get(ctx, client.ObjectKey{Name: cluster.Spec.ControlPlaneRef.Name, Namespace: cluster.Spec.ControlPlaneRef.Namespace}, controlPlane); err != nil {
+		return "", fmt.Errorf("failed to get control plane %s: %w", cluster.Spec.ControlPlaneRef.Kind, err)
+	}
+
+	version, found, err := unstructured.NestedString(controlPlane.Object, "spec", "version")
+	if err != nil {
+		return "", fmt.Errorf("failed to get version from control plane: %w", err)
+	}
+	if !found {
+		return "", fmt.Errorf("version not found in control plane spec")
+	}
+
+	return version, nil
+}
+
 // createOrUpdateKarpenterResources creates or updates the Karpenter NodePool and EC2NodeClass resources in the workload cluster
-func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, bootstrapSecretValue []byte) error {
+func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, machinePool *capiexp.MachinePool, bootstrapSecretValue []byte) error {
+	// Get the worker version from MachinePool
+	workerVersion := ""
+	if machinePool.Spec.Template.Spec.Version != nil {
+		workerVersion = *machinePool.Spec.Template.Spec.Version
+	}
+
+	// Get control plane version and check version skew
+	if workerVersion != "" {
+		controlPlaneVersion, err := r.getControlPlaneVersion(ctx, cluster)
+		if err != nil {
+			logger.Error(err, "Failed to get control plane version, proceeding with update")
+		} else {
+			allowed, err := IsVersionSkewAllowed(controlPlaneVersion, workerVersion)
+			if err != nil {
+				logger.Error(err, "Failed to check version skew, proceeding with update")
+			} else if !allowed {
+				message := fmt.Sprintf("Version skew policy violation: control plane version %s is more than 2 minor versions ahead of worker version %s", controlPlaneVersion, workerVersion)
+				logger.Info("Blocking Karpenter resource update due to version skew policy",
+					"controlPlaneVersion", controlPlaneVersion,
+					"workerVersion", workerVersion,
+					"reason", message)
+
+				// Mark resources as not ready due to version skew
+				conditions.MarkEC2NodeClassNotReady(karpenterMachinePool, VersionSkewBlockedReason, message)
+				conditions.MarkNodePoolNotReady(karpenterMachinePool, VersionSkewBlockedReason, message)
+
+				return fmt.Errorf("version skew policy violation: %s", message)
+			}
+		}
+	}
+
 	workloadClusterClient, err := r.clusterClientGetter(ctx, "", r.client, client.ObjectKeyFromObject(cluster))
 	if err != nil {
 		return fmt.Errorf("failed to get workload cluster client: %w", err)
@@ -340,71 +416,66 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 	ec2NodeClass.SetName(karpenterMachinePool.Name)
 	ec2NodeClass.SetNamespace("default")
 
-	// Check if the EC2NodeClass already exists
-	err := workloadClusterClient.Get(ctx, client.ObjectKey{Name: karpenterMachinePool.Name, Namespace: "default"}, ec2NodeClass)
-	if err != nil && !k8serrors.IsNotFound(err) {
-		return fmt.Errorf("failed to get existing EC2NodeClass: %w", err)
-	}
-
 	// Generate user data for Ignition
 	userData := r.generateUserData(awsCluster.Spec.Region, cluster.Name, karpenterMachinePool.Name)
 
-	// Build the EC2NodeClass spec
-	spec := map[string]interface{}{
-		"amiFamily": "AL2",
-		"role":      karpenterMachinePool.Spec.IamInstanceProfile,
-		"userData":  userData,
-	}
-
-	// Add AMI ID if specified
-	if karpenterMachinePool.Spec.EC2NodeClass != nil && karpenterMachinePool.Spec.EC2NodeClass.AMIID != nil {
-		spec["amiSelectorTerms"] = []map[string]interface{}{
-			{
-				"id": *karpenterMachinePool.Spec.EC2NodeClass.AMIID,
-			},
+	operation, err := controllerutil.CreateOrUpdate(ctx, workloadClusterClient, ec2NodeClass, func() error {
+		// Build the EC2NodeClass spec
+		spec := map[string]interface{}{
+			"amiFamily": "AL2",
+			"role":      karpenterMachinePool.Spec.IamInstanceProfile,
+			"userData":  userData,
 		}
-	}
 
-	// Add security groups if specified
-	if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups) > 0 {
-		spec["securityGroupSelectorTerms"] = []map[string]interface{}{
-			{
-				"tags": map[string]string{
-					"Name": karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups[0], // Using first security group for now
+		// Add AMI ID if specified
+		if karpenterMachinePool.Spec.EC2NodeClass != nil && karpenterMachinePool.Spec.EC2NodeClass.AMIID != nil {
+			spec["amiSelectorTerms"] = []map[string]interface{}{
+				{
+					"id": *karpenterMachinePool.Spec.EC2NodeClass.AMIID,
 				},
-			},
+			}
 		}
+
+		// Add security groups if specified
+		if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups) > 0 {
+			spec["securityGroupSelectorTerms"] = []map[string]interface{}{
+				{
+					"tags": map[string]string{
+						"Name": karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups[0], // Using first security group for now
+					},
+				},
+			}
+		}
+
+		// Add subnets if specified
+		if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.Subnets) > 0 {
+			subnetSelectorTerms := []map[string]interface{}{}
+			for _, subnet := range karpenterMachinePool.Spec.EC2NodeClass.Subnets {
+				subnetSelectorTerms = append(subnetSelectorTerms, map[string]interface{}{
+					"id": subnet,
+				})
+			}
+			spec["subnetSelectorTerms"] = subnetSelectorTerms
+		}
+
+		// Add tags if specified
+		if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.Tags) > 0 {
+			spec["tags"] = karpenterMachinePool.Spec.EC2NodeClass.Tags
+		}
+
+		ec2NodeClass.Object["spec"] = spec
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to create or update EC2NodeClass: %w", err)
 	}
 
-	// Add subnets if specified
-	if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.Subnets) > 0 {
-		subnetSelectorTerms := []map[string]interface{}{}
-		for _, subnet := range karpenterMachinePool.Spec.EC2NodeClass.Subnets {
-			subnetSelectorTerms = append(subnetSelectorTerms, map[string]interface{}{
-				"id": subnet,
-			})
-		}
-		spec["subnetSelectorTerms"] = subnetSelectorTerms
-	}
-
-	// Add tags if specified
-	if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.Tags) > 0 {
-		spec["tags"] = karpenterMachinePool.Spec.EC2NodeClass.Tags
-	}
-
-	ec2NodeClass.Object["spec"] = spec
-
-	// Create or update the EC2NodeClass
-	if k8serrors.IsNotFound(err) {
-		logger.Info("Creating EC2NodeClass", "name", karpenterMachinePool.Name)
-		if err := workloadClusterClient.Create(ctx, ec2NodeClass); err != nil {
-			return fmt.Errorf("failed to create EC2NodeClass: %w", err)
-		}
-	} else {
-		logger.Info("Updating EC2NodeClass", "name", karpenterMachinePool.Name)
-		if err := workloadClusterClient.Update(ctx, ec2NodeClass); err != nil {
-			return fmt.Errorf("failed to update EC2NodeClass: %w", err)
-		}
+	switch operation {
+	case controllerutil.OperationResultCreated:
+		logger.Info("Created EC2NodeClass")
+	case controllerutil.OperationResultUpdated:
+		logger.Info("Updated EC2NodeClass")
 	}
 
 	return nil
@@ -423,104 +494,99 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 	nodePool.SetName(karpenterMachinePool.Name)
 	nodePool.SetNamespace("default")
 
-	// Check if the NodePool already exists
-	err := workloadClusterClient.Get(ctx, client.ObjectKey{Name: karpenterMachinePool.Name, Namespace: "default"}, nodePool)
-	if err != nil && !k8serrors.IsNotFound(err) {
-		return fmt.Errorf("failed to get existing NodePool: %w", err)
-	}
-
-	// Build the NodePool spec
-	spec := map[string]interface{}{
-		"disruption": map[string]interface{}{
-			"consolidateAfter": "30s",
-		},
-		"template": map[string]interface{}{
-			"spec": map[string]interface{}{
-				"nodeClassRef": map[string]interface{}{
-					"apiVersion": "karpenter.k8s.aws/v1beta1",
-					"kind":       "EC2NodeClass",
-					"name":       karpenterMachinePool.Name,
+	operation, err := controllerutil.CreateOrUpdate(ctx, workloadClusterClient, nodePool, func() error {
+		// Build the NodePool spec
+		spec := map[string]interface{}{
+			"disruption": map[string]interface{}{
+				"consolidateAfter": "30s",
+			},
+			"template": map[string]interface{}{
+				"spec": map[string]interface{}{
+					"nodeClassRef": map[string]interface{}{
+						"apiVersion": "karpenter.k8s.aws/v1beta1",
+						"kind":       "EC2NodeClass",
+						"name":       karpenterMachinePool.Name,
+					},
 				},
 			},
-		},
+		}
+
+		// Add NodePool configuration if specified
+		if karpenterMachinePool.Spec.NodePool != nil {
+			if karpenterMachinePool.Spec.NodePool.Disruption != nil {
+				if karpenterMachinePool.Spec.NodePool.Disruption.ConsolidateAfter != nil {
+					spec["disruption"].(map[string]interface{})["consolidateAfter"] = karpenterMachinePool.Spec.NodePool.Disruption.ConsolidateAfter.Duration.String()
+				}
+				if karpenterMachinePool.Spec.NodePool.Disruption.ConsolidationPolicy != nil {
+					spec["disruption"].(map[string]interface{})["consolidationPolicy"] = *karpenterMachinePool.Spec.NodePool.Disruption.ConsolidationPolicy
+				}
+			}
+
+			if karpenterMachinePool.Spec.NodePool.Limits != nil {
+				limits := map[string]interface{}{}
+				if karpenterMachinePool.Spec.NodePool.Limits.CPU != nil {
+					limits["cpu"] = karpenterMachinePool.Spec.NodePool.Limits.CPU.String()
+				}
+				if karpenterMachinePool.Spec.NodePool.Limits.Memory != nil {
+					limits["memory"] = karpenterMachinePool.Spec.NodePool.Limits.Memory.String()
+				}
+				if len(limits) > 0 {
+					spec["limits"] = limits
+				}
+			}
+
+			if len(karpenterMachinePool.Spec.NodePool.Requirements) > 0 {
+				requirements := []map[string]interface{}{}
+				for _, req := range karpenterMachinePool.Spec.NodePool.Requirements {
+					requirement := map[string]interface{}{
+						"key":      req.Key,
+						"operator": req.Operator,
+					}
+					if len(req.Values) > 0 {
+						requirement["values"] = req.Values
+					}
+					requirements = append(requirements, requirement)
+				}
+				spec["requirements"] = requirements
+			}
+
+			if len(karpenterMachinePool.Spec.NodePool.Taints) > 0 {
+				taints := []map[string]interface{}{}
+				for _, taint := range karpenterMachinePool.Spec.NodePool.Taints {
+					taintMap := map[string]interface{}{
+						"key":    taint.Key,
+						"effect": taint.Effect,
+					}
+					if taint.Value != nil {
+						taintMap["value"] = *taint.Value
+					}
+					taints = append(taints, taintMap)
+				}
+				spec["taints"] = taints
+			}
+
+			if len(karpenterMachinePool.Spec.NodePool.Labels) > 0 {
+				spec["labels"] = karpenterMachinePool.Spec.NodePool.Labels
+			}
+
+			if karpenterMachinePool.Spec.NodePool.Weight != nil {
+				spec["weight"] = *karpenterMachinePool.Spec.NodePool.Weight
+			}
+		}
+
+		nodePool.Object["spec"] = spec
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to create or update NodePool: %w", err)
 	}
 
-	// Add NodePool configuration if specified
-	if karpenterMachinePool.Spec.NodePool != nil {
-		if karpenterMachinePool.Spec.NodePool.Disruption != nil {
-			if karpenterMachinePool.Spec.NodePool.Disruption.ConsolidateAfter != nil {
-				spec["disruption"].(map[string]interface{})["consolidateAfter"] = karpenterMachinePool.Spec.NodePool.Disruption.ConsolidateAfter.Duration.String()
-			}
-			if karpenterMachinePool.Spec.NodePool.Disruption.ConsolidationPolicy != nil {
-				spec["disruption"].(map[string]interface{})["consolidationPolicy"] = *karpenterMachinePool.Spec.NodePool.Disruption.ConsolidationPolicy
-			}
-		}
-
-		if karpenterMachinePool.Spec.NodePool.Limits != nil {
-			limits := map[string]interface{}{}
-			if karpenterMachinePool.Spec.NodePool.Limits.CPU != nil {
-				limits["cpu"] = karpenterMachinePool.Spec.NodePool.Limits.CPU.String()
-			}
-			if karpenterMachinePool.Spec.NodePool.Limits.Memory != nil {
-				limits["memory"] = karpenterMachinePool.Spec.NodePool.Limits.Memory.String()
-			}
-			if len(limits) > 0 {
-				spec["limits"] = limits
-			}
-		}
-
-		if len(karpenterMachinePool.Spec.NodePool.Requirements) > 0 {
-			requirements := []map[string]interface{}{}
-			for _, req := range karpenterMachinePool.Spec.NodePool.Requirements {
-				requirement := map[string]interface{}{
-					"key":      req.Key,
-					"operator": req.Operator,
-				}
-				if len(req.Values) > 0 {
-					requirement["values"] = req.Values
-				}
-				requirements = append(requirements, requirement)
-			}
-			spec["requirements"] = requirements
-		}
-
-		if len(karpenterMachinePool.Spec.NodePool.Taints) > 0 {
-			taints := []map[string]interface{}{}
-			for _, taint := range karpenterMachinePool.Spec.NodePool.Taints {
-				taintMap := map[string]interface{}{
-					"key":    taint.Key,
-					"effect": taint.Effect,
-				}
-				if taint.Value != nil {
-					taintMap["value"] = *taint.Value
-				}
-				taints = append(taints, taintMap)
-			}
-			spec["taints"] = taints
-		}
-
-		if len(karpenterMachinePool.Spec.NodePool.Labels) > 0 {
-			spec["labels"] = karpenterMachinePool.Spec.NodePool.Labels
-		}
-
-		if karpenterMachinePool.Spec.NodePool.Weight != nil {
-			spec["weight"] = *karpenterMachinePool.Spec.NodePool.Weight
-		}
-	}
-
-	nodePool.Object["spec"] = spec
-
-	// Create or update the NodePool
-	if k8serrors.IsNotFound(err) {
-		logger.Info("Creating NodePool", "name", karpenterMachinePool.Name)
-		if err := workloadClusterClient.Create(ctx, nodePool); err != nil {
-			return fmt.Errorf("failed to create NodePool: %w", err)
-		}
-	} else {
-		logger.Info("Updating NodePool", "name", karpenterMachinePool.Name)
-		if err := workloadClusterClient.Update(ctx, nodePool); err != nil {
-			return fmt.Errorf("failed to update NodePool: %w", err)
-		}
+	switch operation {
+	case controllerutil.OperationResultCreated:
+		logger.Info("Created NodePool")
+	case controllerutil.OperationResultUpdated:
+		logger.Info("Updated NodePool")
 	}
 
 	return nil
@@ -611,4 +677,114 @@ func (r *KarpenterMachinePoolReconciler) SetupWithManager(ctx context.Context, m
 		For(&v1alpha1.KarpenterMachinePool{}).
 		WithEventFilter(predicates.ResourceNotPaused(logger)).
 		Complete(r)
+}
+
+// CompareKubernetesVersions compares two Kubernetes versions and returns:
+// -1 if version1 < version2
+//
+//	0 if version1 == version2
+//
+// +1 if version1 > version2
+func CompareKubernetesVersions(version1, version2 string) (int, error) {
+	// Remove 'v' prefix if present
+	v1 := strings.TrimPrefix(version1, "v")
+	v2 := strings.TrimPrefix(version2, "v")
+
+	parts1 := strings.Split(v1, ".")
+	parts2 := strings.Split(v2, ".")
+
+	if len(parts1) < 2 || len(parts2) < 2 {
+		return 0, fmt.Errorf("invalid version format: %s or %s", version1, version2)
+	}
+
+	// Compare major version
+	major1, err := strconv.Atoi(parts1[0])
+	if err != nil {
+		return 0, fmt.Errorf("invalid major version in %s: %w", version1, err)
+	}
+	major2, err := strconv.Atoi(parts2[0])
+	if err != nil {
+		return 0, fmt.Errorf("invalid major version in %s: %w", version2, err)
+	}
+
+	if major1 != major2 {
+		if major1 < major2 {
+			return -1, nil
+		}
+		return 1, nil
+	}
+
+	// Compare minor version
+	minor1, err := strconv.Atoi(parts1[1])
+	if err != nil {
+		return 0, fmt.Errorf("invalid minor version in %s: %w", version1, err)
+	}
+	minor2, err := strconv.Atoi(parts2[1])
+	if err != nil {
+		return 0, fmt.Errorf("invalid minor version in %s: %w", version2, err)
+	}
+
+	if minor1 < minor2 {
+		return -1, nil
+	} else if minor1 > minor2 {
+		return 1, nil
+	}
+
+	// If major and minor are the same, compare patch version if available
+	if len(parts1) >= 3 && len(parts2) >= 3 {
+		patch1, err := strconv.Atoi(parts1[2])
+		if err != nil {
+			return 0, fmt.Errorf("invalid patch version in %s: %w", version1, err)
+		}
+		patch2, err := strconv.Atoi(parts2[2])
+		if err != nil {
+			return 0, fmt.Errorf("invalid patch version in %s: %w", version2, err)
+		}
+
+		if patch1 < patch2 {
+			return -1, nil
+		} else if patch1 > patch2 {
+			return 1, nil
+		}
+	}
+
+	return 0, nil
+}
+
+// IsVersionSkewAllowed checks if the worker version can be updated based on the control plane version
+// According to Kubernetes version skew policy, workers can be at most 2 minor versions behind the control plane
+func IsVersionSkewAllowed(controlPlaneVersion, workerVersion string) (bool, error) {
+	comparison, err := CompareKubernetesVersions(controlPlaneVersion, workerVersion)
+	if err != nil {
+		return false, err
+	}
+
+	// If control plane version is older than or equal to worker version, allow the update
+	if comparison <= 0 {
+		return true, nil
+	}
+
+	// Parse versions to check minor version difference
+	v1 := strings.TrimPrefix(controlPlaneVersion, "v")
+	v2 := strings.TrimPrefix(workerVersion, "v")
+
+	parts1 := strings.Split(v1, ".")
+	parts2 := strings.Split(v2, ".")
+
+	if len(parts1) < 2 || len(parts2) < 2 {
+		return false, fmt.Errorf("invalid version format: %s or %s", controlPlaneVersion, workerVersion)
+	}
+
+	minor1, err := strconv.Atoi(parts1[1])
+	if err != nil {
+		return false, fmt.Errorf("invalid minor version in %s: %w", controlPlaneVersion, err)
+	}
+	minor2, err := strconv.Atoi(parts2[1])
+	if err != nil {
+		return false, fmt.Errorf("invalid minor version in %s: %w", workerVersion, err)
+	}
+
+	// Allow if the difference is at most 2 minor versions
+	versionDiff := minor1 - minor2
+	return versionDiff <= 2, nil
 }
