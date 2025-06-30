@@ -410,7 +410,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 	ec2NodeClass := &unstructured.Unstructured{}
 	ec2NodeClass.SetGroupVersionKind(ec2NodeClassGVR.GroupVersion().WithKind("EC2NodeClass"))
 	ec2NodeClass.SetName(karpenterMachinePool.Name)
-	ec2NodeClass.SetNamespace("default")
+	ec2NodeClass.SetNamespace("")
 
 	// Generate user data for Ignition
 	userData := r.generateUserData(awsCluster.Spec.Region, cluster.Name, karpenterMachinePool.Name)
@@ -488,7 +488,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 	nodePool := &unstructured.Unstructured{}
 	nodePool.SetGroupVersionKind(nodePoolGVR.GroupVersion().WithKind("NodePool"))
 	nodePool.SetName(karpenterMachinePool.Name)
-	nodePool.SetNamespace("default")
+	nodePool.SetNamespace("")
 
 	operation, err := controllerutil.CreateOrUpdate(ctx, workloadClusterClient, nodePool, func() error {
 		// Build the NodePool spec
