@@ -44,12 +44,8 @@ const (
 	KarpenterNodePoolReadyCondition capi.ConditionType = "KarpenterNodePoolReadyCondition"
 	// WaitingForBootstrapDataReason used when machine is waiting for bootstrap data to be ready before proceeding.
 	WaitingForBootstrapDataReason = "WaitingForBootstrapData"
-	// NodePoolCreatedReason indicates that the NodePool was successfully created
-	NodePoolCreatedReason = "NodePoolCreated"
 	// NodePoolCreationFailedReason indicates that the NodePool creation failed
 	NodePoolCreationFailedReason = "NodePoolCreationFailed"
-	// EC2NodeClassCreatedReason indicates that the EC2NodeClass was successfully created
-	EC2NodeClassCreatedReason = "EC2NodeClassCreated"
 	// EC2NodeClassCreationFailedReason indicates that the EC2NodeClass creation failed
 	EC2NodeClassCreationFailedReason = "EC2NodeClassCreationFailed"
 	// VersionSkewBlockedReason indicates that the update was blocked due to version skew policy
@@ -155,6 +151,12 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 		}
 	}
 
+	// Create or update Karpenter resources in the workload cluster
+	if err := r.createOrUpdateKarpenterResources(ctx, logger, cluster, awsCluster, karpenterMachinePool, machinePool, bootstrapSecretValue); err != nil {
+		logger.Error(err, "failed to create or update Karpenter resources")
+		return reconcile.Result{}, err
+	}
+
 	bootstrapUserDataHash := fmt.Sprintf("%x", sha256.Sum256(bootstrapSecretValue))
 	previousHash, annotationHashExists := karpenterMachinePool.Annotations[BootstrapDataHashAnnotation]
 	if !annotationHashExists || previousHash != bootstrapUserDataHash {
@@ -179,12 +181,6 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 			logger.Error(err, "failed to patch karpenterMachinePool.annotations with user data hash", "annotation", BootstrapDataHashAnnotation)
 			return reconcile.Result{}, err
 		}
-	}
-
-	// Create or update Karpenter resources in the workload cluster
-	if err := r.createOrUpdateKarpenterResources(ctx, logger, cluster, awsCluster, karpenterMachinePool, machinePool, bootstrapSecretValue); err != nil {
-		logger.Error(err, "failed to create or update Karpenter resources")
-		return reconcile.Result{}, err
 	}
 
 	providerIDList, numberOfNodeClaims, err := r.computeProviderIDListFromNodeClaimsInWorkloadCluster(ctx, logger, cluster)
@@ -407,7 +403,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx co
 func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, cluster *capi.Cluster, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, bootstrapSecretValue []byte) error {
 	ec2NodeClassGVR := schema.GroupVersionResource{
 		Group:    "karpenter.k8s.aws",
-		Version:  "v1beta1",
+		Version:  "v1",
 		Resource: "ec2nodeclasses",
 	}
 
@@ -485,7 +481,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, karpenterMachinePool *v1alpha1.KarpenterMachinePool) error {
 	nodePoolGVR := schema.GroupVersionResource{
 		Group:    "karpenter.sh",
-		Version:  "v1beta1",
+		Version:  "v1",
 		Resource: "nodepools",
 	}
 
@@ -503,10 +499,12 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 			"template": map[string]interface{}{
 				"spec": map[string]interface{}{
 					"nodeClassRef": map[string]interface{}{
-						"apiVersion": "karpenter.k8s.aws/v1beta1",
+						"apiVersion": "karpenter.k8s.aws/v1",
+						"group":      "karpenter.k8s.aws",
 						"kind":       "EC2NodeClass",
 						"name":       karpenterMachinePool.Name,
 					},
+					"requirements": []interface{}{},
 				},
 			},
 		}
@@ -547,7 +545,8 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 					}
 					requirements = append(requirements, requirement)
 				}
-				spec["requirements"] = requirements
+
+				spec["template"].(map[string]interface{})["spec"].(map[string]interface{})["requirements"] = requirements
 			}
 
 			if len(karpenterMachinePool.Spec.NodePool.Taints) > 0 {
@@ -602,7 +601,7 @@ func (r *KarpenterMachinePoolReconciler) deleteKarpenterResources(ctx context.Co
 	// Delete NodePool
 	nodePoolGVR := schema.GroupVersionResource{
 		Group:    "karpenter.sh",
-		Version:  "v1beta1",
+		Version:  "v1",
 		Resource: "nodepools",
 	}
 
@@ -619,7 +618,7 @@ func (r *KarpenterMachinePoolReconciler) deleteKarpenterResources(ctx context.Co
 	// Delete EC2NodeClass
 	ec2NodeClassGVR := schema.GroupVersionResource{
 		Group:    "karpenter.k8s.aws",
-		Version:  "v1beta1",
+		Version:  "v1",
 		Resource: "ec2nodeclasses",
 	}
 

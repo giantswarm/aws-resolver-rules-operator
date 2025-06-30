@@ -50,7 +50,7 @@ func MarkNodePoolReady(setter capiconditions.Setter) {
 }
 
 func MarkNodePoolNotReady(setter capiconditions.Setter, reason, message string) {
-	capiconditions.MarkFalse(setter, NodePoolReady, reason, capi.ConditionSeverityError, message)
+	capiconditions.MarkFalse(setter, NodePoolReady, reason, capi.ConditionSeverityError, message, nil)
 }
 
 func MarkEC2NodeClassReady(setter capiconditions.Setter) {
@@ -58,5 +58,5 @@ func MarkEC2NodeClassReady(setter capiconditions.Setter) {
 }
 
 func MarkEC2NodeClassNotReady(setter capiconditions.Setter, reason, message string) {
-	capiconditions.MarkFalse(setter, EC2NodeClassReady, reason, capi.ConditionSeverityError, message)
+	capiconditions.MarkFalse(setter, EC2NodeClassReady, reason, capi.ConditionSeverityError, message, nil)
 }

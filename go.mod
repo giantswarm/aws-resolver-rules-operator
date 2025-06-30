@@ -1,6 +1,8 @@
 module github.com/aws-resolver-rules-operator
 
-go 1.23.0
+go 1.24.0
+
+toolchain go1.24.3
 
 require (
 	github.com/aws/aws-sdk-go v1.55.7
@@ -25,8 +27,6 @@ require (
 	sigs.k8s.io/controller-runtime v0.19.3
 	sigs.k8s.io/yaml v1.5.0
 )
-
-replace google.golang.org/protobuf v1.31.0 => google.golang.org/protobuf v1.33.0
 
 require (
 	github.com/apparentlymart/go-cidr v1.1.0 // indirect
@@ -90,3 +90,5 @@ require (
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
+
+replace google.golang.org/protobuf v1.31.0 => google.golang.org/protobuf v1.33.0
