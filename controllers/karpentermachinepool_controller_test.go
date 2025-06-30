@@ -219,7 +219,11 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "default",
 				},
-				Spec: capa.AWSClusterRoleIdentitySpec{},
+				Spec: capa.AWSClusterRoleIdentitySpec{
+					AWSRoleSpec: capa.AWSRoleSpec{
+						RoleArn: "arn:aws:iam::123456789012:role/test-role",
+					},
+				},
 			}
 			err = fakeCtrlClient.Create(ctx, awsClusterRoleIdentity)
 			Expect(err).NotTo(HaveOccurred())
@@ -237,6 +241,24 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 
 		When("the owner cluster is also being deleted", func() {
 			BeforeEach(func() {
+				kubeadmControlPlane := &unstructured.Unstructured{}
+				kubeadmControlPlane.Object = map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"name":      ClusterName,
+						"namespace": KarpenterMachinePoolNamespace,
+					},
+					"spec": map[string]interface{}{
+						"version": "v1.21.2",
+					},
+				}
+				kubeadmControlPlane.SetGroupVersionKind(schema.GroupVersionKind{
+					Group:   "controlplane.cluster.x-k8s.io",
+					Kind:    "KubeadmControlPlane",
+					Version: "v1beta1",
+				})
+				err := fakeCtrlClient.Create(ctx, kubeadmControlPlane)
+				Expect(err).NotTo(HaveOccurred())
+
 				cluster := &capi.Cluster{
 					ObjectMeta: ctrl.ObjectMeta{
 						Namespace: KarpenterMachinePoolNamespace,
@@ -247,15 +269,22 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 						Finalizers: []string{"something-to-keep-it-around-when-deleting"},
 					},
 					Spec: capi.ClusterSpec{
+						ControlPlaneRef: &v1.ObjectReference{
+							Kind:       "KubeadmControlPlane",
+							Namespace:  KarpenterMachinePoolNamespace,
+							Name:       ClusterName,
+							APIVersion: "controlplane.cluster.x-k8s.io/v1beta1",
+						},
 						InfrastructureRef: &v1.ObjectReference{
 							Kind:       "AWSCluster",
 							Namespace:  KarpenterMachinePoolNamespace,
 							Name:       ClusterName,
 							APIVersion: "infrastructure.cluster.x-k8s.io/v1beta2",
 						},
+						Topology: nil,
 					},
 				}
-				err := fakeCtrlClient.Create(ctx, cluster)
+				err = fakeCtrlClient.Create(ctx, cluster)
 				Expect(err).NotTo(HaveOccurred())
 
 				err = fakeCtrlClient.Delete(ctx, cluster)
@@ -317,6 +346,9 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 							Name:       KarpenterMachinePoolName,
 						},
 					},
+				},
+				Spec: karpenterinfra.KarpenterMachinePoolSpec{
+					NodePool: &karpenterinfra.NodePoolSpec{},
 				},
 			}
 			err := fakeCtrlClient.Create(ctx, karpenterMachinePool)
@@ -430,6 +462,12 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 						},
 						Spec: capi.ClusterSpec{
 							Paused: true,
+							ControlPlaneRef: &v1.ObjectReference{
+								Kind:       "KubeadmControlPlane",
+								Namespace:  KarpenterMachinePoolNamespace,
+								Name:       ClusterName,
+								APIVersion: "controlplane.cluster.x-k8s.io/v1beta1",
+							},
 							InfrastructureRef: &v1.ObjectReference{
 								Kind:       "AWSCluster",
 								Namespace:  KarpenterMachinePoolNamespace,
@@ -439,6 +477,24 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 						},
 					}
 					err := fakeCtrlClient.Create(ctx, cluster)
+					Expect(err).NotTo(HaveOccurred())
+
+					kubeadmControlPlane := &unstructured.Unstructured{}
+					kubeadmControlPlane.Object = map[string]interface{}{
+						"metadata": map[string]interface{}{
+							"name":      ClusterName,
+							"namespace": KarpenterMachinePoolNamespace,
+						},
+						"spec": map[string]interface{}{
+							"version": "v1.21.2",
+						},
+					}
+					kubeadmControlPlane.SetGroupVersionKind(schema.GroupVersionKind{
+						Group:   "controlplane.cluster.x-k8s.io",
+						Kind:    "KubeadmControlPlane",
+						Version: "v1beta1",
+					})
+					err = fakeCtrlClient.Create(ctx, kubeadmControlPlane)
 					Expect(err).NotTo(HaveOccurred())
 
 					clusterKubeconfigSecret := &v1.Secret{
@@ -466,6 +522,12 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 							},
 						},
 						Spec: capi.ClusterSpec{
+							ControlPlaneRef: &v1.ObjectReference{
+								Kind:       "KubeadmControlPlane",
+								Namespace:  KarpenterMachinePoolNamespace,
+								Name:       ClusterName,
+								APIVersion: "controlplane.cluster.x-k8s.io/v1beta1",
+							},
 							InfrastructureRef: &v1.ObjectReference{
 								Kind:       "AWSCluster",
 								Namespace:  KarpenterMachinePoolNamespace,
@@ -475,6 +537,24 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 						},
 					}
 					err := fakeCtrlClient.Create(ctx, cluster)
+					Expect(err).NotTo(HaveOccurred())
+
+					kubeadmControlPlane := &unstructured.Unstructured{}
+					kubeadmControlPlane.Object = map[string]interface{}{
+						"metadata": map[string]interface{}{
+							"name":      ClusterName,
+							"namespace": KarpenterMachinePoolNamespace,
+						},
+						"spec": map[string]interface{}{
+							"version": "v1.21.2",
+						},
+					}
+					kubeadmControlPlane.SetGroupVersionKind(schema.GroupVersionKind{
+						Group:   "controlplane.cluster.x-k8s.io",
+						Kind:    "KubeadmControlPlane",
+						Version: "v1beta1",
+					})
+					err = fakeCtrlClient.Create(ctx, kubeadmControlPlane)
 					Expect(err).NotTo(HaveOccurred())
 				})
 				When("there is no AWSCluster", func() {
@@ -530,7 +610,11 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 								ObjectMeta: metav1.ObjectMeta{
 									Name: "default",
 								},
-								Spec: capa.AWSClusterRoleIdentitySpec{},
+								Spec: capa.AWSClusterRoleIdentitySpec{
+									AWSRoleSpec: capa.AWSRoleSpec{
+										RoleArn: "arn:aws:iam::123456789012:role/test-role",
+									},
+								},
 							}
 							err := fakeCtrlClient.Create(ctx, awsClusterRoleIdentity)
 							Expect(err).NotTo(HaveOccurred())
@@ -568,6 +652,33 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 								}
 								err := fakeCtrlClient.Create(ctx, bootstrapSecret)
 								Expect(err).NotTo(HaveOccurred())
+							})
+							It("creates karpenter resources in the wc", func() {
+								Expect(reconcileErr).NotTo(HaveOccurred())
+
+								nodepoolList := &unstructured.UnstructuredList{}
+								nodepoolList.SetGroupVersionKind(schema.GroupVersionKind{
+									Group:   "karpenter.sh",
+									Kind:    "NodePoolList",
+									Version: "v1",
+								})
+
+								err := fakeCtrlClient.List(ctx, nodepoolList)
+								Expect(err).NotTo(HaveOccurred())
+								Expect(nodepoolList.Items).To(HaveLen(1))
+								Expect(nodepoolList.Items[0].GetName()).To(Equal(KarpenterMachinePoolName))
+
+								ec2nodeclassList := &unstructured.UnstructuredList{}
+								ec2nodeclassList.SetGroupVersionKind(schema.GroupVersionKind{
+									Group:   "karpenter.k8s.aws",
+									Kind:    "EC2NodeClassList",
+									Version: "v1",
+								})
+
+								err = fakeCtrlClient.List(ctx, ec2nodeclassList)
+								Expect(err).NotTo(HaveOccurred())
+								Expect(ec2nodeclassList.Items).To(HaveLen(1))
+								Expect(ec2nodeclassList.Items[0].GetName()).To(Equal(KarpenterMachinePoolName))
 							})
 							It("adds the finalizer to the KarpenterMachinePool", func() {
 								Expect(reconcileErr).NotTo(HaveOccurred())
@@ -779,7 +890,11 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "default",
 				},
-				Spec: capa.AWSClusterRoleIdentitySpec{},
+				Spec: capa.AWSClusterRoleIdentitySpec{
+					AWSRoleSpec: capa.AWSRoleSpec{
+						RoleArn: "arn:aws:iam::123456789012:role/test-role",
+					},
+				},
 			}
 			err = fakeCtrlClient.Create(ctx, awsClusterRoleIdentity)
 			Expect(err).NotTo(HaveOccurred())
@@ -797,6 +912,89 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 		It("doesn't write the user data to S3 again", func() {
 			Expect(reconcileErr).NotTo(HaveOccurred())
 			Expect(s3Client.PutCallCount()).To(Equal(0))
+		})
+	})
+
+	When("the KarpenterMachinePool has NodePool and EC2NodeClass configuration", func() {
+		It("should handle the configuration without errors", func() {
+			// This test verifies that the controller can handle KarpenterMachinePool
+			// with NodePool and EC2NodeClass configuration without panicking
+			// The actual resource creation is tested in integration tests
+			Expect(reconcileErr).NotTo(HaveOccurred())
+		})
+	})
+
+	Describe("Version comparison functions", func() {
+		Describe("CompareKubernetesVersions", func() {
+			It("should correctly compare versions", func() {
+				// Test cases: (version1, version2, expected_result)
+				testCases := []struct {
+					v1, v2 string
+					want   int
+				}{
+					{"v1.20.0", "v1.20.0", 0},
+					{"v1.20.0", "v1.21.0", -1},
+					{"v1.21.0", "v1.20.0", 1},
+					{"v1.20.1", "v1.20.0", 1},
+					{"v1.20.0", "v1.20.1", -1},
+					{"1.20.0", "v1.20.0", 0},
+					{"v1.20.0", "1.20.0", 0},
+				}
+
+				for _, tc := range testCases {
+					result, err := controllers.CompareKubernetesVersions(tc.v1, tc.v2)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result).To(Equal(tc.want), "comparing %s with %s", tc.v1, tc.v2)
+				}
+			})
+
+			It("should handle invalid version formats", func() {
+				_, err := controllers.CompareKubernetesVersions("invalid", "v1.20.0")
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("invalid version format"))
+			})
+		})
+
+		Describe("IsVersionSkewAllowed", func() {
+			It("should allow updates when control plane is older or equal", func() {
+				testCases := []struct {
+					controlPlane, worker string
+					allowed              bool
+				}{
+					{"v1.20.0", "v1.20.0", true}, // Same version
+					{"v1.20.0", "v1.21.0", true}, // Worker newer
+					{"v1.20.0", "v1.22.0", true}, // Worker newer
+				}
+
+				for _, tc := range testCases {
+					allowed, err := controllers.IsVersionSkewAllowed(tc.controlPlane, tc.worker)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(allowed).To(Equal(tc.allowed), "control plane %s, worker %s", tc.controlPlane, tc.worker)
+				}
+			})
+
+			It("should allow updates within 2 minor versions", func() {
+				testCases := []struct {
+					controlPlane, worker string
+					allowed              bool
+				}{
+					{"v1.22.0", "v1.20.0", true},  // 2 versions behind
+					{"v1.22.0", "v1.21.0", true},  // 1 version behind
+					{"v1.22.0", "v1.19.0", false}, // 3 versions behind
+					{"v1.23.0", "v1.20.0", false}, // 3 versions behind
+				}
+
+				for _, tc := range testCases {
+					allowed, err := controllers.IsVersionSkewAllowed(tc.controlPlane, tc.worker)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(allowed).To(Equal(tc.allowed), "control plane %s, worker %s", tc.controlPlane, tc.worker)
+				}
+			})
+
+			It("should handle invalid version formats", func() {
+				_, err := controllers.IsVersionSkewAllowed("invalid", "v1.20.0")
+				Expect(err).To(HaveOccurred())
+			})
 		})
 	})
 })

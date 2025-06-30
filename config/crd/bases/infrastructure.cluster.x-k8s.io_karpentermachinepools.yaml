@@ -50,12 +50,139 @@ spec:
           spec:
             description: KarpenterMachinePoolSpec defines the desired state of KarpenterMachinePool.
             properties:
+              ec2NodeClass:
+                description: EC2NodeClass specifies the configuration for the Karpenter
+                  EC2NodeClass
+                properties:
+                  amiId:
+                    description: AMIID specifies the AMI ID to use
+                    type: string
+                  securityGroups:
+                    description: SecurityGroups specifies the security groups to use
+                    items:
+                      type: string
+                    type: array
+                  subnets:
+                    description: Subnets specifies the subnets to use
+                    items:
+                      type: string
+                    type: array
+                  tags:
+                    additionalProperties:
+                      type: string
+                    description: Tags specifies the tags to apply to EC2 instances
+                    type: object
+                  userData:
+                    description: UserData specifies the user data to use
+                    type: string
+                type: object
               iamInstanceProfile:
                 description: |-
                   The name or the Amazon Resource Name (ARN) of the instance profile associated
                   with the IAM role for the instance. The instance profile contains the IAM
                   role.
                 type: string
+              nodePool:
+                description: NodePool specifies the configuration for the Karpenter
+                  NodePool
+                properties:
+                  disruption:
+                    description: Disruption specifies the disruption behavior for
+                      the node pool
+                    properties:
+                      consolidateAfter:
+                        description: ConsolidateAfter specifies when to consolidate
+                          nodes
+                        type: string
+                      consolidateUnder:
+                        description: ConsolidateUnder specifies when to consolidate
+                          under
+                        properties:
+                          cpuUtilization:
+                            description: CPUUtilization specifies the CPU utilization
+                              threshold
+                            type: string
+                          memoryUtilization:
+                            description: MemoryUtilization specifies the memory utilization
+                              threshold
+                            type: string
+                        type: object
+                      consolidationPolicy:
+                        description: ConsolidationPolicy specifies the consolidation
+                          policy
+                        type: string
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: Labels specifies the labels to apply to nodes in
+                      this pool
+                    type: object
+                  limits:
+                    description: Limits specifies the limits for the node pool
+                    properties:
+                      cpu:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: CPU specifies the CPU limit
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      memory:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: Memory specifies the memory limit
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                    type: object
+                  requirements:
+                    description: Requirements specifies the requirements for the node
+                      pool
+                    items:
+                      description: RequirementSpec defines a requirement for a NodePool
+                      properties:
+                        key:
+                          description: Key specifies the requirement key
+                          type: string
+                        operator:
+                          description: Operator specifies the requirement operator
+                          type: string
+                        values:
+                          description: Values specifies the requirement values
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                  taints:
+                    description: Taints specifies the taints to apply to nodes in
+                      this pool
+                    items:
+                      description: TaintSpec defines a taint for a NodePool
+                      properties:
+                        effect:
+                          description: Effect specifies the taint effect
+                          type: string
+                        key:
+                          description: Key specifies the taint key
+                          type: string
+                        value:
+                          description: Value specifies the taint value
+                          type: string
+                      required:
+                      - effect
+                      - key
+                      type: object
+                    type: array
+                  weight:
+                    description: Weight specifies the weight of this node pool
+                    format: int32
+                    type: integer
+                type: object
               providerIDList:
                 description: |-
                   ProviderIDList are the identification IDs of machine instances provided by the provider.
@@ -68,6 +195,58 @@ spec:
             description: KarpenterMachinePoolStatus defines the observed state of
               KarpenterMachinePool.
             properties:
+              conditions:
+                description: Conditions defines current service state of the KarpenterMachinePool.
+                items:
+                  description: Condition defines an observation of a Cluster API resource
+                    operational state.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        Last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed. If that is not known, then using the time when
+                        the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        A human readable message indicating details about the transition.
+                        This field may be empty.
+                      type: string
+                    reason:
+                      description: |-
+                        The reason for the condition's last transition in CamelCase.
+                        The specific API may choose whether or not this field is considered a guaranteed API.
+                        This field may not be empty.
+                      type: string
+                    severity:
+                      description: |-
+                        Severity provides an explicit classification of Reason code, so the users or machines can immediately
+                        understand the current situation and act accordingly.
+                        The Severity field MUST be set only when Status=False.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: |-
+                        Type of condition in CamelCase or in foo.example.com/CamelCase.
+                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions
+                        can be useful (see .node.status.conditions), the ability to deconflict is important.
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - status
+                  - type
+                  type: object
+                type: array
+              ec2NodeClassReady:
+                description: EC2NodeClassReady indicates whether the EC2NodeClass
+                  is ready
+                type: boolean
+              nodePoolReady:
+                description: NodePoolReady indicates whether the NodePool is ready
+                type: boolean
               ready:
                 description: Ready is true when the provider resource is ready.
                 type: boolean

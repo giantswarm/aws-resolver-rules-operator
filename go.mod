@@ -1,6 +1,8 @@
 module github.com/aws-resolver-rules-operator
 
-go 1.23.0
+go 1.24.0
+
+toolchain go1.24.3
 
 require (
 	github.com/aws/aws-sdk-go v1.55.7
@@ -25,8 +27,6 @@ require (
 	sigs.k8s.io/controller-runtime v0.19.3
 	sigs.k8s.io/yaml v1.5.0
 )
-
-replace google.golang.org/protobuf v1.31.0 => google.golang.org/protobuf v1.33.0
 
 require (
 	github.com/apparentlymart/go-cidr v1.1.0 // indirect
@@ -66,7 +66,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	golang.org/x/crypto v0.39.0 // indirect
-	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
+	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 	golang.org/x/mod v0.25.0 // indirect
 	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
@@ -90,3 +90,5 @@ require (
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
+
+replace google.golang.org/protobuf v1.31.0 => google.golang.org/protobuf v1.33.0
