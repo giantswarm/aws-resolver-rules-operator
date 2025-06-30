@@ -261,14 +261,29 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 				err = fakeCtrlClient.Delete(ctx, cluster)
 				Expect(err).NotTo(HaveOccurred())
 			})
-			// This test is a bit cumbersome because we are deleting CRs, so we can't use different `It` blocks or the CRs would be gone.
-			// We first mock the call to `TerminateInstancesByTag` to return some instances so that we can test
-			// the behavior when there are pending instances to remove.
-			// Then we manually/explicitly call the reconciler inside the test again, to be able to test the behavior
-			// when there are no instances to remove.
+			// This test is a bit cumbersome because we are deleting CRs, so we can't use different `It` blocks, or the CRs would be gone.
+			// We first create a karpenter NodePool CR in the workload cluster, so that we can test that we won't remove
+			// the finalizer until the NodePool is removed, to avoid removing the `KarpenterMachinePool` before karpenter keeps launching instances.
+			// Then we manually/explicitly call the reconciler inside the test again, to be able to test the behavior when the NodePool
+			// is gone (so we know karpenter won't launch new instances).
 			When("there are ec2 instances from karpenter", func() {
 				BeforeEach(func() {
-					ec2Client.TerminateInstancesByTagReturnsOnCall(0, []string{"i-abc123", "i-def456"}, nil)
+					nodePool := &unstructured.Unstructured{}
+					nodePool.Object = map[string]interface{}{
+						"metadata": map[string]interface{}{
+							"name": KarpenterMachinePoolName,
+						},
+						"spec": map[string]interface{}{},
+					}
+					nodePool.SetGroupVersionKind(schema.GroupVersionKind{
+						Group:   "karpenter.sh",
+						Kind:    "NodePool",
+						Version: "v1",
+					})
+					// We want the NodePool CR on the WC.
+					// For the tests, the WC client is the same client we use for the reconciler
+					err := fakeCtrlClient.Create(ctx, nodePool)
+					Expect(err).NotTo(HaveOccurred())
 				})
 
 				It("deletes KarpenterMachinePool ec2 instances and finalizer", func() {
@@ -282,7 +297,19 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 					// Finalizer should be there blocking the deletion of the CR
 					Expect(karpenterMachinePoolList.Items).To(HaveLen(1))
 
-					ec2Client.TerminateInstancesByTagReturnsOnCall(0, nil, nil)
+					nodePool := &unstructured.Unstructured{}
+					nodePool.Object = map[string]interface{}{
+						"metadata": map[string]interface{}{
+							"name": KarpenterMachinePoolName,
+						},
+					}
+					nodePool.SetGroupVersionKind(schema.GroupVersionKind{
+						Group:   "karpenter.sh",
+						Kind:    "NodePool",
+						Version: "v1",
+					})
+					err = fakeCtrlClient.Delete(ctx, nodePool)
+					Expect(err).NotTo(HaveOccurred())
 
 					reconcileResult, reconcileErr = reconciler.Reconcile(ctx, ctrl.Request{
 						NamespacedName: types.NamespacedName{
