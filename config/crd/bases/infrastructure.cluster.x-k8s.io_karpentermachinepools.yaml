@@ -65,23 +65,20 @@ spec:
                       You can specify a combination of AWS account IDs, "self", "amazon", and "aws-marketplace"
                     type: string
                   securityGroups:
+                    additionalProperties:
+                      type: string
                     description: SecurityGroups specifies the security groups to use
-                    items:
-                      type: string
-                    type: array
+                    type: object
                   subnets:
-                    description: Subnets specifies the subnets to use
-                    items:
+                    additionalProperties:
                       type: string
-                    type: array
+                    description: Subnets specifies the subnets to use
+                    type: object
                   tags:
                     additionalProperties:
                       type: string
                     description: Tags specifies the tags to apply to EC2 instances
                     type: object
-                  userData:
-                    description: UserData specifies the user data to use
-                    type: string
                 type: object
               iamInstanceProfile:
                 description: |-

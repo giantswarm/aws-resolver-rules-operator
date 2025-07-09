@@ -500,9 +500,8 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 						EC2NodeClass: &karpenterinfra.EC2NodeClassSpec{
 							AMIName:        AMIName,
 							AMIOwner:       AMIOwner,
-							SecurityGroups: []string{KarpenterNodesSecurityGroup},
-							Subnets:        []string{KarpenterNodesSubnets},
-							// UserData:       nil,
+							SecurityGroups: map[string]string{"my-target-sg": "is-this"},
+							Subnets:        map[string]string{"my-target-subnet": "is-that"},
 							// Tags:           nil,
 						},
 						IamInstanceProfile: KarpenterNodesInstanceProfile,
@@ -802,7 +801,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 								// Assert the security group name field
 								securityGroupTags, ok := securityGroupSelectorTerm0["tags"].(map[string]interface{})
 								Expect(ok).To(BeTrue(), "expected tags to be a map[string]string")
-								Expect(securityGroupTags["Name"]).To(Equal(KarpenterNodesSecurityGroup))
+								Expect(securityGroupTags["my-target-sg"]).To(Equal("is-this"))
 
 								// 	Assert subnets are the expected ones
 								subnetSelectorTerms, found, err := unstructured.NestedSlice(ec2nodeclassList.Items[0].Object, "spec", "subnetSelectorTerms")
@@ -815,7 +814,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 								// Assert the security group name field
 								subnetTags, ok := subnetSelectorTerm0["tags"].(map[string]interface{})
 								Expect(ok).To(BeTrue(), "expected tags to be a map[string]string")
-								Expect(subnetTags["Name"]).To(Equal(KarpenterNodesSubnets))
+								Expect(subnetTags["my-target-subnet"]).To(Equal("is-that"))
 
 								// 	Assert userdata is the expected one
 								userData, found, err := unstructured.NestedString(ec2nodeclassList.Items[0].Object, "spec", "userData")
@@ -1017,9 +1016,8 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 				},
 				Spec: karpenterinfra.KarpenterMachinePoolSpec{
 					EC2NodeClass: &karpenterinfra.EC2NodeClassSpec{
-						SecurityGroups: []string{KarpenterNodesSecurityGroup},
-						Subnets:        []string{KarpenterNodesSubnets},
-						// UserData:       nil,
+						SecurityGroups: map[string]string{"my-target-sg": "is-this"},
+						Subnets:        map[string]string{"my-target-subnet": "is-that"},
 						// Tags:           nil,
 					},
 					IamInstanceProfile: KarpenterNodesInstanceProfile,
