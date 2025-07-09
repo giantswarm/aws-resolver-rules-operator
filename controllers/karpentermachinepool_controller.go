@@ -427,53 +427,30 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 				},
 			},
 			"instanceProfile": karpenterMachinePool.Spec.IamInstanceProfile,
-			"securityGroupSelectorTerms": []map[string]interface{}{
+			"userData":        userData,
+		}
+
+		// Add security groups if specified
+		if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups) > 0 {
+			spec["securityGroupSelectorTerms"] = []map[string]interface{}{
 				{
 					"tags": map[string]string{
 						"Name": karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups[0], // Using first security group for now
 					},
 				},
-			},
-			"subnetSelectorTerms": []map[string]interface{}{
-				{
-					"tags": map[string]string{
-						"Name": karpenterMachinePool.Spec.EC2NodeClass.Subnets[0], // Using first security group for now
-					},
-				},
-			},
-			"userData": userData,
+			}
 		}
 
-		// Add AMI ID if specified
-		// if karpenterMachinePool.Spec.EC2NodeClass != nil && karpenterMachinePool.Spec.EC2NodeClass.AMIID != nil {
-		// 	spec["amiSelectorTerms"] = []map[string]interface{}{
-		// 		{
-		// 			"id": *karpenterMachinePool.Spec.EC2NodeClass.AMIID,
-		// 		},
-		// 	}
-		// }
-
-		// Add security groups if specified
-		// if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups) > 0 {
-		// 	spec["securityGroupSelectorTerms"] = []map[string]interface{}{
-		// 		{
-		// 			"tags": map[string]string{
-		// 				"Name": karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups[0], // Using first security group for now
-		// 			},
-		// 		},
-		// 	}
-		// }
-
 		// Add subnets if specified
-		// if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.Subnets) > 0 {
-		// 	subnetSelectorTerms := []map[string]interface{}{}
-		// 	for _, subnet := range karpenterMachinePool.Spec.EC2NodeClass.Subnets {
-		// 		subnetSelectorTerms = append(subnetSelectorTerms, map[string]interface{}{
-		// 			"id": subnet,
-		// 		})
-		// 	}
-		// 	spec["subnetSelectorTerms"] = subnetSelectorTerms
-		// }
+		if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.Subnets) > 0 {
+			spec["subnetSelectorTerms"] = []map[string]interface{}{
+				{
+					"tags": map[string]string{
+						"Name": karpenterMachinePool.Spec.EC2NodeClass.Subnets[0], // Using first subnet for now
+					},
+				},
+			}
+		}
 
 		// Add tags if specified
 		if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.Tags) > 0 {
