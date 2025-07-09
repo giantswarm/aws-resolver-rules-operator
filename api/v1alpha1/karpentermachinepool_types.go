@@ -114,9 +114,14 @@ type TaintSpec struct {
 
 // EC2NodeClassSpec defines the configuration for a Karpenter EC2NodeClass
 type EC2NodeClassSpec struct {
-	// AMIID specifies the AMI ID to use
-	// +optional
-	AMIID *string `json:"amiId,omitempty"`
+	// Name is the ami name in EC2.
+	// This value is the name field, which is different from the name tag.
+	AMIName string `json:"amiName,omitempty"`
+	// Owner is the owner for the ami.
+	// You can specify a combination of AWS account IDs, "self", "amazon", and "aws-marketplace"
+	AMIOwner string `json:"amiOwner,omitempty"`
+	// - name: flatcar-stable-{{ $.Values.baseOS }}-kube-{{ $.Values.k8sVersion }}-tooling-{{ $.Values.toolingVersion }}-gs
+	//		//      owner: {{ int64 $.Values.amiOwner | quote }}
 
 	// SecurityGroups specifies the security groups to use
 	// +optional

@@ -196,7 +196,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	karpenterMachinePool.Status.Replicas = numberOfNodeClaims
 	karpenterMachinePool.Status.Ready = true
 
-	logger.Info("Found NodeClaims in workload cluster, patching KarpenterMachinePool", "numberOfNodeClaims", numberOfNodeClaims)
+	logger.Info("Found NodeClaims in workload cluster, patching KarpenterMachinePool", "numberOfNodeClaims", numberOfNodeClaims, "providerIDList", providerIDList)
 
 	if err := r.client.Status().Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy), client.FieldOwner("karpentermachinepool-controller")); err != nil {
 		logger.Error(err, "failed to patch karpenterMachinePool.status.Replicas")
@@ -293,6 +293,7 @@ func (r *KarpenterMachinePoolReconciler) computeProviderIDListFromNodeClaimsInWo
 			logger.Error(err, "error retrieving nodeClaim.status.providerID", "nodeClaim", nc.GetName())
 			continue
 		}
+		logger.Info("nodeClaim.status.providerID", "nodeClaimName", nc.GetName(), "statusFieldFound", found, "nodeClaim", nc.Object)
 		if found && providerID != "" {
 			providerIDList = append(providerIDList, providerID)
 		}
@@ -413,46 +414,66 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 	ec2NodeClass.SetNamespace("default")
 
 	// Generate user data for Ignition
-	userData := r.generateUserData(awsCluster.Spec.Region, cluster.Name, karpenterMachinePool.Name)
+	userData := r.generateUserData(awsCluster.Spec.S3Bucket.Name, cluster.Name, karpenterMachinePool.Name)
 
 	operation, err := controllerutil.CreateOrUpdate(ctx, workloadClusterClient, ec2NodeClass, func() error {
 		// Build the EC2NodeClass spec
 		spec := map[string]interface{}{
 			"amiFamily": "AL2",
-			"role":      karpenterMachinePool.Spec.IamInstanceProfile,
-			"userData":  userData,
-		}
-
-		// Add AMI ID if specified
-		if karpenterMachinePool.Spec.EC2NodeClass != nil && karpenterMachinePool.Spec.EC2NodeClass.AMIID != nil {
-			spec["amiSelectorTerms"] = []map[string]interface{}{
+			"amiSelectorTerms": []map[string]interface{}{
 				{
-					"id": *karpenterMachinePool.Spec.EC2NodeClass.AMIID,
+					"name":  karpenterMachinePool.Spec.EC2NodeClass.AMIName,
+					"owner": karpenterMachinePool.Spec.EC2NodeClass.AMIOwner,
 				},
-			}
-		}
-
-		// Add security groups if specified
-		if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups) > 0 {
-			spec["securityGroupSelectorTerms"] = []map[string]interface{}{
+			},
+			"instanceProfile": karpenterMachinePool.Spec.IamInstanceProfile,
+			"securityGroupSelectorTerms": []map[string]interface{}{
 				{
 					"tags": map[string]string{
 						"Name": karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups[0], // Using first security group for now
 					},
 				},
-			}
+			},
+			"subnetSelectorTerms": []map[string]interface{}{
+				{
+					"tags": map[string]string{
+						"Name": karpenterMachinePool.Spec.EC2NodeClass.Subnets[0], // Using first security group for now
+					},
+				},
+			},
+			"userData": userData,
 		}
 
+		// Add AMI ID if specified
+		// if karpenterMachinePool.Spec.EC2NodeClass != nil && karpenterMachinePool.Spec.EC2NodeClass.AMIID != nil {
+		// 	spec["amiSelectorTerms"] = []map[string]interface{}{
+		// 		{
+		// 			"id": *karpenterMachinePool.Spec.EC2NodeClass.AMIID,
+		// 		},
+		// 	}
+		// }
+
+		// Add security groups if specified
+		// if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups) > 0 {
+		// 	spec["securityGroupSelectorTerms"] = []map[string]interface{}{
+		// 		{
+		// 			"tags": map[string]string{
+		// 				"Name": karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups[0], // Using first security group for now
+		// 			},
+		// 		},
+		// 	}
+		// }
+
 		// Add subnets if specified
-		if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.Subnets) > 0 {
-			subnetSelectorTerms := []map[string]interface{}{}
-			for _, subnet := range karpenterMachinePool.Spec.EC2NodeClass.Subnets {
-				subnetSelectorTerms = append(subnetSelectorTerms, map[string]interface{}{
-					"id": subnet,
-				})
-			}
-			spec["subnetSelectorTerms"] = subnetSelectorTerms
-		}
+		// if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.Subnets) > 0 {
+		// 	subnetSelectorTerms := []map[string]interface{}{}
+		// 	for _, subnet := range karpenterMachinePool.Spec.EC2NodeClass.Subnets {
+		// 		subnetSelectorTerms = append(subnetSelectorTerms, map[string]interface{}{
+		// 			"id": subnet,
+		// 		})
+		// 	}
+		// 	spec["subnetSelectorTerms"] = subnetSelectorTerms
+		// }
 
 		// Add tags if specified
 		if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.Tags) > 0 {
@@ -636,13 +657,13 @@ func (r *KarpenterMachinePoolReconciler) deleteKarpenterResources(ctx context.Co
 }
 
 // generateUserData generates the user data for Ignition configuration
-func (r *KarpenterMachinePoolReconciler) generateUserData(region, clusterName, karpenterMachinePoolName string) string {
+func (r *KarpenterMachinePoolReconciler) generateUserData(s3bucketName, clusterName, karpenterMachinePoolName string) string {
 	userData := map[string]interface{}{
 		"ignition": map[string]interface{}{
 			"config": map[string]interface{}{
 				"merge": []map[string]interface{}{
 					{
-						"source":       fmt.Sprintf("s3://%s-capa-%s/%s/%s", region, clusterName, S3ObjectPrefix, karpenterMachinePoolName),
+						"source":       fmt.Sprintf("s3://%s/%s/%s-%s", s3bucketName, S3ObjectPrefix, clusterName, karpenterMachinePoolName),
 						"verification": map[string]interface{}{},
 					},
 				},
