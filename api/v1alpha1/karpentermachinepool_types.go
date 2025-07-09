@@ -120,20 +120,14 @@ type EC2NodeClassSpec struct {
 	// Owner is the owner for the ami.
 	// You can specify a combination of AWS account IDs, "self", "amazon", and "aws-marketplace"
 	AMIOwner string `json:"amiOwner,omitempty"`
-	// - name: flatcar-stable-{{ $.Values.baseOS }}-kube-{{ $.Values.k8sVersion }}-tooling-{{ $.Values.toolingVersion }}-gs
-	//		//      owner: {{ int64 $.Values.amiOwner | quote }}
 
 	// SecurityGroups specifies the security groups to use
 	// +optional
-	SecurityGroups []string `json:"securityGroups,omitempty"`
+	SecurityGroups map[string]string `json:"securityGroups,omitempty"`
 
 	// Subnets specifies the subnets to use
 	// +optional
-	Subnets []string `json:"subnets,omitempty"`
-
-	// UserData specifies the user data to use
-	// +optional
-	UserData *string `json:"userData,omitempty"`
+	Subnets map[string]string `json:"subnets,omitempty"`
 
 	// Tags specifies the tags to apply to EC2 instances
 	// +optional

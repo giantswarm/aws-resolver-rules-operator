@@ -416,6 +416,28 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 	// Generate user data for Ignition
 	userData := r.generateUserData(awsCluster.Spec.S3Bucket.Name, cluster.Name, karpenterMachinePool.Name)
 
+	// Add security groups tag selector if specified
+	securityGroupTagsSelector := map[string]string{
+		fmt.Sprintf("sigs.k8s.io/cluster-api-provider-aws/cluster/%s", cluster.Name): "owned",
+		"sigs.k8s.io/cluster-api-provider-aws/role":                                  "node",
+	}
+	if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups) > 0 {
+		for securityGroupTagKey, securityGroupTagValue := range karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups {
+			securityGroupTagsSelector[securityGroupTagKey] = securityGroupTagValue
+		}
+	}
+
+	// Add subnet tag selector if specified
+	subnetTagsSelector := map[string]string{
+		fmt.Sprintf("sigs.k8s.io/cluster-api-provider-aws/cluster/%s", cluster.Name): "owned",
+		"giantswarm.io/role": "nodes",
+	}
+	if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.Subnets) > 0 {
+		for subnetTagKey, subnetTagValue := range karpenterMachinePool.Spec.EC2NodeClass.Subnets {
+			subnetTagsSelector[subnetTagKey] = subnetTagValue
+		}
+	}
+
 	operation, err := controllerutil.CreateOrUpdate(ctx, workloadClusterClient, ec2NodeClass, func() error {
 		// Build the EC2NodeClass spec
 		spec := map[string]interface{}{
@@ -427,29 +449,17 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 				},
 			},
 			"instanceProfile": karpenterMachinePool.Spec.IamInstanceProfile,
-			"userData":        userData,
-		}
-
-		// Add security groups if specified
-		if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups) > 0 {
-			spec["securityGroupSelectorTerms"] = []map[string]interface{}{
+			"securityGroupSelectorTerms": []map[string]interface{}{
 				{
-					"tags": map[string]string{
-						"Name": karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups[0], // Using first security group for now
-					},
+					"tags": securityGroupTagsSelector,
 				},
-			}
-		}
-
-		// Add subnets if specified
-		if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.Subnets) > 0 {
-			spec["subnetSelectorTerms"] = []map[string]interface{}{
+			},
+			"subnetSelectorTerms": []map[string]interface{}{
 				{
-					"tags": map[string]string{
-						"Name": karpenterMachinePool.Spec.EC2NodeClass.Subnets[0], // Using first subnet for now
-					},
+					"tags": subnetTagsSelector,
 				},
-			}
+			},
+			"userData": userData,
 		}
 
 		// Add tags if specified
