@@ -11,7 +11,7 @@ GITSHA1        := $(shell git rev-parse --verify HEAD)
 MODULE         := $(shell go list -m)
 OS             := $(shell go env GOOS)
 SOURCES        := $(shell find . -name '*.go')
-VERSION        := $(shell architect project version)
+
 ifeq ($(OS), linux)
 EXTLDFLAGS := -static
 endif

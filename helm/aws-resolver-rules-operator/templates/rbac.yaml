@@ -24,6 +24,7 @@ rules:
       - controlplane.cluster.x-k8s.io
     resources:
       - awsmanagedcontrolplanes
+      - kubeadmcontrolplanes
     verbs:
       - get
       - list
