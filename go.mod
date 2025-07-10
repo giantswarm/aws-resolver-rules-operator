@@ -16,6 +16,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0
+	github.com/samber/lo v1.51.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/tools v0.35.0
 	k8s.io/api v0.31.2

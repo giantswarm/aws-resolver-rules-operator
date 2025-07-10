@@ -388,7 +388,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx co
 	}
 
 	// Create or update NodePool
-	if err := r.createOrUpdateNodePool(ctx, logger, workloadClusterClient, karpenterMachinePool); err != nil {
+	if err := r.createOrUpdateNodePool(ctx, logger, workloadClusterClient, cluster, karpenterMachinePool); err != nil {
 		conditions.MarkNodePoolNotReady(karpenterMachinePool, NodePoolCreationFailedReason, err.Error())
 		return fmt.Errorf("failed to create or update NodePool: %w", err)
 	}
@@ -441,14 +441,49 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 	operation, err := controllerutil.CreateOrUpdate(ctx, workloadClusterClient, ec2NodeClass, func() error {
 		// Build the EC2NodeClass spec
 		spec := map[string]interface{}{
-			"amiFamily": "AL2",
+			"amiFamily": "Custom",
 			"amiSelectorTerms": []map[string]interface{}{
 				{
 					"name":  karpenterMachinePool.Spec.EC2NodeClass.AMIName,
 					"owner": karpenterMachinePool.Spec.EC2NodeClass.AMIOwner,
 				},
 			},
+			"blockDeviceMappings": []map[string]interface{}{
+				{
+					"deviceName": "/dev/xvda",
+					"rootVolume": true,
+					"ebs": map[string]interface{}{
+						"volumeSize":          "8Gi",
+						"volumeType":          "gp3",
+						"deleteOnTermination": true,
+					},
+				},
+				{
+					"deviceName": "/dev/xvdd",
+					"ebs": map[string]interface{}{
+						"encrypted":           true,
+						"volumeSize":          "120Gi",
+						"volumeType":          "gp3",
+						"deleteOnTermination": true,
+					},
+				},
+				{
+					"deviceName": "/dev/xvde",
+					"ebs": map[string]interface{}{
+						"encrypted":           true,
+						"volumeSize":          "30Gi",
+						"volumeType":          "gp3",
+						"deleteOnTermination": true,
+					},
+				},
+			},
 			"instanceProfile": karpenterMachinePool.Spec.IamInstanceProfile,
+			"metadataOptions": map[string]interface{}{
+				"httpEndpoint":            "enabled",
+				"httpProtocolIPv6":        "disabled",
+				"httpPutResponseHopLimit": 1,
+				"httpTokens":              "required",
+			},
 			"securityGroupSelectorTerms": []map[string]interface{}{
 				{
 					"tags": securityGroupTagsSelector,
@@ -460,11 +495,6 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 				},
 			},
 			"userData": userData,
-		}
-
-		// Add tags if specified
-		if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.Tags) > 0 {
-			spec["tags"] = karpenterMachinePool.Spec.EC2NodeClass.Tags
 		}
 
 		ec2NodeClass.Object["spec"] = spec
@@ -486,7 +516,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 }
 
 // createOrUpdateNodePool creates or updates the NodePool resource in the workload cluster
-func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, karpenterMachinePool *v1alpha1.KarpenterMachinePool) error {
+func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool) error {
 	nodePoolGVR := schema.GroupVersionResource{
 		Group:    "karpenter.sh",
 		Version:  "v1",
@@ -498,90 +528,100 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 	nodePool.SetName(karpenterMachinePool.Name)
 	nodePool.SetNamespace("default")
 
+	// Set default requirements and overwrite with the user provided configuration
+	requirements := []map[string]interface{}{
+		{
+			"key":      "karpenter.k8s.aws/instance-family",
+			"operator": "NotIn",
+			"values":   []string{"t3", "t3a", "t2"},
+		},
+		{
+			"key":      "karpenter.k8s.aws/instance-cpu",
+			"operator": "In",
+			"values":   []string{"4", "8", "16", "32"},
+		},
+		{
+			"key":      "karpenter.k8s.aws/instance-hypervisor",
+			"operator": "In",
+			"values":   []string{"nitro"},
+		},
+		{
+			"key":      "kubernetes.io/arch",
+			"operator": "In",
+			"values":   []string{"amd64"},
+		},
+		{
+			"key":      "karpenter.sh/capacity-type",
+			"operator": "In",
+			"values":   []string{"spot", "on-demand"},
+		},
+		{
+			"key":      "kubernetes.io/os",
+			"operator": "In",
+			"values":   []string{"linux"},
+		},
+	}
+	if len(karpenterMachinePool.Spec.NodePool.Template.Spec.Requirements) > 0 {
+		requirements = []map[string]interface{}{}
+		for _, req := range karpenterMachinePool.Spec.NodePool.Template.Spec.Requirements {
+			requirement := map[string]interface{}{
+				"key":      req.Key,
+				"operator": req.Operator,
+				"values":   req.Values,
+			}
+			requirements = append(requirements, requirement)
+		}
+	}
+
+	// Set default labels and overwrite with the user provided configuration
+	labels := map[string]string{
+		"giantswarm.io/machine-pool": fmt.Sprintf("%s-%s", cluster.Name, karpenterMachinePool.Name),
+	}
+	if len(karpenterMachinePool.Spec.NodePool.Template.ObjectMeta.Labels) > 0 {
+		for labelKey, labelValue := range karpenterMachinePool.Spec.NodePool.Template.ObjectMeta.Labels {
+			labels[labelKey] = labelValue
+		}
+	}
+
 	operation, err := controllerutil.CreateOrUpdate(ctx, workloadClusterClient, nodePool, func() error {
-		// Build the NodePool spec
-		spec := map[string]interface{}{
-			"disruption": map[string]interface{}{
-				"consolidateAfter": "30s",
-			},
+		nodePool.Object["spec"] = map[string]interface{}{
 			"template": map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"labels": labels,
+				},
 				"spec": map[string]interface{}{
-					"nodeClassRef": map[string]interface{}{
-						"apiVersion": "karpenter.k8s.aws/v1",
-						"group":      "karpenter.k8s.aws",
-						"kind":       "EC2NodeClass",
-						"name":       karpenterMachinePool.Name,
+					"taints": karpenterMachinePool.Spec.NodePool.Template.Spec.Taints,
+					"startupTaints": []interface{}{
+						map[string]interface{}{
+							"effect": "NoExecute",
+							"key":    "node.cilium.io/agent-not-ready",
+							"value":  "true",
+						},
+						map[string]interface{}{
+							"effect": "NoExecute",
+							"key":    "node.cluster.x-k8s.io/uninitialized",
+							"value":  "true",
+						},
 					},
-					"requirements": []interface{}{},
+					"requirements": requirements,
+					"nodeClassRef": map[string]interface{}{
+						"group": "karpenter.k8s.aws",
+						"kind":  "EC2NodeClass",
+						"name":  karpenterMachinePool.Name,
+					},
+					"terminationGracePeriodSeconds": karpenterMachinePool.Spec.NodePool.Template.Spec.TerminationGracePeriod,
+					"expireAfter":                   karpenterMachinePool.Spec.NodePool.Template.Spec.ExpireAfter,
 				},
 			},
+			"disruption": map[string]interface{}{
+				"budgets":             karpenterMachinePool.Spec.NodePool.Disruption.Budgets,
+				"consolidateAfter":    karpenterMachinePool.Spec.NodePool.Disruption.ConsolidateAfter,
+				"consolidationPolicy": karpenterMachinePool.Spec.NodePool.Disruption.ConsolidationPolicy,
+			},
+			"limits": karpenterMachinePool.Spec.NodePool.Limits,
+			"weight": karpenterMachinePool.Spec.NodePool.Weight,
 		}
 
-		// Add NodePool configuration if specified
-		if karpenterMachinePool.Spec.NodePool != nil {
-			if karpenterMachinePool.Spec.NodePool.Disruption != nil {
-				if karpenterMachinePool.Spec.NodePool.Disruption.ConsolidateAfter != nil {
-					spec["disruption"].(map[string]interface{})["consolidateAfter"] = karpenterMachinePool.Spec.NodePool.Disruption.ConsolidateAfter.Duration.String()
-				}
-				if karpenterMachinePool.Spec.NodePool.Disruption.ConsolidationPolicy != nil {
-					spec["disruption"].(map[string]interface{})["consolidationPolicy"] = *karpenterMachinePool.Spec.NodePool.Disruption.ConsolidationPolicy
-				}
-			}
-
-			if karpenterMachinePool.Spec.NodePool.Limits != nil {
-				limits := map[string]interface{}{}
-				if karpenterMachinePool.Spec.NodePool.Limits.CPU != nil {
-					limits["cpu"] = karpenterMachinePool.Spec.NodePool.Limits.CPU.String()
-				}
-				if karpenterMachinePool.Spec.NodePool.Limits.Memory != nil {
-					limits["memory"] = karpenterMachinePool.Spec.NodePool.Limits.Memory.String()
-				}
-				if len(limits) > 0 {
-					spec["limits"] = limits
-				}
-			}
-
-			if len(karpenterMachinePool.Spec.NodePool.Requirements) > 0 {
-				requirements := []map[string]interface{}{}
-				for _, req := range karpenterMachinePool.Spec.NodePool.Requirements {
-					requirement := map[string]interface{}{
-						"key":      req.Key,
-						"operator": req.Operator,
-					}
-					if len(req.Values) > 0 {
-						requirement["values"] = req.Values
-					}
-					requirements = append(requirements, requirement)
-				}
-
-				spec["template"].(map[string]interface{})["spec"].(map[string]interface{})["requirements"] = requirements
-			}
-
-			if len(karpenterMachinePool.Spec.NodePool.Taints) > 0 {
-				taints := []map[string]interface{}{}
-				for _, taint := range karpenterMachinePool.Spec.NodePool.Taints {
-					taintMap := map[string]interface{}{
-						"key":    taint.Key,
-						"effect": taint.Effect,
-					}
-					if taint.Value != nil {
-						taintMap["value"] = *taint.Value
-					}
-					taints = append(taints, taintMap)
-				}
-				spec["taints"] = taints
-			}
-
-			if len(karpenterMachinePool.Spec.NodePool.Labels) > 0 {
-				spec["labels"] = karpenterMachinePool.Spec.NodePool.Labels
-			}
-
-			if karpenterMachinePool.Spec.NodePool.Weight != nil {
-				spec["weight"] = *karpenterMachinePool.Spec.NodePool.Weight
-			}
-		}
-
-		nodePool.Object["spec"] = spec
 		return nil
 	})
 

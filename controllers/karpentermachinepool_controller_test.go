@@ -43,7 +43,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 	)
 
 	const (
-		AMIName                       = "flatcar-stable-1234.5-kube-1.25.1-tooling-1.2.3-gs"
+		AMIName                       = "flatcar-stable-4152.2.3-kube-1.29.1-tooling-1.26.0-gs"
 		AMIOwner                      = "1234567890"
 		AWSRegion                     = "eu-west-1"
 		ClusterName                   = "foo"
@@ -359,7 +359,25 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 					},
 					Spec: karpenterinfra.KarpenterMachinePoolSpec{
 						EC2NodeClass: &karpenterinfra.EC2NodeClassSpec{},
-						NodePool:     &karpenterinfra.NodePoolSpec{},
+						NodePool: &karpenterinfra.NodePoolSpec{
+							Template: karpenterinfra.NodeClaimTemplate{
+								Spec: karpenterinfra.NodeClaimTemplateSpec{
+									Requirements: []karpenterinfra.NodeSelectorRequirementWithMinValues{
+										{
+											NodeSelectorRequirement: v1.NodeSelectorRequirement{
+												Key:      "kubernetes.io/os",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"linux"},
+											},
+										},
+									},
+								},
+							},
+							Disruption: karpenterinfra.Disruption{
+								ConsolidateAfter:    karpenterinfra.MustParseNillableDuration("30s"),
+								ConsolidationPolicy: karpenterinfra.ConsolidationPolicyWhenEmptyOrUnderutilized,
+							},
+						},
 					},
 				}
 				err := k8sClient.Create(ctx, karpenterMachinePool)
@@ -427,7 +445,27 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 							},
 						},
 					},
-					Spec: karpenterinfra.KarpenterMachinePoolSpec{},
+					Spec: karpenterinfra.KarpenterMachinePoolSpec{
+						NodePool: &karpenterinfra.NodePoolSpec{
+							Template: karpenterinfra.NodeClaimTemplate{
+								Spec: karpenterinfra.NodeClaimTemplateSpec{
+									Requirements: []karpenterinfra.NodeSelectorRequirementWithMinValues{
+										{
+											NodeSelectorRequirement: v1.NodeSelectorRequirement{
+												Key:      "kubernetes.io/os",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"linux"},
+											},
+										},
+									},
+								},
+							},
+							Disruption: karpenterinfra.Disruption{
+								ConsolidateAfter:    karpenterinfra.MustParseNillableDuration("30s"),
+								ConsolidationPolicy: karpenterinfra.ConsolidationPolicyWhenEmptyOrUnderutilized,
+							},
+						},
+					},
 				}
 				err = k8sClient.Create(ctx, karpenterMachinePool)
 				Expect(err).NotTo(HaveOccurred())
@@ -502,10 +540,27 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 							AMIOwner:       AMIOwner,
 							SecurityGroups: map[string]string{"my-target-sg": "is-this"},
 							Subnets:        map[string]string{"my-target-subnet": "is-that"},
-							// Tags:           nil,
 						},
 						IamInstanceProfile: KarpenterNodesInstanceProfile,
-						NodePool:           &karpenterinfra.NodePoolSpec{},
+						NodePool: &karpenterinfra.NodePoolSpec{
+							Template: karpenterinfra.NodeClaimTemplate{
+								Spec: karpenterinfra.NodeClaimTemplateSpec{
+									Requirements: []karpenterinfra.NodeSelectorRequirementWithMinValues{
+										{
+											NodeSelectorRequirement: v1.NodeSelectorRequirement{
+												Key:      "kubernetes.io/os",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"linux"},
+											},
+										},
+									},
+								},
+							},
+							Disruption: karpenterinfra.Disruption{
+								ConsolidateAfter:    karpenterinfra.MustParseNillableDuration("30s"),
+								ConsolidationPolicy: karpenterinfra.ConsolidationPolicyWhenEmptyOrUnderutilized,
+							},
+						},
 					},
 				}
 				err = k8sClient.Create(ctx, karpenterMachinePool)
@@ -1018,10 +1073,27 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 					EC2NodeClass: &karpenterinfra.EC2NodeClassSpec{
 						SecurityGroups: map[string]string{"my-target-sg": "is-this"},
 						Subnets:        map[string]string{"my-target-subnet": "is-that"},
-						// Tags:           nil,
 					},
 					IamInstanceProfile: KarpenterNodesInstanceProfile,
-					NodePool:           &karpenterinfra.NodePoolSpec{},
+					NodePool: &karpenterinfra.NodePoolSpec{
+						Template: karpenterinfra.NodeClaimTemplate{
+							Spec: karpenterinfra.NodeClaimTemplateSpec{
+								Requirements: []karpenterinfra.NodeSelectorRequirementWithMinValues{
+									{
+										NodeSelectorRequirement: v1.NodeSelectorRequirement{
+											Key:      "kubernetes.io/os",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"linux"},
+										},
+									},
+								},
+							},
+						},
+						Disruption: karpenterinfra.Disruption{
+							ConsolidateAfter:    karpenterinfra.MustParseNillableDuration("30s"),
+							ConsolidationPolicy: karpenterinfra.ConsolidationPolicyWhenEmptyOrUnderutilized,
+						},
+					},
 				},
 			}
 			err = k8sClient.Create(ctx, karpenterMachinePool)
