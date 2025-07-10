@@ -412,6 +412,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 	ec2NodeClass.SetGroupVersionKind(ec2NodeClassGVR.GroupVersion().WithKind("EC2NodeClass"))
 	ec2NodeClass.SetName(karpenterMachinePool.Name)
 	ec2NodeClass.SetNamespace("")
+	ec2NodeClass.SetLabels(map[string]string{"app.kubernetes.io/managed-by": "aws-resolver-rules-operator"})
 
 	// Generate user data for Ignition
 	userData := r.generateUserData(awsCluster.Spec.S3Bucket.Name, cluster.Name, karpenterMachinePool.Name)
@@ -527,51 +528,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 	nodePool.SetGroupVersionKind(nodePoolGVR.GroupVersion().WithKind("NodePool"))
 	nodePool.SetName(karpenterMachinePool.Name)
 	nodePool.SetNamespace("")
-
-	// Set default requirements and overwrite with the user provided configuration
-	requirements := []map[string]interface{}{
-		{
-			"key":      "karpenter.k8s.aws/instance-family",
-			"operator": "NotIn",
-			"values":   []string{"t3", "t3a", "t2"},
-		},
-		{
-			"key":      "karpenter.k8s.aws/instance-cpu",
-			"operator": "In",
-			"values":   []string{"4", "8", "16", "32"},
-		},
-		{
-			"key":      "karpenter.k8s.aws/instance-hypervisor",
-			"operator": "In",
-			"values":   []string{"nitro"},
-		},
-		{
-			"key":      "kubernetes.io/arch",
-			"operator": "In",
-			"values":   []string{"amd64"},
-		},
-		{
-			"key":      "karpenter.sh/capacity-type",
-			"operator": "In",
-			"values":   []string{"spot", "on-demand"},
-		},
-		{
-			"key":      "kubernetes.io/os",
-			"operator": "In",
-			"values":   []string{"linux"},
-		},
-	}
-	if len(karpenterMachinePool.Spec.NodePool.Template.Spec.Requirements) > 0 {
-		requirements = []map[string]interface{}{}
-		for _, req := range karpenterMachinePool.Spec.NodePool.Template.Spec.Requirements {
-			requirement := map[string]interface{}{
-				"key":      req.Key,
-				"operator": req.Operator,
-				"values":   req.Values,
-			}
-			requirements = append(requirements, requirement)
-		}
-	}
+	nodePool.SetLabels(map[string]string{"app.kubernetes.io/managed-by": "aws-resolver-rules-operator"})
 
 	// Set default labels and overwrite with the user provided configuration
 	labels := map[string]string{
@@ -603,7 +560,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 							"value":  "true",
 						},
 					},
-					"requirements": requirements,
+					"requirements": karpenterMachinePool.Spec.NodePool.Template.Spec.Requirements,
 					"nodeClassRef": map[string]interface{}{
 						"group": "karpenter.k8s.aws",
 						"kind":  "EC2NodeClass",
