@@ -26,6 +26,7 @@ crds: controller-gen ## Generate CustomResourceDefinition.
 generate: controller-gen crds ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	go generate ./...
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	@go run golang.org/x/tools/cmd/goimports -w ./api/v1alpha1
 
 .PHONY: create-acceptance-cluster
 create-acceptance-cluster: kind
