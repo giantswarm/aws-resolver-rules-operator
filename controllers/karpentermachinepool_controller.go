@@ -14,7 +14,6 @@ import (
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
@@ -588,32 +587,6 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 		}
 	}
 
-	requirements := []v1alpha1.NodeSelectorRequirementWithMinValues{}
-	taints := []v1.Taint{}
-	expireAfter := v1alpha1.MustParseNillableDuration("720h")
-	budgets := []v1alpha1.Budget{}
-	consolidateAfter := v1alpha1.MustParseNillableDuration("0s")
-	consolidationPolicy := "WhenEmptyOrUnderutilized"
-
-	if karpenterMachinePool.Spec.NodePool != nil {
-		requirements = karpenterMachinePool.Spec.NodePool.Template.Spec.Requirements
-		taints = karpenterMachinePool.Spec.NodePool.Template.Spec.Taints
-		expireAfter = karpenterMachinePool.Spec.NodePool.Template.Spec.ExpireAfter
-		budgets = karpenterMachinePool.Spec.NodePool.Disruption.Budgets
-		consolidateAfter = karpenterMachinePool.Spec.NodePool.Disruption.ConsolidateAfter
-		consolidationPolicy = string(karpenterMachinePool.Spec.NodePool.Disruption.ConsolidationPolicy)
-	}
-
-	terminationGracePeriod := metav1.Duration{}
-	if karpenterMachinePool.Spec.NodePool != nil && karpenterMachinePool.Spec.NodePool.Template.Spec.TerminationGracePeriod != nil {
-		terminationGracePeriod = *karpenterMachinePool.Spec.NodePool.Template.Spec.TerminationGracePeriod
-	}
-
-	weight := int32(1)
-	if karpenterMachinePool.Spec.NodePool != nil && karpenterMachinePool.Spec.NodePool.Weight != nil {
-		weight = *karpenterMachinePool.Spec.NodePool.Weight
-	}
-
 	operation, err := controllerutil.CreateOrUpdate(ctx, workloadClusterClient, nodePool, func() error {
 		spec := map[string]interface{}{
 			"template": map[string]interface{}{
@@ -621,7 +594,6 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 					"labels": labels,
 				},
 				"spec": map[string]interface{}{
-					"taints": taints,
 					"startupTaints": []interface{}{
 						map[string]interface{}{
 							"effect": "NoExecute",
@@ -634,23 +606,39 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 							"value":  "true",
 						},
 					},
-					"requirements": requirements,
 					"nodeClassRef": map[string]interface{}{
 						"group": "karpenter.k8s.aws",
 						"kind":  "EC2NodeClass",
 						"name":  karpenterMachinePool.Name,
 					},
-					"terminationGracePeriodSeconds": terminationGracePeriod,
-					"expireAfter":                   expireAfter,
 				},
 			},
-			"disruption": map[string]interface{}{
-				"budgets":             budgets,
-				"consolidateAfter":    consolidateAfter,
-				"consolidationPolicy": consolidationPolicy,
-			},
-			"limits": karpenterMachinePool.Spec.NodePool.Limits,
-			"weight": weight,
+			"disruption": map[string]interface{}{},
+		}
+
+		if karpenterMachinePool.Spec.NodePool != nil {
+			dis := spec["disruption"].(map[string]interface{})
+			dis["budgets"] = karpenterMachinePool.Spec.NodePool.Disruption.Budgets
+			dis["consolidateAfter"] = karpenterMachinePool.Spec.NodePool.Disruption.ConsolidateAfter
+			dis["consolidationPolicy"] = karpenterMachinePool.Spec.NodePool.Disruption.ConsolidationPolicy
+
+			if karpenterMachinePool.Spec.NodePool.Limits != nil {
+				spec["limits"] = karpenterMachinePool.Spec.NodePool.Limits
+			}
+
+			if karpenterMachinePool.Spec.NodePool.Weight != nil {
+				spec["weight"] = *karpenterMachinePool.Spec.NodePool.Weight
+			}
+
+			tpl := spec["template"].(map[string]interface{})["spec"].(map[string]interface{})
+
+			tpl["taints"] = karpenterMachinePool.Spec.NodePool.Template.Spec.Taints
+			tpl["requirements"] = karpenterMachinePool.Spec.NodePool.Template.Spec.Requirements
+			tpl["expireAfter"] = karpenterMachinePool.Spec.NodePool.Template.Spec.ExpireAfter
+
+			if karpenterMachinePool.Spec.NodePool.Template.Spec.TerminationGracePeriod != nil {
+				tpl["terminationGracePeriodSeconds"] = karpenterMachinePool.Spec.NodePool.Template.Spec.TerminationGracePeriod
+			}
 		}
 
 		nodePool.Object["spec"] = spec
