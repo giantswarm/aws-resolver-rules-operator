@@ -411,7 +411,8 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 	ec2NodeClass := &unstructured.Unstructured{}
 	ec2NodeClass.SetGroupVersionKind(ec2NodeClassGVR.GroupVersion().WithKind("EC2NodeClass"))
 	ec2NodeClass.SetName(karpenterMachinePool.Name)
-	ec2NodeClass.SetNamespace("default")
+	ec2NodeClass.SetNamespace("")
+	ec2NodeClass.SetLabels(map[string]string{"app.kubernetes.io/managed-by": "aws-resolver-rules-operator"})
 
 	// Generate user data for Ignition
 	userData := r.generateUserData(awsCluster.Spec.S3Bucket.Name, cluster.Name, karpenterMachinePool.Name)
@@ -526,7 +527,8 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 	nodePool := &unstructured.Unstructured{}
 	nodePool.SetGroupVersionKind(nodePoolGVR.GroupVersion().WithKind("NodePool"))
 	nodePool.SetName(karpenterMachinePool.Name)
-	nodePool.SetNamespace("default")
+	nodePool.SetNamespace("")
+	nodePool.SetLabels(map[string]string{"app.kubernetes.io/managed-by": "aws-resolver-rules-operator"})
 
 	// Set default requirements and overwrite with the user provided configuration
 	requirements := []map[string]interface{}{
@@ -572,6 +574,8 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 			requirements = append(requirements, requirement)
 		}
 	}
+	nodePool.SetNamespace("")
+	nodePool.SetLabels(map[string]string{"app.kubernetes.io/managed-by": "aws-resolver-rules-operator"})
 
 	// Set default labels and overwrite with the user provided configuration
 	labels := map[string]string{
@@ -603,7 +607,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 							"value":  "true",
 						},
 					},
-					"requirements": requirements,
+					"requirements": karpenterMachinePool.Spec.NodePool.Template.Spec.Requirements,
 					"nodeClassRef": map[string]interface{}{
 						"group": "karpenter.k8s.aws",
 						"kind":  "EC2NodeClass",
