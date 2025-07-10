@@ -14,6 +14,7 @@ import (
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
@@ -581,20 +582,46 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 	labels := map[string]string{
 		"giantswarm.io/machine-pool": fmt.Sprintf("%s-%s", cluster.Name, karpenterMachinePool.Name),
 	}
-	if len(karpenterMachinePool.Spec.NodePool.Template.ObjectMeta.Labels) > 0 {
+	if karpenterMachinePool.Spec.NodePool != nil && len(karpenterMachinePool.Spec.NodePool.Template.ObjectMeta.Labels) > 0 {
 		for labelKey, labelValue := range karpenterMachinePool.Spec.NodePool.Template.ObjectMeta.Labels {
 			labels[labelKey] = labelValue
 		}
 	}
 
+	requirements := []v1alpha1.NodeSelectorRequirementWithMinValues{}
+	taints := []v1.Taint{}
+	expireAfter := v1alpha1.MustParseNillableDuration("720h")
+	budgets := []v1alpha1.Budget{}
+	consolidateAfter := v1alpha1.MustParseNillableDuration("0s")
+	consolidationPolicy := "WhenEmptyOrUnderutilized"
+
+	if karpenterMachinePool.Spec.NodePool != nil {
+		requirements = karpenterMachinePool.Spec.NodePool.Template.Spec.Requirements
+		taints = karpenterMachinePool.Spec.NodePool.Template.Spec.Taints
+		expireAfter = karpenterMachinePool.Spec.NodePool.Template.Spec.ExpireAfter
+		budgets = karpenterMachinePool.Spec.NodePool.Disruption.Budgets
+		consolidateAfter = karpenterMachinePool.Spec.NodePool.Disruption.ConsolidateAfter
+		consolidationPolicy = string(karpenterMachinePool.Spec.NodePool.Disruption.ConsolidationPolicy)
+	}
+
+	terminationGracePeriod := metav1.Duration{}
+	if karpenterMachinePool.Spec.NodePool != nil && karpenterMachinePool.Spec.NodePool.Template.Spec.TerminationGracePeriod != nil {
+		terminationGracePeriod = *karpenterMachinePool.Spec.NodePool.Template.Spec.TerminationGracePeriod
+	}
+
+	weight := int32(1)
+	if karpenterMachinePool.Spec.NodePool != nil && karpenterMachinePool.Spec.NodePool.Weight != nil {
+		weight = *karpenterMachinePool.Spec.NodePool.Weight
+	}
+
 	operation, err := controllerutil.CreateOrUpdate(ctx, workloadClusterClient, nodePool, func() error {
-		nodePool.Object["spec"] = map[string]interface{}{
+		spec := map[string]interface{}{
 			"template": map[string]interface{}{
 				"metadata": map[string]interface{}{
 					"labels": labels,
 				},
 				"spec": map[string]interface{}{
-					"taints": karpenterMachinePool.Spec.NodePool.Template.Spec.Taints,
+					"taints": taints,
 					"startupTaints": []interface{}{
 						map[string]interface{}{
 							"effect": "NoExecute",
@@ -607,24 +634,26 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 							"value":  "true",
 						},
 					},
-					"requirements": karpenterMachinePool.Spec.NodePool.Template.Spec.Requirements,
+					"requirements": requirements,
 					"nodeClassRef": map[string]interface{}{
 						"group": "karpenter.k8s.aws",
 						"kind":  "EC2NodeClass",
 						"name":  karpenterMachinePool.Name,
 					},
-					"terminationGracePeriodSeconds": karpenterMachinePool.Spec.NodePool.Template.Spec.TerminationGracePeriod,
-					"expireAfter":                   karpenterMachinePool.Spec.NodePool.Template.Spec.ExpireAfter,
+					"terminationGracePeriodSeconds": terminationGracePeriod,
+					"expireAfter":                   expireAfter,
 				},
 			},
 			"disruption": map[string]interface{}{
-				"budgets":             karpenterMachinePool.Spec.NodePool.Disruption.Budgets,
-				"consolidateAfter":    karpenterMachinePool.Spec.NodePool.Disruption.ConsolidateAfter,
-				"consolidationPolicy": karpenterMachinePool.Spec.NodePool.Disruption.ConsolidationPolicy,
+				"budgets":             budgets,
+				"consolidateAfter":    consolidateAfter,
+				"consolidationPolicy": consolidationPolicy,
 			},
 			"limits": karpenterMachinePool.Spec.NodePool.Limits,
-			"weight": karpenterMachinePool.Spec.NodePool.Weight,
+			"weight": weight,
 		}
+
+		nodePool.Object["spec"] = spec
 
 		return nil
 	})
