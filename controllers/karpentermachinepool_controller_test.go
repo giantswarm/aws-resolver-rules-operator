@@ -9,7 +9,9 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gstruct"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -51,9 +53,8 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 		DataSecretName                = "foo-mp-12345"
 		KarpenterMachinePoolName      = "foo"
 		KarpenterNodesInstanceProfile = "karpenter-iam-role"
-		KarpenterNodesSecurityGroup   = "sg-12345678"
-		KarpenterNodesSubnets         = "subnet-12345678"
 		KubernetesVersion             = "v1.29.1"
+		NewerKubernetesVersion        = "v1.29.1"
 	)
 
 	BeforeEach(func() {
@@ -265,6 +266,10 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 					Version: "v1beta1",
 				})
 				err := k8sClient.Create(ctx, kubeadmControlPlane)
+				Expect(err).NotTo(HaveOccurred())
+				err = unstructured.SetNestedField(kubeadmControlPlane.Object, map[string]interface{}{"version": KubernetesVersion}, "status")
+				Expect(err).NotTo(HaveOccurred())
+				err = k8sClient.Status().Update(ctx, kubeadmControlPlane)
 				Expect(err).NotTo(HaveOccurred())
 
 				cluster := &capi.Cluster{
@@ -518,6 +523,8 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 
 				Eventually(komega.Get(machinePool), time.Second*10, time.Millisecond*250).Should(Succeed())
 
+				terminationGracePeriod := metav1.Duration{Duration: 30 * time.Second}
+				weight := int32(1)
 				karpenterMachinePool := &karpenterinfra.KarpenterMachinePool{
 					ObjectMeta: ctrl.ObjectMeta{
 						Namespace: namespace,
@@ -554,12 +561,19 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 											},
 										},
 									},
+									ExpireAfter:            karpenterinfra.MustParseNillableDuration("24h"),
+									TerminationGracePeriod: &terminationGracePeriod,
 								},
 							},
 							Disruption: karpenterinfra.Disruption{
 								ConsolidateAfter:    karpenterinfra.MustParseNillableDuration("30s"),
 								ConsolidationPolicy: karpenterinfra.ConsolidationPolicyWhenEmptyOrUnderutilized,
 							},
+							Limits: map[v1.ResourceName]resource.Quantity{
+								v1.ResourceCPU:    resource.MustParse("1000m"),
+								v1.ResourceMemory: resource.MustParse("1000Mi"),
+							},
+							Weight: &weight,
 						},
 					},
 				}
@@ -620,6 +634,10 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 						Version: "v1beta1",
 					})
 					err = k8sClient.Create(ctx, kubeadmControlPlane)
+					Expect(err).NotTo(HaveOccurred())
+					err = unstructured.SetNestedField(kubeadmControlPlane.Object, map[string]interface{}{"version": KubernetesVersion}, "status")
+					Expect(err).NotTo(HaveOccurred())
+					err = k8sClient.Status().Update(ctx, kubeadmControlPlane)
 					Expect(err).NotTo(HaveOccurred())
 
 					clusterKubeconfigSecret := &v1.Secret{
@@ -684,6 +702,10 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 						Version: "v1beta1",
 					})
 					err = k8sClient.Create(ctx, kubeadmControlPlane)
+					Expect(err).NotTo(HaveOccurred())
+					err = unstructured.SetNestedField(kubeadmControlPlane.Object, map[string]interface{}{"version": KubernetesVersion}, "status")
+					Expect(err).NotTo(HaveOccurred())
+					err = k8sClient.Status().Update(ctx, kubeadmControlPlane)
 					Expect(err).NotTo(HaveOccurred())
 				})
 				When("there is no AWSCluster", func() {
@@ -802,9 +824,59 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 								err := k8sClient.Create(ctx, bootstrapSecret)
 								Expect(err).NotTo(HaveOccurred())
 							})
-							It("creates karpenter resources in the wc", func() {
+							It("creates karpenter EC2NodeClass object in workload cluster", func() {
 								Expect(reconcileErr).NotTo(HaveOccurred())
 
+								ec2nodeclassList := &unstructured.UnstructuredList{}
+								ec2nodeclassList.SetGroupVersionKind(schema.GroupVersionKind{
+									Group:   "karpenter.k8s.aws",
+									Kind:    "EC2NodeClassList",
+									Version: "v1",
+								})
+
+								err := k8sClient.List(ctx, ec2nodeclassList)
+								Expect(err).NotTo(HaveOccurred())
+								Expect(ec2nodeclassList.Items).To(HaveLen(1))
+								Expect(ec2nodeclassList.Items[0].GetName()).To(Equal(KarpenterMachinePoolName))
+
+								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "userData").To(Equal(fmt.Sprintf("{\"ignition\":{\"config\":{\"merge\":[{\"source\":\"s3://%s/karpenter-machine-pool/%s-%s\",\"verification\":{}}],\"replace\":{\"verification\":{}}},\"proxy\":{},\"security\":{\"tls\":{}},\"timeouts\":{},\"version\":\"3.4.0\"},\"kernelArguments\":{},\"passwd\":{},\"storage\":{},\"systemd\":{}}", AWSClusterBucketName, ClusterName, KarpenterMachinePoolName)))
+								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "instanceProfile").To(Equal(KarpenterNodesInstanceProfile))
+
+								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "amiSelectorTerms").To(HaveLen(1))
+								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "amiSelectorTerms").To(
+									ContainElement( // slice matcher: at least one element matches
+										gstruct.MatchAllKeys(gstruct.Keys{ // map matcher: all these keys must match exactly
+											"name":  Equal(AMIName),
+											"owner": Equal(AMIOwner),
+										}),
+									),
+								)
+
+								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "securityGroupSelectorTerms").To(HaveLen(1))
+								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "securityGroupSelectorTerms").To(
+									ConsistOf(
+										gstruct.MatchAllKeys(gstruct.Keys{
+											// the top-level map has a single "tags" field,
+											// whose value itself must be a map containing our SG name → value
+											"tags": gstruct.MatchAllKeys(gstruct.Keys{
+												"my-target-sg": Equal("is-this"),
+											}),
+										}),
+									),
+								)
+
+								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "subnetSelectorTerms").To(HaveLen(1))
+								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "subnetSelectorTerms").To(
+									ConsistOf(
+										gstruct.MatchAllKeys(gstruct.Keys{
+											"tags": gstruct.MatchAllKeys(gstruct.Keys{
+												"my-target-subnet": Equal("is-that"),
+											}),
+										}),
+									),
+								)
+							})
+							It("creates karpenter NodePool object in workload cluster", func() {
 								nodepoolList := &unstructured.UnstructuredList{}
 								nodepoolList.SetGroupVersionKind(schema.GroupVersionKind{
 									Group:   "karpenter.sh",
@@ -817,71 +889,13 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 								Expect(nodepoolList.Items).To(HaveLen(1))
 								Expect(nodepoolList.Items[0].GetName()).To(Equal(KarpenterMachinePoolName))
 
-								ec2nodeclassList := &unstructured.UnstructuredList{}
-								ec2nodeclassList.SetGroupVersionKind(schema.GroupVersionKind{
-									Group:   "karpenter.k8s.aws",
-									Kind:    "EC2NodeClassList",
-									Version: "v1",
-								})
-
-								err = k8sClient.List(ctx, ec2nodeclassList)
-								Expect(err).NotTo(HaveOccurred())
-								Expect(ec2nodeclassList.Items).To(HaveLen(1))
-								Expect(ec2nodeclassList.Items[0].GetName()).To(Equal(KarpenterMachinePoolName))
-								amiSelectorTerms, found, err := unstructured.NestedSlice(ec2nodeclassList.Items[0].Object, "spec", "amiSelectorTerms")
-								Expect(err).NotTo(HaveOccurred())
-								Expect(found).To(BeTrue())
-								Expect(amiSelectorTerms).To(HaveLen(1))
-
-								// Let's make sure the amiSelectorTerms field is what we expect
-								term0, ok := amiSelectorTerms[0].(map[string]interface{})
-								Expect(ok).To(BeTrue(), "expected amiSelectorTerms[0] to be a map")
-								// Assert the name field
-								nameVal, ok := term0["name"].(string)
-								Expect(ok).To(BeTrue(), "expected name to be a string")
-								Expect(nameVal).To(Equal(AMIName))
-								// Assert the owner field
-								ownerF, ok := term0["owner"].(string)
-								Expect(ok).To(BeTrue(), "expected owner to be a number")
-								Expect(ownerF).To(Equal(AMIOwner))
-
-								// 	Assert security groups are the expected ones
-								securityGroupSelectorTerms, found, err := unstructured.NestedSlice(ec2nodeclassList.Items[0].Object, "spec", "securityGroupSelectorTerms")
-								Expect(err).NotTo(HaveOccurred())
-								Expect(found).To(BeTrue())
-								Expect(securityGroupSelectorTerms).To(HaveLen(1))
-								// Let's make sure the securityGroupSelectorTerms field is what we expect
-								securityGroupSelectorTerm0, ok := securityGroupSelectorTerms[0].(map[string]interface{})
-								Expect(ok).To(BeTrue(), "expected securityGroupSelectorTerms[0] to be a map")
-								// Assert the security group name field
-								securityGroupTags, ok := securityGroupSelectorTerm0["tags"].(map[string]interface{})
-								Expect(ok).To(BeTrue(), "expected tags to be a map[string]string")
-								Expect(securityGroupTags["my-target-sg"]).To(Equal("is-this"))
-
-								// 	Assert subnets are the expected ones
-								subnetSelectorTerms, found, err := unstructured.NestedSlice(ec2nodeclassList.Items[0].Object, "spec", "subnetSelectorTerms")
-								Expect(err).NotTo(HaveOccurred())
-								Expect(found).To(BeTrue())
-								Expect(subnetSelectorTerms).To(HaveLen(1))
-								// Let's make sure the subnetSelectorTerms field is what we expect
-								subnetSelectorTerm0, ok := subnetSelectorTerms[0].(map[string]interface{})
-								Expect(ok).To(BeTrue(), "expected subnetSelectorTerms[0] to be a map")
-								// Assert the security group name field
-								subnetTags, ok := subnetSelectorTerm0["tags"].(map[string]interface{})
-								Expect(ok).To(BeTrue(), "expected tags to be a map[string]string")
-								Expect(subnetTags["my-target-subnet"]).To(Equal("is-that"))
-
-								// 	Assert userdata is the expected one
-								userData, found, err := unstructured.NestedString(ec2nodeclassList.Items[0].Object, "spec", "userData")
-								Expect(err).NotTo(HaveOccurred())
-								Expect(found).To(BeTrue())
-								Expect(userData).To(Equal(fmt.Sprintf("{\"ignition\":{\"config\":{\"merge\":[{\"source\":\"s3://%s/karpenter-machine-pool/%s-%s\",\"verification\":{}}],\"replace\":{\"verification\":{}}},\"proxy\":{},\"security\":{\"tls\":{}},\"timeouts\":{},\"version\":\"3.4.0\"},\"kernelArguments\":{},\"passwd\":{},\"storage\":{},\"systemd\":{}}", AWSClusterBucketName, ClusterName, KarpenterMachinePoolName)))
-
-								// 	Assert instance profile is the expected one
-								iamInstanceProfile, found, err := unstructured.NestedString(ec2nodeclassList.Items[0].Object, "spec", "instanceProfile")
-								Expect(err).NotTo(HaveOccurred())
-								Expect(found).To(BeTrue())
-								Expect(iamInstanceProfile).To(Equal(KarpenterNodesInstanceProfile))
+								ExpectUnstructured(nodepoolList.Items[0], "spec", "disruption", "consolidateAfter").To(Equal("30s"))
+								ExpectUnstructured(nodepoolList.Items[0], "spec", "disruption", "consolidationPolicy").To(BeEquivalentTo(karpenterinfra.ConsolidationPolicyWhenEmptyOrUnderutilized))
+								ExpectUnstructured(nodepoolList.Items[0], "spec", "limits").To(HaveKeyWithValue("cpu", "1"))
+								ExpectUnstructured(nodepoolList.Items[0], "spec", "limits").To(HaveKeyWithValue("memory", "1000Mi"))
+								ExpectUnstructured(nodepoolList.Items[0], "spec", "weight").To(BeEquivalentTo(int64(1)))
+								ExpectUnstructured(nodepoolList.Items[0], "spec", "template", "spec", "expireAfter").To(BeEquivalentTo("24h"))
+								ExpectUnstructured(nodepoolList.Items[0], "spec", "template", "spec", "terminationGracePeriod").To(BeEquivalentTo("30s"))
 							})
 							It("adds the finalizer to the KarpenterMachinePool", func() {
 								Expect(reconcileErr).NotTo(HaveOccurred())
@@ -904,18 +918,6 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 								err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: KarpenterMachinePoolName}, updatedKarpenterMachinePool)
 								Expect(err).NotTo(HaveOccurred())
 								Expect(updatedKarpenterMachinePool.Annotations).To(HaveKeyWithValue(controllers.BootstrapDataHashAnnotation, Equal(capiBootstrapSecretHash)))
-							})
-							When("there are no NodeClaim in the workload cluster yet", func() {
-								It("requeues to try again soon", func() {
-									Expect(reconcileErr).NotTo(HaveOccurred())
-									Expect(reconcileResult.RequeueAfter).To(Equal(1 * time.Minute))
-									updatedKarpenterMachinePool := &karpenterinfra.KarpenterMachinePool{}
-									err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: KarpenterMachinePoolName}, updatedKarpenterMachinePool)
-									Expect(err).NotTo(HaveOccurred())
-									Expect(updatedKarpenterMachinePool.Status.Ready).To(BeFalse())
-									Expect(updatedKarpenterMachinePool.Status.Replicas).To(BeZero())
-									Expect(updatedKarpenterMachinePool.Spec.ProviderIDList).To(BeEmpty())
-								})
 							})
 							When("there are NodeClaim resources in the workload cluster", func() {
 								BeforeEach(func() {
@@ -1009,7 +1011,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 	When("the KarpenterMachinePool exists with a hash annotation signaling unchanged bootstrap data", func() {
 		BeforeEach(func() {
 			dataSecretName := DataSecretName
-			version := KubernetesVersion
+			kubernetesVersion := KubernetesVersion
 			machinePool := &capiexp.MachinePool{
 				ObjectMeta: ctrl.ObjectMeta{
 					Namespace: namespace,
@@ -1020,7 +1022,6 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 				},
 				Spec: capiexp.MachinePoolSpec{
 					ClusterName: ClusterName,
-					// Replicas:    nil,
 					Template: capi.MachineTemplateSpec{
 						ObjectMeta: capi.ObjectMeta{},
 						Spec: capi.MachineSpec{
@@ -1040,7 +1041,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 								Name:       KarpenterMachinePoolName,
 								APIVersion: "infrastructure.cluster.x-k8s.io/v1alpha1",
 							},
-							Version: &version,
+							Version: &kubernetesVersion,
 						},
 					},
 				},
@@ -1099,6 +1100,32 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 			err = k8sClient.Create(ctx, karpenterMachinePool)
 			Expect(err).NotTo(HaveOccurred())
 
+			kubeadmControlPlane := &unstructured.Unstructured{}
+			kubeadmControlPlane.Object = map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"name":      ClusterName,
+					"namespace": namespace,
+				},
+				"spec": map[string]interface{}{
+					"kubeadmConfigSpec": map[string]interface{}{},
+					"machineTemplate": map[string]interface{}{
+						"infrastructureRef": map[string]interface{}{},
+					},
+					"version": KubernetesVersion,
+				},
+			}
+			kubeadmControlPlane.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   "controlplane.cluster.x-k8s.io",
+				Kind:    "KubeadmControlPlane",
+				Version: "v1beta1",
+			})
+			err = k8sClient.Create(ctx, kubeadmControlPlane)
+			Expect(err).NotTo(HaveOccurred())
+			err = unstructured.SetNestedField(kubeadmControlPlane.Object, map[string]interface{}{"version": KubernetesVersion}, "status")
+			Expect(err).NotTo(HaveOccurred())
+			err = k8sClient.Status().Update(ctx, kubeadmControlPlane)
+			Expect(err).NotTo(HaveOccurred())
+
 			cluster := &capi.Cluster{
 				ObjectMeta: ctrl.ObjectMeta{
 					Namespace: namespace,
@@ -1108,6 +1135,12 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 					},
 				},
 				Spec: capi.ClusterSpec{
+					ControlPlaneRef: &v1.ObjectReference{
+						Kind:       "KubeadmControlPlane",
+						Namespace:  namespace,
+						Name:       ClusterName,
+						APIVersion: "controlplane.cluster.x-k8s.io/v1beta1",
+					},
 					InfrastructureRef: &v1.ObjectReference{
 						Kind:       "AWSCluster",
 						Namespace:  namespace,
@@ -1175,78 +1208,14 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 			Expect(s3Client.PutCallCount()).To(Equal(0))
 		})
 	})
-
-	Describe("Version comparison functions", func() {
-		Describe("CompareKubernetesVersions", func() {
-			It("should correctly compare versions", func() {
-				// Test cases: (version1, version2, expected_result)
-				testCases := []struct {
-					v1, v2 string
-					want   int
-				}{
-					{"v1.20.0", "v1.20.0", 0},
-					{"v1.20.0", "v1.21.0", -1},
-					{"v1.21.0", "v1.20.0", 1},
-					{"v1.20.1", "v1.20.0", 1},
-					{"v1.20.0", "v1.20.1", -1},
-					{"1.20.0", "v1.20.0", 0},
-					{"v1.20.0", "1.20.0", 0},
-				}
-
-				for _, tc := range testCases {
-					result, err := controllers.CompareKubernetesVersions(tc.v1, tc.v2)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(result).To(Equal(tc.want), "comparing %s with %s", tc.v1, tc.v2)
-				}
-			})
-
-			It("should handle invalid version formats", func() {
-				_, err := controllers.CompareKubernetesVersions("invalid", "v1.20.0")
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("invalid version format"))
-			})
-		})
-
-		Describe("IsVersionSkewAllowed", func() {
-			It("should allow updates when control plane is older or equal", func() {
-				testCases := []struct {
-					controlPlane, worker string
-					allowed              bool
-				}{
-					{"v1.20.0", "v1.20.0", true}, // Same version
-					{"v1.20.0", "v1.21.0", true}, // Worker newer
-					{"v1.20.0", "v1.22.0", true}, // Worker newer
-				}
-
-				for _, tc := range testCases {
-					allowed, err := controllers.IsVersionSkewAllowed(tc.controlPlane, tc.worker)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(allowed).To(Equal(tc.allowed), "control plane %s, worker %s", tc.controlPlane, tc.worker)
-				}
-			})
-
-			It("should allow updates within 2 minor versions", func() {
-				testCases := []struct {
-					controlPlane, worker string
-					allowed              bool
-				}{
-					{"v1.22.0", "v1.20.0", true},  // 2 versions behind
-					{"v1.22.0", "v1.21.0", true},  // 1 version behind
-					{"v1.22.0", "v1.19.0", false}, // 3 versions behind
-					{"v1.23.0", "v1.20.0", false}, // 3 versions behind
-				}
-
-				for _, tc := range testCases {
-					allowed, err := controllers.IsVersionSkewAllowed(tc.controlPlane, tc.worker)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(allowed).To(Equal(tc.allowed), "control plane %s, worker %s", tc.controlPlane, tc.worker)
-				}
-			})
-
-			It("should handle invalid version formats", func() {
-				_, err := controllers.IsVersionSkewAllowed("invalid", "v1.20.0")
-				Expect(err).To(HaveOccurred())
-			})
-		})
-	})
 })
+
+// ExpectUnstructured digs into u.Object at the given path,
+// asserts that it was found and error‐free, and returns
+// a GomegaAssertion on the raw interface{} value.
+func ExpectUnstructured(u unstructured.Unstructured, fields ...string) Assertion {
+	v, found, err := unstructured.NestedFieldNoCopy(u.Object, fields...)
+	Expect(found).To(BeTrue(), "expected to find field %v", fields)
+	Expect(err).NotTo(HaveOccurred(), "error retrieving %v: %v", fields, err)
+	return Expect(v)
+}
