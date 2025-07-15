@@ -839,7 +839,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 								Expect(ec2nodeclassList.Items).To(HaveLen(1))
 								Expect(ec2nodeclassList.Items[0].GetName()).To(Equal(KarpenterMachinePoolName))
 
-								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "userData").To(Equal(fmt.Sprintf("{\"ignition\":{\"config\":{\"merge\":[{\"source\":\"s3://%s/karpenter-machine-pool/%s-%s\",\"verification\":{}}],\"replace\":{\"verification\":{}}},\"proxy\":{},\"security\":{\"tls\":{}},\"timeouts\":{},\"version\":\"3.4.0\"},\"kernelArguments\":{},\"passwd\":{},\"storage\":{},\"systemd\":{}}", AWSClusterBucketName, ClusterName, KarpenterMachinePoolName)))
+								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "userData").To(Equal(fmt.Sprintf("{\"ignition\":{\"config\":{\"merge\":[{\"source\":\"s3://%s/karpenter-machine-pool/%s\",\"verification\":{}}],\"replace\":{\"verification\":{}}},\"proxy\":{},\"security\":{\"tls\":{}},\"timeouts\":{},\"version\":\"3.4.0\"},\"kernelArguments\":{},\"passwd\":{},\"storage\":{},\"systemd\":{}}", AWSClusterBucketName, KarpenterMachinePoolName)))
 								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "instanceProfile").To(Equal(KarpenterNodesInstanceProfile))
 
 								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "amiSelectorTerms").To(HaveLen(1))

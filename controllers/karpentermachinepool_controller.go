@@ -392,7 +392,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 	ec2NodeClass.SetLabels(map[string]string{"app.kubernetes.io/managed-by": "aws-resolver-rules-operator"})
 
 	// Generate user data for Ignition
-	userData := r.generateUserData(awsCluster.Spec.S3Bucket.Name, cluster.Name, karpenterMachinePool.Name)
+	userData := r.generateUserData(awsCluster.Spec.S3Bucket.Name, karpenterMachinePool.Name)
 
 	// Add security groups tag selector if specified
 	securityGroupTagsSelector := map[string]string{}
@@ -628,13 +628,13 @@ func (r *KarpenterMachinePoolReconciler) deleteKarpenterResources(ctx context.Co
 }
 
 // generateUserData generates the user data for Ignition configuration
-func (r *KarpenterMachinePoolReconciler) generateUserData(s3bucketName, clusterName, karpenterMachinePoolName string) string {
+func (r *KarpenterMachinePoolReconciler) generateUserData(s3bucketName, karpenterMachinePoolName string) string {
 	userData := map[string]interface{}{
 		"ignition": map[string]interface{}{
 			"config": map[string]interface{}{
 				"merge": []map[string]interface{}{
 					{
-						"source":       fmt.Sprintf("s3://%s/%s/%s-%s", s3bucketName, S3ObjectPrefix, clusterName, karpenterMachinePoolName),
+						"source":       fmt.Sprintf("s3://%s/%s/%s", s3bucketName, S3ObjectPrefix, karpenterMachinePoolName),
 						"verification": map[string]interface{}{},
 					},
 				},
