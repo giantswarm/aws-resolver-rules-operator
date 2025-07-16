@@ -13,6 +13,7 @@ import (
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
@@ -37,12 +38,9 @@ import (
 
 const (
 	BootstrapDataHashAnnotation = "giantswarm.io/userdata-hash"
+	EC2NodeClassAPIGroup        = "karpenter.k8s.aws"
 	KarpenterFinalizer          = "capa-operator.finalizers.giantswarm.io/karpenter-controller"
 	S3ObjectPrefix              = "karpenter-machine-pool"
-	// KarpenterNodePoolReadyCondition reports on current status of the autoscaling group. Ready indicates the group is provisioned.
-	KarpenterNodePoolReadyCondition capi.ConditionType = "KarpenterNodePoolReadyCondition"
-	// WaitingForBootstrapDataReason used when machine is waiting for bootstrap data to be ready before proceeding.
-	WaitingForBootstrapDataReason = "WaitingForBootstrapData"
 	// NodePoolCreationFailedReason indicates that the NodePool creation failed
 	NodePoolCreationFailedReason = "NodePoolCreationFailed"
 	// EC2NodeClassCreationFailedReason indicates that the EC2NodeClass creation failed
@@ -380,7 +378,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx co
 // createOrUpdateEC2NodeClass creates or updates the EC2NodeClass resource in the workload cluster
 func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, cluster *capi.Cluster, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, bootstrapSecretValue []byte) error {
 	ec2NodeClassGVR := schema.GroupVersionResource{
-		Group:    "karpenter.k8s.aws",
+		Group:    EC2NodeClassAPIGroup,
 		Version:  "v1",
 		Resource: "ec2nodeclasses",
 	}
@@ -396,10 +394,6 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 
 	// Add security groups tag selector if specified
 	securityGroupTagsSelector := map[string]string{}
-	// securityGroupTagsSelector := map[string]string{
-	// 	fmt.Sprintf("sigs.k8s.io/cluster-api-provider-aws/cluster/%s", cluster.Name): "owned",
-	// 	"sigs.k8s.io/cluster-api-provider-aws/role":                                  "node",
-	// }
 	if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups) > 0 {
 		for securityGroupTagKey, securityGroupTagValue := range karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups {
 			securityGroupTagsSelector[securityGroupTagKey] = securityGroupTagValue
@@ -408,10 +402,6 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 
 	// Add subnet tag selector if specified
 	subnetTagsSelector := map[string]string{}
-	// subnetTagsSelector := map[string]string{
-	// 	fmt.Sprintf("sigs.k8s.io/cluster-api-provider-aws/cluster/%s", cluster.Name): "owned",
-	// 	"giantswarm.io/role": "nodes",
-	// }
 	if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.Subnets) > 0 {
 		for subnetTagKey, subnetTagValue := range karpenterMachinePool.Spec.EC2NodeClass.Subnets {
 			subnetTagsSelector[subnetTagKey] = subnetTagValue
@@ -527,7 +517,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 						},
 					},
 					"nodeClassRef": map[string]interface{}{
-						"group": "karpenter.k8s.aws",
+						"group": EC2NodeClassAPIGroup,
 						"kind":  "EC2NodeClass",
 						"name":  karpenterMachinePool.Name,
 					},
@@ -602,14 +592,14 @@ func (r *KarpenterMachinePoolReconciler) deleteKarpenterResources(ctx context.Co
 	nodePool.SetName(karpenterMachinePool.Name)
 	nodePool.SetNamespace("default")
 
-	if err := workloadClusterClient.Delete(ctx, nodePool); err != nil && !k8serrors.IsNotFound(err) {
+	if err := workloadClusterClient.Delete(ctx, nodePool); err != nil && !k8serrors.IsNotFound(err) && !meta.IsNoMatchError(err) {
 		logger.Error(err, "failed to delete NodePool", "name", karpenterMachinePool.Name)
 		return fmt.Errorf("failed to delete NodePool: %w", err)
 	}
 
 	// Delete EC2NodeClass
 	ec2NodeClassGVR := schema.GroupVersionResource{
-		Group:    "karpenter.k8s.aws",
+		Group:    EC2NodeClassAPIGroup,
 		Version:  "v1",
 		Resource: "ec2nodeclasses",
 	}
@@ -619,7 +609,7 @@ func (r *KarpenterMachinePoolReconciler) deleteKarpenterResources(ctx context.Co
 	ec2NodeClass.SetName(karpenterMachinePool.Name)
 	ec2NodeClass.SetNamespace("default")
 
-	if err := workloadClusterClient.Delete(ctx, ec2NodeClass); err != nil && !k8serrors.IsNotFound(err) {
+	if err := workloadClusterClient.Delete(ctx, ec2NodeClass); err != nil && !k8serrors.IsNotFound(err) && !meta.IsNoMatchError(err) {
 		logger.Error(err, "failed to delete EC2NodeClass", "name", karpenterMachinePool.Name)
 		return fmt.Errorf("failed to delete EC2NodeClass: %w", err)
 	}
