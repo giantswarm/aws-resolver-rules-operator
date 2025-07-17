@@ -124,9 +124,6 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 		return reconcile.Result{}, fmt.Errorf("failed to get AWSClusterRoleIdentity referenced in AWSCluster: %w", err)
 	}
 
-	// Create a deep copy of the reconciled object so we can change it
-	karpenterMachinePoolCopy := karpenterMachinePool.DeepCopy()
-
 	if !karpenterMachinePool.GetDeletionTimestamp().IsZero() {
 		return r.reconcileDelete(ctx, logger, cluster, awsCluster, karpenterMachinePool, roleIdentity)
 	}
@@ -141,6 +138,8 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 		return reconcile.Result{}, errors.New("error retrieving bootstrap data: secret value key is missing")
 	}
 
+	// Create a deep copy of the reconciled object so we can change it
+	karpenterMachinePoolCopy := karpenterMachinePool.DeepCopy()
 	updated := controllerutil.AddFinalizer(karpenterMachinePool, KarpenterFinalizer)
 	if updated {
 		if err := r.client.Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy)); err != nil {
@@ -392,79 +391,22 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 	// Generate user data for Ignition
 	userData := r.generateUserData(awsCluster.Spec.S3Bucket.Name, karpenterMachinePool.Name)
 
-	// Add security groups tag selector if specified
-	securityGroupTagsSelector := map[string]string{}
-	if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups) > 0 {
-		for securityGroupTagKey, securityGroupTagValue := range karpenterMachinePool.Spec.EC2NodeClass.SecurityGroups {
-			securityGroupTagsSelector[securityGroupTagKey] = securityGroupTagValue
-		}
-	}
-
-	// Add subnet tag selector if specified
-	subnetTagsSelector := map[string]string{}
-	if karpenterMachinePool.Spec.EC2NodeClass != nil && len(karpenterMachinePool.Spec.EC2NodeClass.Subnets) > 0 {
-		for subnetTagKey, subnetTagValue := range karpenterMachinePool.Spec.EC2NodeClass.Subnets {
-			subnetTagsSelector[subnetTagKey] = subnetTagValue
-		}
-	}
-
 	operation, err := controllerutil.CreateOrUpdate(ctx, workloadClusterClient, ec2NodeClass, func() error {
 		// Build the EC2NodeClass spec
 		spec := map[string]interface{}{
-			"amiFamily": "Custom",
-			"amiSelectorTerms": []map[string]interface{}{
-				{
-					"name":  karpenterMachinePool.Spec.EC2NodeClass.AMIName,
-					"owner": karpenterMachinePool.Spec.EC2NodeClass.AMIOwner,
-				},
-			},
-			"blockDeviceMappings": []map[string]interface{}{
-				{
-					"deviceName": "/dev/xvda",
-					"rootVolume": true,
-					"ebs": map[string]interface{}{
-						"volumeSize":          "8Gi",
-						"volumeType":          "gp3",
-						"deleteOnTermination": true,
-					},
-				},
-				{
-					"deviceName": "/dev/xvdd",
-					"ebs": map[string]interface{}{
-						"encrypted":           true,
-						"volumeSize":          "120Gi",
-						"volumeType":          "gp3",
-						"deleteOnTermination": true,
-					},
-				},
-				{
-					"deviceName": "/dev/xvde",
-					"ebs": map[string]interface{}{
-						"encrypted":           true,
-						"volumeSize":          "30Gi",
-						"volumeType":          "gp3",
-						"deleteOnTermination": true,
-					},
-				},
-			},
-			"instanceProfile": karpenterMachinePool.Spec.IamInstanceProfile,
+			"amiFamily":           "Custom",
+			"amiSelectorTerms":    karpenterMachinePool.Spec.EC2NodeClass.AMISelectorTerms,
+			"blockDeviceMappings": karpenterMachinePool.Spec.EC2NodeClass.BlockDeviceMappings,
+			"instanceProfile":     karpenterMachinePool.Spec.EC2NodeClass.InstanceProfile,
 			"metadataOptions": map[string]interface{}{
 				"httpEndpoint":            "enabled",
 				"httpProtocolIPv6":        "disabled",
 				"httpPutResponseHopLimit": 1,
 				"httpTokens":              "required",
 			},
-			"securityGroupSelectorTerms": []map[string]interface{}{
-				{
-					"tags": securityGroupTagsSelector,
-				},
-			},
-			"subnetSelectorTerms": []map[string]interface{}{
-				{
-					"tags": subnetTagsSelector,
-				},
-			},
-			"userData": userData,
+			"securityGroupSelectorTerms": karpenterMachinePool.Spec.EC2NodeClass.SecurityGroupSelectorTerms,
+			"subnetSelectorTerms":        karpenterMachinePool.Spec.EC2NodeClass.SubnetSelectorTerms,
+			"userData":                   userData,
 		}
 
 		ec2NodeClass.Object["spec"] = spec

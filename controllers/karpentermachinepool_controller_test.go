@@ -31,6 +31,18 @@ import (
 	"github.com/aws-resolver-rules-operator/pkg/resolver/resolverfakes"
 )
 
+const (
+	AMIName                       = "flatcar-stable-4152.2.3-kube-1.29.1-tooling-1.26.0-gs"
+	AMIOwner                      = "1234567890"
+	AWSRegion                     = "eu-west-1"
+	ClusterName                   = "foo"
+	AWSClusterBucketName          = "my-awesome-bucket"
+	DataSecretName                = "foo-mp-12345"
+	KarpenterMachinePoolName      = "foo"
+	KarpenterNodesInstanceProfile = "karpenter-iam-role"
+	KubernetesVersion             = "v1.29.1"
+)
+
 var _ = Describe("KarpenterMachinePool reconciler", func() {
 	var (
 		capiBootstrapSecretContent []byte
@@ -39,22 +51,10 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 		s3Client                   *resolverfakes.FakeS3Client
 		ec2Client                  *resolverfakes.FakeEC2Client
 		ctx                        context.Context
+		instanceProfile            = KarpenterNodesInstanceProfile
 		reconciler                 *controllers.KarpenterMachinePoolReconciler
 		reconcileErr               error
 		reconcileResult            reconcile.Result
-	)
-
-	const (
-		AMIName                       = "flatcar-stable-4152.2.3-kube-1.29.1-tooling-1.26.0-gs"
-		AMIOwner                      = "1234567890"
-		AWSRegion                     = "eu-west-1"
-		ClusterName                   = "foo"
-		AWSClusterBucketName          = "my-awesome-bucket"
-		DataSecretName                = "foo-mp-12345"
-		KarpenterMachinePoolName      = "foo"
-		KarpenterNodesInstanceProfile = "karpenter-iam-role"
-		KubernetesVersion             = "v1.29.1"
-		NewerKubernetesVersion        = "v1.29.1"
 	)
 
 	BeforeEach(func() {
@@ -363,7 +363,24 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 						},
 					},
 					Spec: karpenterinfra.KarpenterMachinePoolSpec{
-						EC2NodeClass: &karpenterinfra.EC2NodeClassSpec{},
+						EC2NodeClass: &karpenterinfra.EC2NodeClassSpec{
+							AMISelectorTerms: []karpenterinfra.AMISelectorTerm{
+								{
+									Name:  AMIName,
+									Owner: AMIOwner,
+								},
+							},
+							SecurityGroupSelectorTerms: []karpenterinfra.SecurityGroupSelectorTerm{
+								{
+									Tags: map[string]string{"my-target-sg": "is-this"},
+								},
+							},
+							SubnetSelectorTerms: []karpenterinfra.SubnetSelectorTerm{
+								{
+									Tags: map[string]string{"my-target-subnet": "is-that"},
+								},
+							},
+						},
 						NodePool: &karpenterinfra.NodePoolSpec{
 							Template: karpenterinfra.NodeClaimTemplate{
 								Spec: karpenterinfra.NodeClaimTemplateSpec{
@@ -525,6 +542,10 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 
 				terminationGracePeriod := metav1.Duration{Duration: 30 * time.Second}
 				weight := int32(1)
+				deviceName := "/dev/xvda"
+				volumeSize := resource.MustParse("8Gi")
+				volumeTypeGp3 := "gp3"
+				deleteOnTerminationTrue := true
 				karpenterMachinePool := &karpenterinfra.KarpenterMachinePool{
 					ObjectMeta: ctrl.ObjectMeta{
 						Namespace: namespace,
@@ -543,12 +564,35 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 					},
 					Spec: karpenterinfra.KarpenterMachinePoolSpec{
 						EC2NodeClass: &karpenterinfra.EC2NodeClassSpec{
-							AMIName:        AMIName,
-							AMIOwner:       AMIOwner,
-							SecurityGroups: map[string]string{"my-target-sg": "is-this"},
-							Subnets:        map[string]string{"my-target-subnet": "is-that"},
+							AMISelectorTerms: []karpenterinfra.AMISelectorTerm{
+								{
+									Name:  AMIName,
+									Owner: AMIOwner,
+								},
+							},
+							BlockDeviceMappings: []*karpenterinfra.BlockDeviceMapping{
+								{
+									DeviceName: &deviceName,
+									EBS: &karpenterinfra.BlockDevice{
+										DeleteOnTermination: &deleteOnTerminationTrue,
+										VolumeSize:          &volumeSize,
+										VolumeType:          &volumeTypeGp3,
+									},
+									RootVolume: true,
+								},
+							},
+							InstanceProfile: &instanceProfile,
+							SecurityGroupSelectorTerms: []karpenterinfra.SecurityGroupSelectorTerm{
+								{
+									Tags: map[string]string{"my-target-sg": "is-this"},
+								},
+							},
+							SubnetSelectorTerms: []karpenterinfra.SubnetSelectorTerm{
+								{
+									Tags: map[string]string{"my-target-subnet": "is-that"},
+								},
+							},
 						},
-						IamInstanceProfile: KarpenterNodesInstanceProfile,
 						NodePool: &karpenterinfra.NodePoolSpec{
 							Template: karpenterinfra.NodeClaimTemplate{
 								Spec: karpenterinfra.NodeClaimTemplateSpec{
@@ -829,7 +873,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 
 								ec2nodeclassList := &unstructured.UnstructuredList{}
 								ec2nodeclassList.SetGroupVersionKind(schema.GroupVersionKind{
-									Group:   "karpenter.k8s.aws",
+									Group:   controllers.EC2NodeClassAPIGroup,
 									Kind:    "EC2NodeClassList",
 									Version: "v1",
 								})
@@ -841,6 +885,21 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 
 								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "userData").To(Equal(fmt.Sprintf("{\"ignition\":{\"config\":{\"merge\":[{\"source\":\"s3://%s/karpenter-machine-pool/%s\",\"verification\":{}}],\"replace\":{\"verification\":{}}},\"proxy\":{},\"security\":{\"tls\":{}},\"timeouts\":{},\"version\":\"3.4.0\"},\"kernelArguments\":{},\"passwd\":{},\"storage\":{},\"systemd\":{}}", AWSClusterBucketName, KarpenterMachinePoolName)))
 								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "instanceProfile").To(Equal(KarpenterNodesInstanceProfile))
+
+								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "blockDeviceMappings").To(HaveLen(1))
+								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "blockDeviceMappings").To(
+									ContainElement( // slice matcher: at least one element matches
+										gstruct.MatchAllKeys(gstruct.Keys{ // map matcher: all these keys must match exactly
+											"deviceName": Equal("/dev/xvda"),
+											"rootVolume": BeTrue(),
+											"ebs": gstruct.MatchAllKeys(gstruct.Keys{
+												"deleteOnTermination": BeTrue(),
+												"volumeSize":          Equal("8Gi"),
+												"volumeType":          Equal("gp3"),
+											}),
+										}),
+									),
+								)
 
 								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "amiSelectorTerms").To(HaveLen(1))
 								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "amiSelectorTerms").To(
@@ -1072,10 +1131,24 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 				},
 				Spec: karpenterinfra.KarpenterMachinePoolSpec{
 					EC2NodeClass: &karpenterinfra.EC2NodeClassSpec{
-						SecurityGroups: map[string]string{"my-target-sg": "is-this"},
-						Subnets:        map[string]string{"my-target-subnet": "is-that"},
+						AMISelectorTerms: []karpenterinfra.AMISelectorTerm{
+							{
+								Name:  AMIName,
+								Owner: AMIOwner,
+							},
+						},
+						InstanceProfile: &instanceProfile,
+						SecurityGroupSelectorTerms: []karpenterinfra.SecurityGroupSelectorTerm{
+							{
+								Tags: map[string]string{"my-target-sg": "is-this"},
+							},
+						},
+						SubnetSelectorTerms: []karpenterinfra.SubnetSelectorTerm{
+							{
+								Tags: map[string]string{"my-target-subnet": "is-that"},
+							},
+						},
 					},
-					IamInstanceProfile: KarpenterNodesInstanceProfile,
 					NodePool: &karpenterinfra.NodePoolSpec{
 						Template: karpenterinfra.NodeClaimTemplate{
 							Spec: karpenterinfra.NodeClaimTemplateSpec{
