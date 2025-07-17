@@ -18,14 +18,19 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 // KarpenterMachinePoolSpec defines the desired state of KarpenterMachinePool.
 type KarpenterMachinePoolSpec struct {
-	// The name or the Amazon Resource Name (ARN) of the instance profile associated
-	// with the IAM role for the instance. The instance profile contains the IAM
-	// role.
-	IamInstanceProfile string `json:"iamInstanceProfile,omitempty"`
+	// NodePool specifies the configuration for the Karpenter NodePool
+	// +optional
+	NodePool *NodePoolSpec `json:"nodePool,omitempty"`
+
+	// EC2NodeClass specifies the configuration for the Karpenter EC2NodeClass
+	// +optional
+	EC2NodeClass *EC2NodeClassSpec `json:"ec2NodeClass,omitempty"`
+
 	// ProviderIDList are the identification IDs of machine instances provided by the provider.
 	// This field must match the provider IDs as seen on the node objects corresponding to a machine pool's machine instances.
 	// +optional
@@ -41,6 +46,18 @@ type KarpenterMachinePoolStatus struct {
 	// Replicas is the most recently observed number of replicas
 	// +optional
 	Replicas int32 `json:"replicas"`
+
+	// Conditions defines current service state of the KarpenterMachinePool.
+	// +optional
+	Conditions capi.Conditions `json:"conditions,omitempty"`
+
+	// NodePoolReady indicates whether the NodePool is ready
+	// +optional
+	NodePoolReady bool `json:"nodePoolReady"`
+
+	// EC2NodeClassReady indicates whether the EC2NodeClass is ready
+	// +optional
+	EC2NodeClassReady bool `json:"ec2NodeClassReady"`
 }
 
 // +kubebuilder:object:root=true
@@ -71,4 +88,12 @@ type KarpenterMachinePoolList struct {
 
 func init() {
 	SchemeBuilder.Register(&KarpenterMachinePool{}, &KarpenterMachinePoolList{})
+}
+
+func (in *KarpenterMachinePool) GetConditions() capi.Conditions {
+	return in.Status.Conditions
+}
+
+func (in *KarpenterMachinePool) SetConditions(conditions capi.Conditions) {
+	in.Status.Conditions = conditions
 }
