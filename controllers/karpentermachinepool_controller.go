@@ -356,7 +356,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx co
 	}
 
 	// Create or update EC2NodeClass
-	if err := r.createOrUpdateEC2NodeClass(ctx, logger, workloadClusterClient, cluster, awsCluster, karpenterMachinePool, bootstrapSecretValue); err != nil {
+	if err := r.createOrUpdateEC2NodeClass(ctx, logger, workloadClusterClient, awsCluster, karpenterMachinePool, bootstrapSecretValue); err != nil {
 		conditions.MarkEC2NodeClassNotReady(karpenterMachinePool, EC2NodeClassCreationFailedReason, err.Error())
 		return fmt.Errorf("failed to create or update EC2NodeClass: %w", err)
 	}
@@ -375,7 +375,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx co
 }
 
 // createOrUpdateEC2NodeClass creates or updates the EC2NodeClass resource in the workload cluster
-func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, cluster *capi.Cluster, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, bootstrapSecretValue []byte) error {
+func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, bootstrapSecretValue []byte) error {
 	ec2NodeClassGVR := schema.GroupVersionResource{
 		Group:    EC2NodeClassAPIGroup,
 		Version:  "v1",
@@ -407,6 +407,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 			"securityGroupSelectorTerms": karpenterMachinePool.Spec.EC2NodeClass.SecurityGroupSelectorTerms,
 			"subnetSelectorTerms":        karpenterMachinePool.Spec.EC2NodeClass.SubnetSelectorTerms,
 			"userData":                   userData,
+			"tags":                       mergeMaps(awsCluster.Spec.AdditionalTags, karpenterMachinePool.Spec.EC2NodeClass.Tags),
 		}
 
 		ec2NodeClass.Object["spec"] = spec
@@ -425,6 +426,16 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 	}
 
 	return nil
+}
+
+func mergeMaps[A comparable, B any](maps ...map[A]B) map[A]B {
+	result := make(map[A]B)
+	for _, m := range maps {
+		for k, v := range m {
+			result[k] = v
+		}
+	}
+	return result
 }
 
 // createOrUpdateNodePool creates or updates the NodePool resource in the workload cluster

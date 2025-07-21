@@ -75,11 +75,6 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 		err = karpenterinfra.AddToScheme(scheme.Scheme)
 		Expect(err).NotTo(HaveOccurred())
 
-		// fakeCtrlClient := fake.NewClientBuilder().
-		// 	WithScheme(scheme.Scheme).
-		// 	// WithStatusSubresource(&karpenterinfra.KarpenterMachinePool{}).
-		// 	Build()
-
 		workloadClusterClientGetter := func(ctx context.Context, _ string, _ client.Client, _ client.ObjectKey) (client.Client, error) {
 			// Return the same client that we're using for the test
 			return k8sClient, nil
@@ -592,6 +587,9 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 									Tags: map[string]string{"my-target-subnet": "is-that"},
 								},
 							},
+							Tags: map[string]string{
+								"one-tag": "only-for-karpenter",
+							},
 						},
 						NodePool: &karpenterinfra.NodePoolSpec{
 							Template: karpenterinfra.NodeClaimTemplate{
@@ -807,6 +805,9 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 									Name:      ClusterName,
 								},
 								Spec: capa.AWSClusterSpec{
+									AdditionalTags: map[string]string{
+										"additional-tag-for-all-resources": "custom-tag",
+									},
 									IdentityRef: &capa.AWSIdentityReference{
 										Name: "default",
 										Kind: capa.ClusterRoleIdentityKind,
@@ -885,6 +886,10 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 
 								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "userData").To(Equal(fmt.Sprintf("{\"ignition\":{\"config\":{\"merge\":[{\"source\":\"s3://%s/karpenter-machine-pool/%s\",\"verification\":{}}],\"replace\":{\"verification\":{}}},\"proxy\":{},\"security\":{\"tls\":{}},\"timeouts\":{},\"version\":\"3.4.0\"},\"kernelArguments\":{},\"passwd\":{},\"storage\":{},\"systemd\":{}}", AWSClusterBucketName, KarpenterMachinePoolName)))
 								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "instanceProfile").To(Equal(KarpenterNodesInstanceProfile))
+								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "tags").
+									To(HaveKeyWithValue("additional-tag-for-all-resources", "custom-tag"))
+								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "tags").
+									To(HaveKeyWithValue("one-tag", "only-for-karpenter"))
 
 								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "blockDeviceMappings").To(HaveLen(1))
 								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "blockDeviceMappings").To(
@@ -1283,8 +1288,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 	})
 })
 
-// ExpectUnstructured digs into u.Object at the given path,
-// asserts that it was found and error‐free, and returns
+// ExpectUnstructured digs into u.Object at the given path, asserts that it was found and error‐free, and returns
 // a GomegaAssertion on the raw interface{} value.
 func ExpectUnstructured(u unstructured.Unstructured, fields ...string) Assertion {
 	v, found, err := unstructured.NestedFieldNoCopy(u.Object, fields...)

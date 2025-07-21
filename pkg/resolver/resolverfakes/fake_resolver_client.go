@@ -583,20 +583,6 @@ func (fake *FakeResolverClient) GetResolverRuleByNameReturnsOnCall(i int, result
 func (fake *FakeResolverClient) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.associateResolverRuleWithContextMutex.RLock()
-	defer fake.associateResolverRuleWithContextMutex.RUnlock()
-	fake.createResolverRuleMutex.RLock()
-	defer fake.createResolverRuleMutex.RUnlock()
-	fake.deleteResolverRuleMutex.RLock()
-	defer fake.deleteResolverRuleMutex.RUnlock()
-	fake.disassociateResolverRuleWithContextMutex.RLock()
-	defer fake.disassociateResolverRuleWithContextMutex.RUnlock()
-	fake.findResolverRuleIdsAssociatedWithVPCIdMutex.RLock()
-	defer fake.findResolverRuleIdsAssociatedWithVPCIdMutex.RUnlock()
-	fake.findResolverRulesByAWSAccountIdMutex.RLock()
-	defer fake.findResolverRulesByAWSAccountIdMutex.RUnlock()
-	fake.getResolverRuleByNameMutex.RLock()
-	defer fake.getResolverRuleByNameMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

@@ -653,22 +653,6 @@ func (fake *FakeRoute53Client) GetHostedZoneNSRecordReturnsOnCall(i int, result1
 func (fake *FakeRoute53Client) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.addDelegationToParentZoneMutex.RLock()
-	defer fake.addDelegationToParentZoneMutex.RUnlock()
-	fake.addDnsRecordsToHostedZoneMutex.RLock()
-	defer fake.addDnsRecordsToHostedZoneMutex.RUnlock()
-	fake.createHostedZoneMutex.RLock()
-	defer fake.createHostedZoneMutex.RUnlock()
-	fake.deleteDelegationFromParentZoneMutex.RLock()
-	defer fake.deleteDelegationFromParentZoneMutex.RUnlock()
-	fake.deleteDnsRecordsFromHostedZoneMutex.RLock()
-	defer fake.deleteDnsRecordsFromHostedZoneMutex.RUnlock()
-	fake.deleteHostedZoneMutex.RLock()
-	defer fake.deleteHostedZoneMutex.RUnlock()
-	fake.getHostedZoneIdByNameMutex.RLock()
-	defer fake.getHostedZoneIdByNameMutex.RUnlock()
-	fake.getHostedZoneNSRecordMutex.RLock()
-	defer fake.getHostedZoneNSRecordMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value
