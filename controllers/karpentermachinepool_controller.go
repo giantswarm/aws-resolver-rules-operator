@@ -37,10 +37,23 @@ import (
 )
 
 const (
+	// BootstrapDataHashAnnotation stores the SHA256 hash of the bootstrap data
+	// to detect when userdata changes and needs to be re-uploaded to S3
 	BootstrapDataHashAnnotation = "giantswarm.io/userdata-hash"
-	EC2NodeClassAPIGroup        = "karpenter.k8s.aws"
-	KarpenterFinalizer          = "capa-operator.finalizers.giantswarm.io/karpenter-controller"
-	S3ObjectPrefix              = "karpenter-machine-pool"
+
+	// EC2NodeClassAPIGroup is the API group for Karpenter EC2NodeClass resources
+	EC2NodeClassAPIGroup = "karpenter.k8s.aws"
+
+	// KarpenterFinalizer ensures proper cleanup of Karpenter resources and EC2 instances
+	// before allowing the KarpenterMachinePool to be deleted
+	KarpenterFinalizer = "capa-operator.finalizers.giantswarm.io/karpenter-controller"
+
+	// S3ObjectPrefix is the S3 path prefix where bootstrap data is stored
+	// Format: s3://<bucket>/<prefix>/<machine-pool-name>
+	S3ObjectPrefix = "karpenter-machine-pool"
+
+	// Condition reasons for tracking resource creation states
+
 	// NodePoolCreationFailedReason indicates that the NodePool creation failed
 	NodePoolCreationFailedReason = "NodePoolCreationFailed"
 	// EC2NodeClassCreationFailedReason indicates that the EC2NodeClass creation failed
@@ -52,7 +65,7 @@ const (
 type KarpenterMachinePoolReconciler struct {
 	awsClients resolver.AWSClients
 	client     client.Client
-	// clusterClientGetter is used to create a client targeting the workload cluster
+	// clusterClientGetter is used to create a kubernetes client targeting the workload cluster
 	clusterClientGetter remote.ClusterClientGetter
 }
 
@@ -60,10 +73,12 @@ func NewKarpenterMachinepoolReconciler(client client.Client, clusterClientGetter
 	return &KarpenterMachinePoolReconciler{awsClients: awsClients, client: client, clusterClientGetter: clusterClientGetter}
 }
 
-// Reconcile reconciles KarpenterMachinePool, which represent cluster node pools that will be managed by karpenter.
-// The controller will upload to S3 the Ignition configuration for the reconciled node pool.
-// It will also take care of deleting EC2 instances created by karpenter when the cluster is being removed.
-// And lastly, it will create the karpenter CRs in the workload cluster.
+// Reconcile reconciles KarpenterMachinePool CRs, which represent cluster node pools that will be managed by karpenter.
+// KarpenterMachinePoolReconciler reconciles KarpenterMachinePool objects by:
+// 1. Creating Karpenter NodePool and EC2NodeClass resources in workload clusters
+// 2. Managing bootstrap data upload to S3 for node initialization
+// 3. Enforcing Kubernetes version skew policies
+// 4. Cleaning up EC2 instances when clusters are deleted
 func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	logger := log.FromContext(ctx)
 	logger.Info("Reconciling")
@@ -86,6 +101,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	}
 	logger = logger.WithValues("machinePool", machinePool.Name)
 
+	// Bootstrap data must be available before we can proceed with creating Karpenter resources
 	if machinePool.Spec.Template.Spec.Bootstrap.DataSecretName == nil {
 		logger.Info("Bootstrap data secret reference is not yet available")
 		return reconcile.Result{RequeueAfter: time.Duration(10) * time.Second}, nil
@@ -115,31 +131,26 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 		return ctrl.Result{}, nil
 	}
 
+	// S3 bucket is required for storing bootstrap data that Karpenter nodes will fetch
 	if awsCluster.Spec.S3Bucket == nil {
 		return reconcile.Result{}, errors.New("a cluster wide object storage configured at `AWSCluster.spec.s3Bucket` is required")
 	}
 
+	// Get AWS credentials for S3 and EC2 operations
 	roleIdentity := &capa.AWSClusterRoleIdentity{}
 	if err = r.client.Get(ctx, client.ObjectKey{Name: awsCluster.Spec.IdentityRef.Name}, roleIdentity); err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to get AWSClusterRoleIdentity referenced in AWSCluster: %w", err)
 	}
 
+	// Handle deletion: cleanup EC2 instances and Karpenter resources
 	if !karpenterMachinePool.GetDeletionTimestamp().IsZero() {
 		return r.reconcileDelete(ctx, logger, cluster, awsCluster, karpenterMachinePool, roleIdentity)
 	}
 
-	bootstrapSecret := &v1.Secret{}
-	if err := r.client.Get(ctx, client.ObjectKey{Namespace: req.Namespace, Name: *machinePool.Spec.Template.Spec.Bootstrap.DataSecretName}, bootstrapSecret); err != nil {
-		return reconcile.Result{}, fmt.Errorf("bootstrap secret in MachinePool.spec.template.spec.bootstrap.dataSecretName is not found: %w", err)
-	}
-
-	bootstrapSecretValue, ok := bootstrapSecret.Data["value"]
-	if !ok {
-		return reconcile.Result{}, errors.New("error retrieving bootstrap data: secret value key is missing")
-	}
-
 	// Create a deep copy of the reconciled object so we can change it
 	karpenterMachinePoolCopy := karpenterMachinePool.DeepCopy()
+
+	// Add finalizer to ensure proper cleanup sequence
 	updated := controllerutil.AddFinalizer(karpenterMachinePool, KarpenterFinalizer)
 	if updated {
 		if err := r.client.Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy)); err != nil {
@@ -148,37 +159,17 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	}
 
 	// Create or update Karpenter custom resources in the workload cluster.
-	if err := r.createOrUpdateKarpenterResources(ctx, logger, cluster, awsCluster, karpenterMachinePool, machinePool, bootstrapSecretValue); err != nil {
+	if err := r.createOrUpdateKarpenterResources(ctx, logger, cluster, awsCluster, karpenterMachinePool, machinePool); err != nil {
 		logger.Error(err, "failed to create or update Karpenter custom resources in the workload cluster")
 		return reconcile.Result{}, err
 	}
 
-	bootstrapUserDataHash := fmt.Sprintf("%x", sha256.Sum256(bootstrapSecretValue))
-	previousHash, annotationHashExists := karpenterMachinePool.Annotations[BootstrapDataHashAnnotation]
-	if !annotationHashExists || previousHash != bootstrapUserDataHash {
-		s3Client, err := r.awsClients.NewS3Client(awsCluster.Spec.Region, roleIdentity.Spec.RoleArn)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-
-		key := path.Join(S3ObjectPrefix, req.Name)
-
-		logger.Info("Writing userdata to S3", "bucket", awsCluster.Spec.S3Bucket.Name, "key", key)
-		if err = s3Client.Put(ctx, awsCluster.Spec.S3Bucket.Name, key, bootstrapSecretValue); err != nil {
-			return reconcile.Result{}, err
-		}
-
-		if karpenterMachinePool.Annotations == nil {
-			karpenterMachinePool.Annotations = make(map[string]string)
-		}
-		karpenterMachinePool.Annotations[BootstrapDataHashAnnotation] = bootstrapUserDataHash
-
-		if err := r.client.Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy)); err != nil {
-			logger.Error(err, "failed to patch karpenterMachinePool.annotations with user data hash", "annotation", BootstrapDataHashAnnotation)
-			return reconcile.Result{}, err
-		}
+	// Reconcile bootstrap data - fetch secret and upload to S3 if changed
+	if err := r.reconcileMachinePoolBootstrapUserData(ctx, logger, awsCluster, karpenterMachinePool, *machinePool.Spec.Template.Spec.Bootstrap.DataSecretName, roleIdentity); err != nil {
+		return reconcile.Result{}, err
 	}
 
+	// Update status with current node information from the workload cluster
 	providerIDList, numberOfNodeClaims, err := r.computeProviderIDListFromNodeClaimsInWorkloadCluster(ctx, logger, cluster)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -201,6 +192,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 		return reconcile.Result{}, err
 	}
 
+	// Update the parent MachinePool replica count to match actual node claims
 	if machinePool.Spec.Replicas == nil || *machinePool.Spec.Replicas != numberOfNodeClaims {
 		machinePoolCopy := machinePool.DeepCopy()
 		machinePool.Spec.Replicas = &numberOfNodeClaims
@@ -213,7 +205,58 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	return reconcile.Result{}, nil
 }
 
+// reconcileMachinePoolBootstrapUserData handles the bootstrap user data reconciliation process.
+// It fetches the bootstrap secret, checks if the data has changed, and uploads it to S3 if needed.
+// It also updates the hash annotation to track the current bootstrap data version.
+func (r *KarpenterMachinePoolReconciler) reconcileMachinePoolBootstrapUserData(ctx context.Context, logger logr.Logger, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, dataSecretName string, roleIdentity *capa.AWSClusterRoleIdentity) error {
+	// Get the bootstrap secret containing userdata for node initialization
+	bootstrapSecret := &v1.Secret{}
+	if err := r.client.Get(ctx, client.ObjectKey{Namespace: karpenterMachinePool.Namespace, Name: dataSecretName}, bootstrapSecret); err != nil {
+		return fmt.Errorf("bootstrap secret in MachinePool.spec.template.spec.bootstrap.dataSecretName is not found: %w", err)
+	}
+
+	bootstrapSecretValue, ok := bootstrapSecret.Data["value"]
+	if !ok {
+		return errors.New("error retrieving bootstrap data: secret value key is missing")
+	}
+
+	// Check if bootstrap data has changed and needs to be re-uploaded to S3
+	bootstrapUserDataHash := fmt.Sprintf("%x", sha256.Sum256(bootstrapSecretValue))
+	previousHash, annotationHashExists := karpenterMachinePool.Annotations[BootstrapDataHashAnnotation]
+	if !annotationHashExists || previousHash != bootstrapUserDataHash {
+		s3Client, err := r.awsClients.NewS3Client(awsCluster.Spec.Region, roleIdentity.Spec.RoleArn)
+		if err != nil {
+			return err
+		}
+
+		key := path.Join(S3ObjectPrefix, karpenterMachinePool.Name)
+
+		logger.Info("Writing userdata to S3", "bucket", awsCluster.Spec.S3Bucket.Name, "key", key)
+		if err = s3Client.Put(ctx, awsCluster.Spec.S3Bucket.Name, key, bootstrapSecretValue); err != nil {
+			return err
+		}
+
+		// Create copy for patching annotations
+		karpenterMachinePoolCopy := karpenterMachinePool.DeepCopy()
+
+		// Update the hash annotation to track the current bootstrap data version
+		if karpenterMachinePool.Annotations == nil {
+			karpenterMachinePool.Annotations = make(map[string]string)
+		}
+		karpenterMachinePool.Annotations[BootstrapDataHashAnnotation] = bootstrapUserDataHash
+
+		if err := r.client.Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy)); err != nil {
+			logger.Error(err, "failed to patch karpenterMachinePool.annotations with user data hash", "annotation", BootstrapDataHashAnnotation)
+			return err
+		}
+	}
+
+	return nil
+}
+
 // reconcileDelete deletes the karpenter custom resources from the workload cluster.
+// When the cluster itself is being deleted, it also terminates all EC2 instances
+// created by Karpenter to prevent orphaned resources.
 func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, roleIdentity *capa.AWSClusterRoleIdentity) (reconcile.Result, error) {
 	// We check if the owner Cluster is also being deleted (on top of the `KarpenterMachinePool` being deleted).
 	// If the Cluster is being deleted, we terminate all the ec2 instances that karpenter may have launched.
@@ -256,6 +299,8 @@ func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, lo
 	return reconcile.Result{}, nil
 }
 
+// getWorkloadClusterNodeClaims retrieves all NodeClaim resources from the workload cluster.
+// NodeClaims represent actual compute resources provisioned by Karpenter.
 func (r *KarpenterMachinePoolReconciler) getWorkloadClusterNodeClaims(ctx context.Context, cluster *capi.Cluster) (*unstructured.UnstructuredList, error) {
 	nodeClaimList := &unstructured.UnstructuredList{}
 	workloadClusterClient, err := r.clusterClientGetter(ctx, "", r.client, client.ObjectKeyFromObject(cluster))
@@ -274,6 +319,9 @@ func (r *KarpenterMachinePoolReconciler) getWorkloadClusterNodeClaims(ctx contex
 	return nodeClaimList, err
 }
 
+// computeProviderIDListFromNodeClaimsInWorkloadCluster extracts provider IDs from NodeClaims
+// and returns both the list of provider IDs and the total count of node claims.
+// Provider IDs are AWS-specific identifiers like "aws:///us-west-2a/i-1234567890abcdef0"
 func (r *KarpenterMachinePoolReconciler) computeProviderIDListFromNodeClaimsInWorkloadCluster(ctx context.Context, logger logr.Logger, cluster *capi.Cluster) ([]string, int32, error) {
 	var providerIDList []string
 
@@ -298,7 +346,9 @@ func (r *KarpenterMachinePoolReconciler) computeProviderIDListFromNodeClaimsInWo
 	return providerIDList, int32(len(nodeClaimList.Items)), nil
 }
 
-// getControlPlaneVersion retrieves the current Kubernetes version from the control plane
+// getControlPlaneVersion retrieves the current Kubernetes version from the control plane.
+// This is used for version skew validation to ensure workers don't run newer versions
+// than the control plane, as defined in the version skew policy https://kubernetes.io/releases/version-skew-policy/.
 func (r *KarpenterMachinePoolReconciler) getControlPlaneVersion(ctx context.Context, cluster *capi.Cluster) (string, error) {
 	if cluster.Spec.ControlPlaneRef == nil {
 		return "", fmt.Errorf("cluster has no control plane reference")
@@ -329,8 +379,10 @@ func (r *KarpenterMachinePoolReconciler) getControlPlaneVersion(ctx context.Cont
 	return version, nil
 }
 
-// createOrUpdateKarpenterResources creates or updates the Karpenter NodePool and EC2NodeClass custom resources in the workload cluster
-func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, machinePool *capiexp.MachinePool, bootstrapSecretValue []byte) error {
+// createOrUpdateKarpenterResources creates or updates the Karpenter NodePool and EC2NodeClass custom resources in the workload cluster.
+// This method enforces version skew policies and sets appropriate conditions based on success/failure states.
+func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, machinePool *capiexp.MachinePool) error {
+	// Validate version skew: ensure worker nodes don't use newer Kubernetes versions than control plane
 	allowed, controlPlaneCurrentVersion, nodePoolDesiredVersion, err := r.IsVersionSkewAllowed(ctx, cluster, machinePool)
 	if err != nil {
 		return err
@@ -356,7 +408,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx co
 	}
 
 	// Create or update EC2NodeClass
-	if err := r.createOrUpdateEC2NodeClass(ctx, logger, workloadClusterClient, awsCluster, karpenterMachinePool, bootstrapSecretValue); err != nil {
+	if err := r.createOrUpdateEC2NodeClass(ctx, logger, workloadClusterClient, awsCluster, karpenterMachinePool); err != nil {
 		conditions.MarkEC2NodeClassNotReady(karpenterMachinePool, EC2NodeClassCreationFailedReason, err.Error())
 		return fmt.Errorf("failed to create or update EC2NodeClass: %w", err)
 	}
@@ -375,7 +427,9 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx co
 }
 
 // createOrUpdateEC2NodeClass creates or updates the EC2NodeClass resource in the workload cluster
-func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, bootstrapSecretValue []byte) error {
+// EC2NodeClass defines the EC2-specific configuration for nodes that Karpenter will provision,
+// including AMI selection, instance profiles, security groups, and user data.
+func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool) error {
 	ec2NodeClassGVR := schema.GroupVersionResource{
 		Group:    EC2NodeClassAPIGroup,
 		Version:  "v1",
@@ -428,6 +482,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 	return nil
 }
 
+// mergeMaps combines multiple maps, with later maps taking precedence for duplicate keys
 func mergeMaps[A comparable, B any](maps ...map[A]B) map[A]B {
 	result := make(map[A]B)
 	for _, m := range maps {
@@ -438,7 +493,9 @@ func mergeMaps[A comparable, B any](maps ...map[A]B) map[A]B {
 	return result
 }
 
-// createOrUpdateNodePool creates or updates the NodePool resource in the workload cluster
+// createOrUpdateNodePool creates or updates the NodePool resource in the workload cluster.
+// NodePool defines the desired state and constraints for nodes that Karpenter should provision,
+// including resource limits, disruption policies, and node requirements.
 func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool) error {
 	nodePoolGVR := schema.GroupVersionResource{
 		Group:    "karpenter.sh",
@@ -479,6 +536,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 			"disruption": map[string]interface{}{},
 		}
 
+		// Apply user-defined NodePool configuration if provided
 		if karpenterMachinePool.Spec.NodePool != nil {
 			dis := spec["disruption"].(map[string]interface{})
 			dis["budgets"] = karpenterMachinePool.Spec.NodePool.Disruption.Budgets
@@ -526,7 +584,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 	return nil
 }
 
-// deleteKarpenterResources deletes the Karpenter NodePool and EC2NodeClass resources from the workload cluster
+// deleteKarpenterResources deletes the Karpenter NodePool and EC2NodeClass resources from the workload cluster.
 func (r *KarpenterMachinePoolReconciler) deleteKarpenterResources(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool) error {
 	workloadClusterClient, err := r.clusterClientGetter(ctx, "", r.client, client.ObjectKeyFromObject(cluster))
 	if err != nil {
@@ -570,7 +628,7 @@ func (r *KarpenterMachinePoolReconciler) deleteKarpenterResources(ctx context.Co
 	return nil
 }
 
-// generateUserData generates the user data for Ignition configuration
+// generateUserData generates the user data for Ignition configuration.
 func (r *KarpenterMachinePoolReconciler) generateUserData(s3bucketName, karpenterMachinePoolName string) string {
 	userData := map[string]interface{}{
 		"ignition": map[string]interface{}{
@@ -615,12 +673,17 @@ func (r *KarpenterMachinePoolReconciler) SetupWithManager(ctx context.Context, m
 
 // IsVersionSkewAllowed checks if the worker version can be updated based on the control plane version.
 // The workers can't use a newer k8s version than the one used by the control plane.
+//
+// This implements Kubernetes version skew policy https://kubernetes.io/releases/version-skew-policy/
+//
+// Returns: (allowed bool, controlPlaneVersion string, desiredWorkerVersion string, error)
 func (r *KarpenterMachinePoolReconciler) IsVersionSkewAllowed(ctx context.Context, cluster *capi.Cluster, machinePool *capiexp.MachinePool) (bool, string, string, error) {
 	controlPlaneVersion, err := r.getControlPlaneVersion(ctx, cluster)
 	if err != nil {
 		return true, "", "", fmt.Errorf("failed to get current Control Plane k8s version: %w", err)
 	}
 
+	// Parse versions using semantic versioning for proper comparison
 	controlPlaneCurrentK8sVersion, err := semver.ParseTolerant(controlPlaneVersion)
 	if err != nil {
 		return true, "", "", fmt.Errorf("failed to parse current Control Plane k8s version: %w", err)
@@ -631,5 +694,6 @@ func (r *KarpenterMachinePoolReconciler) IsVersionSkewAllowed(ctx context.Contex
 		return true, controlPlaneVersion, "", fmt.Errorf("failed to parse node pool desired k8s version: %w", err)
 	}
 
+	// Allow if control plane version >= desired worker version
 	return controlPlaneCurrentK8sVersion.GE(machinePoolDesiredK8sVersion), controlPlaneVersion, *machinePool.Spec.Template.Spec.Version, nil
 }
