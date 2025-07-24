@@ -86,7 +86,11 @@ func MarkIDNotProvided(cluster *capi.Cluster, id string) {
 }
 
 func MarkNodePoolCreated(setter capiconditions.Setter) {
-	capiconditions.MarkTrue(setter, NodePoolCreatedCondition)
+	capiconditions.Set(setter, &capi.Condition{
+		Type:   NodePoolCreatedCondition,
+		Status: "True",
+		Reason: NodePoolCreationSucceededReason,
+	})
 }
 
 func MarkNodePoolNotCreated(setter capiconditions.Setter, reason, message string) {
@@ -94,7 +98,11 @@ func MarkNodePoolNotCreated(setter capiconditions.Setter, reason, message string
 }
 
 func MarkEC2NodeClassCreated(setter capiconditions.Setter) {
-	capiconditions.MarkTrue(setter, EC2NodeClassCreatedCondition)
+	capiconditions.Set(setter, &capi.Condition{
+		Type:   EC2NodeClassCreatedCondition,
+		Status: "True",
+		Reason: EC2NodeClassCreationSucceededReason,
+	})
 }
 
 func MarkEC2NodeClassNotCreated(setter capiconditions.Setter, reason, message string) {
@@ -102,7 +110,11 @@ func MarkEC2NodeClassNotCreated(setter capiconditions.Setter, reason, message st
 }
 
 func MarkBootstrapDataReady(setter capiconditions.Setter) {
-	capiconditions.MarkTrue(setter, BootstrapDataReadyCondition)
+	capiconditions.Set(setter, &capi.Condition{
+		Type:   BootstrapDataReadyCondition,
+		Status: "True",
+		Reason: ReadyReason,
+	})
 }
 
 func MarkBootstrapDataNotReady(setter capiconditions.Setter, reason, message string) {
@@ -110,7 +122,11 @@ func MarkBootstrapDataNotReady(setter capiconditions.Setter, reason, message str
 }
 
 func MarkVersionSkewValid(setter capiconditions.Setter) {
-	capiconditions.MarkTrue(setter, VersionSkewValidCondition)
+	capiconditions.Set(setter, &capi.Condition{
+		Type:   VersionSkewValidCondition,
+		Status: "True",
+		Reason: VersionSkewValidReason,
+	})
 }
 
 func MarkVersionSkewInvalid(setter capiconditions.Setter, reason, message string) {
@@ -118,7 +134,11 @@ func MarkVersionSkewInvalid(setter capiconditions.Setter, reason, message string
 }
 
 func MarkKarpenterMachinePoolReady(setter capiconditions.Setter) {
-	capiconditions.MarkTrue(setter, ReadyCondition)
+	capiconditions.Set(setter, &capi.Condition{
+		Type:   ReadyCondition,
+		Status: "True",
+		Reason: ReadyReason,
+	})
 }
 
 func MarkKarpenterMachinePoolNotReady(setter capiconditions.Setter, reason, message string) {

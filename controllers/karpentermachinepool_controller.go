@@ -153,26 +153,24 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	}
 
 	// Create or update Karpenter custom resources in the workload cluster.
-	karpenterMachinePoolConditionsCopy := karpenterMachinePool.DeepCopy()
 	if err := r.createOrUpdateKarpenterResources(ctx, logger, cluster, awsCluster, karpenterMachinePool, machinePool); err != nil {
 		logger.Error(err, "failed to create or update Karpenter custom resources in the workload cluster")
 
 		// Ensure conditions are persisted even when errors occur
-		if statusErr := r.client.Status().Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolConditionsCopy), client.FieldOwner("karpentermachinepool-controller")); statusErr != nil {
-			logger.Error(statusErr, "failed to patch karpenterMachinePool status with error conditions")
+		if statusErr := r.client.Status().Update(ctx, karpenterMachinePool); statusErr != nil {
+			logger.Error(statusErr, "failed to update karpenterMachinePool status with error conditions")
 		}
 
 		return reconcile.Result{}, err
 	}
 
 	// Reconcile bootstrap data - fetch secret and upload to S3 if changed
-	karpenterMachinePoolBootstrapConditionsCopy := karpenterMachinePool.DeepCopy()
 	if err := r.reconcileMachinePoolBootstrapUserData(ctx, logger, awsCluster, karpenterMachinePool, *machinePool.Spec.Template.Spec.Bootstrap.DataSecretName, roleIdentity); err != nil {
 		conditions.MarkBootstrapDataNotReady(karpenterMachinePool, conditions.BootstrapDataUploadFailedReason, fmt.Sprintf("Failed to reconcile bootstrap data: %v", err))
 
 		// Ensure conditions are persisted even when errors occur
-		if statusErr := r.client.Status().Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolBootstrapConditionsCopy), client.FieldOwner("karpentermachinepool-controller")); statusErr != nil {
-			logger.Error(statusErr, "failed to patch karpenterMachinePool status with bootstrap error conditions")
+		if statusErr := r.client.Status().Update(ctx, karpenterMachinePool); statusErr != nil {
+			logger.Error(statusErr, "failed to update karpenterMachinePool status with bootstrap error conditions")
 		}
 
 		return reconcile.Result{}, err
@@ -180,13 +178,12 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	conditions.MarkBootstrapDataReady(karpenterMachinePool)
 
 	// Update status with current node information from the workload cluster
-	karpenterMachinePoolStatusCopy := karpenterMachinePool.DeepCopy()
 	if err := r.saveKarpenterInstancesToStatus(ctx, logger, cluster, karpenterMachinePool, machinePool); err != nil {
 		logger.Error(err, "failed to save Karpenter instances to status")
 
 		// Ensure conditions are persisted even when errors occur
-		if statusErr := r.client.Status().Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolStatusCopy), client.FieldOwner("karpentermachinepool-controller")); statusErr != nil {
-			logger.Error(statusErr, "failed to patch karpenterMachinePool status with conditions before returning error")
+		if statusErr := r.client.Status().Update(ctx, karpenterMachinePool); statusErr != nil {
+			logger.Error(statusErr, "failed to update karpenterMachinePool status with conditions before returning error")
 		}
 
 		return reconcile.Result{}, err
@@ -196,8 +193,8 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	conditions.MarkKarpenterMachinePoolReady(karpenterMachinePool)
 
 	// Update the status to persist the Ready condition
-	if err := r.client.Status().Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolStatusCopy), client.FieldOwner("karpentermachinepool-controller")); err != nil {
-		logger.Error(err, "failed to patch karpenterMachinePool status with Ready condition")
+	if err := r.client.Status().Update(ctx, karpenterMachinePool); err != nil {
+		logger.Error(err, "failed to update karpenterMachinePool status with Ready condition")
 		return reconcile.Result{}, err
 	}
 
@@ -466,15 +463,13 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx co
 		conditions.MarkEC2NodeClassNotCreated(karpenterMachinePool, conditions.EC2NodeClassCreationFailedReason, fmt.Sprintf("%v", err))
 		return fmt.Errorf("failed to create or update EC2NodeClass: %w", err)
 	}
+	conditions.MarkEC2NodeClassCreated(karpenterMachinePool)
 
 	// Create or update NodePool
 	if err := r.createOrUpdateNodePool(ctx, logger, workloadClusterClient, cluster, karpenterMachinePool); err != nil {
 		conditions.MarkNodePoolNotCreated(karpenterMachinePool, conditions.NodePoolCreationFailedReason, fmt.Sprintf("%v", err))
 		return fmt.Errorf("failed to create or update NodePool: %w", err)
 	}
-
-	// Mark both resources as successfully created
-	conditions.MarkEC2NodeClassCreated(karpenterMachinePool)
 	conditions.MarkNodePoolCreated(karpenterMachinePool)
 
 	return nil

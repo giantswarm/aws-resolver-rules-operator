@@ -1303,6 +1303,235 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 		})
 	})
 
+	When("creating the NodePool fails", func() {
+		BeforeEach(func() {
+			dataSecretName = DataSecretName
+			kubernetesVersion := KubernetesVersion
+			machinePool := &capiexp.MachinePool{
+				ObjectMeta: ctrl.ObjectMeta{
+					Namespace: namespace,
+					Name:      KarpenterMachinePoolName,
+					Labels: map[string]string{
+						capi.ClusterNameLabel: ClusterName,
+					},
+				},
+				Spec: capiexp.MachinePoolSpec{
+					ClusterName: ClusterName,
+					Template: capi.MachineTemplateSpec{
+						Spec: capi.MachineSpec{
+							ClusterName: ClusterName,
+							Version:     &kubernetesVersion,
+							Bootstrap: capi.Bootstrap{
+								DataSecretName: &dataSecretName,
+							},
+						},
+					},
+				},
+			}
+			err := k8sClient.Create(ctx, machinePool)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Get the created machinePool to access its UID
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: KarpenterMachinePoolName}, machinePool)
+			Expect(err).NotTo(HaveOccurred())
+
+			deviceName := "/dev/xvda"
+			volumeType := "gp3"
+			deleteOnTermination := true
+			volumeSize, _ := resource.ParseQuantity("8Gi")
+			kmp := &karpenterinfra.KarpenterMachinePool{
+				ObjectMeta: ctrl.ObjectMeta{
+					Namespace: namespace,
+					Name:      KarpenterMachinePoolName,
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion: "cluster.x-k8s.io/v1beta1",
+							Kind:       "MachinePool",
+							Name:       KarpenterMachinePoolName,
+							UID:        machinePool.UID,
+						},
+					},
+				},
+				Spec: karpenterinfra.KarpenterMachinePoolSpec{
+					EC2NodeClass: &karpenterinfra.EC2NodeClassSpec{
+						InstanceProfile: &instanceProfile,
+						AMISelectorTerms: []karpenterinfra.AMISelectorTerm{
+							{
+								Alias: "al2@latest",
+							},
+						},
+						BlockDeviceMappings: []*karpenterinfra.BlockDeviceMapping{
+							{
+								DeviceName: &deviceName,
+								RootVolume: true,
+								EBS: &karpenterinfra.BlockDevice{
+									VolumeSize:          &volumeSize,
+									VolumeType:          &volumeType,
+									DeleteOnTermination: &deleteOnTermination,
+								},
+							},
+						},
+						SecurityGroupSelectorTerms: []karpenterinfra.SecurityGroupSelectorTerm{
+							{
+								Tags: map[string]string{"Name": "foo"},
+							},
+						},
+						SubnetSelectorTerms: []karpenterinfra.SubnetSelectorTerm{
+							{
+								Tags: map[string]string{"Name": "foo"},
+							},
+						},
+						Tags: map[string]string{
+							"one-tag": "only-for-karpenter",
+						},
+					},
+					// NodePool spec omitted to focus on testing condition persistence
+					// NodePool: nil,
+				},
+			}
+			err = k8sClient.Create(ctx, kmp)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Create Cluster resource
+			cluster := &capi.Cluster{
+				ObjectMeta: ctrl.ObjectMeta{
+					Namespace: namespace,
+					Name:      ClusterName,
+					Labels: map[string]string{
+						capi.ClusterNameLabel: ClusterName,
+					},
+				},
+				Spec: capi.ClusterSpec{
+					ControlPlaneRef: &v1.ObjectReference{
+						Kind:       "KubeadmControlPlane",
+						Namespace:  namespace,
+						Name:       ClusterName,
+						APIVersion: "controlplane.cluster.x-k8s.io/v1beta1",
+					},
+					InfrastructureRef: &v1.ObjectReference{
+						Kind:       "AWSCluster",
+						Namespace:  namespace,
+						Name:       ClusterName,
+						APIVersion: "infrastructure.cluster.x-k8s.io/v1beta2",
+					},
+				},
+			}
+			err = k8sClient.Create(ctx, cluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Create AWSCluster resource
+			awsCluster := &capa.AWSCluster{
+				ObjectMeta: ctrl.ObjectMeta{
+					Namespace: namespace,
+					Name:      ClusterName,
+				},
+				Spec: capa.AWSClusterSpec{
+					AdditionalTags: map[string]string{
+						"additional-tag-for-all-resources": "custom-tag",
+					},
+					IdentityRef: &capa.AWSIdentityReference{
+						Name: "default",
+						Kind: capa.ClusterRoleIdentityKind,
+					},
+					Region:   AWSRegion,
+					S3Bucket: &capa.S3Bucket{Name: AWSClusterBucketName},
+				},
+			}
+			err = k8sClient.Create(ctx, awsCluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Create AWSClusterRoleIdentity resource
+			awsClusterRoleIdentity := &capa.AWSClusterRoleIdentity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "default",
+				},
+				Spec: capa.AWSClusterRoleIdentitySpec{
+					AWSRoleSpec: capa.AWSRoleSpec{
+						RoleArn: "arn:aws:iam::123456789012:role/test-role",
+					},
+				},
+			}
+			err = k8sClient.Create(ctx, awsClusterRoleIdentity)
+			Expect(err).To(SatisfyAny(
+				BeNil(),
+				MatchError(ContainSubstring("already exists")),
+			))
+
+			// Create bootstrap secret for successful reconciliation
+			bootstrapSecret := &v1.Secret{
+				ObjectMeta: ctrl.ObjectMeta{
+					Namespace: namespace,
+					Name:      DataSecretName,
+				},
+				Data: map[string][]byte{"value": capiBootstrapSecretContent},
+			}
+			err = k8sClient.Create(ctx, bootstrapSecret)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Create control plane with same version as machine pool for successful version skew validation
+			kubeadmControlPlane := &unstructured.Unstructured{}
+			kubeadmControlPlane.Object = map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"name":      ClusterName,
+					"namespace": namespace,
+				},
+				"spec": map[string]interface{}{
+					"kubeadmConfigSpec": map[string]interface{}{},
+					"machineTemplate": map[string]interface{}{
+						"infrastructureRef": map[string]interface{}{},
+					},
+					"version": KubernetesVersion,
+				},
+			}
+			kubeadmControlPlane.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   "controlplane.cluster.x-k8s.io",
+				Kind:    "KubeadmControlPlane",
+				Version: "v1beta1",
+			})
+			err = k8sClient.Create(ctx, kubeadmControlPlane)
+			Expect(err).NotTo(HaveOccurred())
+			err = unstructured.SetNestedField(kubeadmControlPlane.Object, map[string]interface{}{"version": KubernetesVersion}, "status")
+			Expect(err).NotTo(HaveOccurred())
+			err = k8sClient.Status().Update(ctx, kubeadmControlPlane)
+			Expect(err).NotTo(HaveOccurred())
+
+			reconcileResult, reconcileErr = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: namespace,
+					Name:      KarpenterMachinePoolName,
+				},
+			})
+		})
+
+		It("updates conditions even when reconciliation fails", func() {
+			Expect(reconcileErr).To(HaveOccurred())
+			Expect(reconcileErr.Error()).To(ContainSubstring("failed to create or update NodePool"))
+
+			// Get the updated KarpenterMachinePool
+			updatedKarpenterMachinePool := &karpenterinfra.KarpenterMachinePool{}
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: KarpenterMachinePoolName}, updatedKarpenterMachinePool)
+			Expect(err).NotTo(HaveOccurred())
+
+			// This condition should be properly persisted even though reconciliation failed
+			ec2NodeClassCondition := findCondition(updatedKarpenterMachinePool.Status.Conditions, "EC2NodeClassCreated")
+			Expect(ec2NodeClassCondition).NotTo(BeNil(), "EC2NodeClass condition should be persisted even on error")
+			Expect(string(ec2NodeClassCondition.Status)).To(Equal("True"), "EC2NodeClass was created successfully")
+			Expect(ec2NodeClassCondition.Reason).To(Equal("EC2NodeClassCreated"))
+
+			// Version skew should be valid since we use the same version
+			versionSkewCondition := findCondition(updatedKarpenterMachinePool.Status.Conditions, "VersionSkewValid")
+			Expect(versionSkewCondition).NotTo(BeNil(), "VersionSkew condition should be persisted even on error")
+			Expect(string(versionSkewCondition.Status)).To(Equal("True"), "Version skew should be valid")
+			Expect(versionSkewCondition.Reason).To(Equal("VersionSkewValid"))
+
+			// NodePool should be False since creation failed
+			nodePoolCondition := findCondition(updatedKarpenterMachinePool.Status.Conditions, "NodePoolCreated")
+			Expect(nodePoolCondition).NotTo(BeNil(), "NodePool condition should be persisted even on error")
+			Expect(string(nodePoolCondition.Status)).To(Equal("False"), "NodePool creation failed")
+			Expect(nodePoolCondition.Reason).To(Equal("NodePoolCreationFailed"))
+		})
+	})
+
 	When("version skew validation fails (node pool version newer than control plane)", func() {
 		var controlPlaneVersion = "v1.29.0"
 		var nodePoolVersion = "v1.30.0" // Newer than control plane - should violate version skew policy
