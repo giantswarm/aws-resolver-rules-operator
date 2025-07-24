@@ -39,10 +39,6 @@ type KarpenterMachinePoolSpec struct {
 
 // KarpenterMachinePoolStatus defines the observed state of KarpenterMachinePool.
 type KarpenterMachinePoolStatus struct {
-	// Ready is true when the provider resource is ready.
-	// +optional
-	Ready bool `json:"ready"`
-
 	// Replicas is the most recently observed number of replicas
 	// +optional
 	Replicas int32 `json:"replicas"`
@@ -50,14 +46,6 @@ type KarpenterMachinePoolStatus struct {
 	// Conditions defines current service state of the KarpenterMachinePool.
 	// +optional
 	Conditions capi.Conditions `json:"conditions,omitempty"`
-
-	// NodePoolReady indicates whether the NodePool is ready
-	// +optional
-	NodePoolReady bool `json:"nodePoolReady"`
-
-	// EC2NodeClassReady indicates whether the EC2NodeClass is ready
-	// +optional
-	EC2NodeClassReady bool `json:"ec2NodeClassReady"`
 }
 
 // +kubebuilder:object:root=true

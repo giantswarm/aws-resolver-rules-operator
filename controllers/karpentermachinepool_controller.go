@@ -51,15 +51,6 @@ const (
 	// S3ObjectPrefix is the S3 path prefix where bootstrap data is stored
 	// Format: s3://<bucket>/<prefix>/<machine-pool-name>
 	S3ObjectPrefix = "karpenter-machine-pool"
-
-	// Condition reasons for tracking resource creation states
-
-	// NodePoolCreationFailedReason indicates that the NodePool creation failed
-	NodePoolCreationFailedReason = "NodePoolCreationFailed"
-	// EC2NodeClassCreationFailedReason indicates that the EC2NodeClass creation failed
-	EC2NodeClassCreationFailedReason = "EC2NodeClassCreationFailed"
-	// VersionSkewBlockedReason indicates that the update was blocked due to version skew policy
-	VersionSkewBlockedReason = "VersionSkewBlocked"
 )
 
 type KarpenterMachinePoolReconciler struct {
@@ -150,6 +141,9 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	// Create a deep copy of the reconciled object so we can change it
 	karpenterMachinePoolCopy := karpenterMachinePool.DeepCopy()
 
+	// Initialize conditions - mark as initializing until all steps complete
+	conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.InitializingReason, "KarpenterMachinePool is being initialized")
+
 	// Add finalizer to ensure proper cleanup sequence
 	updated := controllerutil.AddFinalizer(karpenterMachinePool, KarpenterFinalizer)
 	if updated {
@@ -161,35 +155,75 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	// Create or update Karpenter custom resources in the workload cluster.
 	if err := r.createOrUpdateKarpenterResources(ctx, logger, cluster, awsCluster, karpenterMachinePool, machinePool); err != nil {
 		logger.Error(err, "failed to create or update Karpenter custom resources in the workload cluster")
+
+		// Ensure conditions are persisted even when errors occur
+		if statusErr := r.client.Status().Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy), client.FieldOwner("karpentermachinepool-controller")); statusErr != nil {
+			logger.Error(statusErr, "failed to patch karpenterMachinePool status with error conditions")
+		}
+
 		return reconcile.Result{}, err
 	}
 
 	// Reconcile bootstrap data - fetch secret and upload to S3 if changed
 	if err := r.reconcileMachinePoolBootstrapUserData(ctx, logger, awsCluster, karpenterMachinePool, *machinePool.Spec.Template.Spec.Bootstrap.DataSecretName, roleIdentity); err != nil {
+		conditions.MarkBootstrapDataNotReady(karpenterMachinePool, conditions.BootstrapDataUploadFailedReason, fmt.Sprintf("Failed to reconcile bootstrap data: %v", err))
+
+		// Ensure conditions are persisted even when errors occur
+		if statusErr := r.client.Status().Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy), client.FieldOwner("karpentermachinepool-controller")); statusErr != nil {
+			logger.Error(statusErr, "failed to patch karpenterMachinePool status with bootstrap error conditions")
+		}
+
 		return reconcile.Result{}, err
 	}
+	conditions.MarkBootstrapDataReady(karpenterMachinePool)
 
 	// Update status with current node information from the workload cluster
-	providerIDList, numberOfNodeClaims, err := r.computeProviderIDListFromNodeClaimsInWorkloadCluster(ctx, logger, cluster)
-	if err != nil {
+	if err := r.saveKarpenterInstancesToStatus(ctx, logger, cluster, karpenterMachinePool, machinePool); err != nil {
 		return reconcile.Result{}, err
 	}
 
+	// Mark the KarpenterMachinePool as ready when all conditions are satisfied
+	conditions.MarkKarpenterMachinePoolReady(karpenterMachinePool)
+
+	// Update the status to persist the Ready condition
+	if err := r.client.Status().Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy), client.FieldOwner("karpentermachinepool-controller")); err != nil {
+		logger.Error(err, "failed to patch karpenterMachinePool status with Ready condition")
+		return reconcile.Result{}, err
+	}
+
+	return reconcile.Result{}, nil
+}
+
+// saveKarpenterInstancesToStatus updates the KarpenterMachinePool and parent MachinePool with current node information
+// from the workload cluster, including replica counts and provider ID lists.
+func (r *KarpenterMachinePoolReconciler) saveKarpenterInstancesToStatus(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, machinePool *capiexp.MachinePool) error {
+	// Create a copy for tracking changes
+	karpenterMachinePoolCopy := karpenterMachinePool.DeepCopy()
+
+	// Get current node information from the workload cluster
+	providerIDList, numberOfNodeClaims, err := r.computeProviderIDListFromNodeClaimsInWorkloadCluster(ctx, logger, cluster)
+	if err != nil {
+		return err
+	}
+
+	// Update KarpenterMachinePool status with current replica count
 	karpenterMachinePool.Status.Replicas = numberOfNodeClaims
-	karpenterMachinePool.Status.Ready = true
 
 	logger.Info("Found NodeClaims in workload cluster, patching KarpenterMachinePool", "numberOfNodeClaims", numberOfNodeClaims, "providerIDList", providerIDList)
 
+	// Patch the status with the updated replica count
 	if err := r.client.Status().Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy), client.FieldOwner("karpentermachinepool-controller")); err != nil {
 		logger.Error(err, "failed to patch karpenterMachinePool.status.Replicas")
-		return reconcile.Result{}, err
+		return err
 	}
 
+	// Update KarpenterMachinePool spec with current provider ID list
 	karpenterMachinePool.Spec.ProviderIDList = providerIDList
 
+	// Patch the spec with the updated provider ID list
 	if err := r.client.Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy), client.FieldOwner("karpentermachinepool-controller")); err != nil {
 		logger.Error(err, "failed to patch karpenterMachinePool.spec.providerIDList")
-		return reconcile.Result{}, err
+		return err
 	}
 
 	// Update the parent MachinePool replica count to match actual node claims
@@ -198,11 +232,11 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 		machinePool.Spec.Replicas = &numberOfNodeClaims
 		if err := r.client.Patch(ctx, machinePool, client.MergeFrom(machinePoolCopy), client.FieldOwner("karpenter-machinepool-controller")); err != nil {
 			logger.Error(err, "failed to patch MachinePool.spec.replicas")
-			return reconcile.Result{}, err
+			return err
 		}
 	}
 
-	return reconcile.Result{}, nil
+	return nil
 }
 
 // reconcileMachinePoolBootstrapUserData handles the bootstrap user data reconciliation process.
@@ -212,11 +246,17 @@ func (r *KarpenterMachinePoolReconciler) reconcileMachinePoolBootstrapUserData(c
 	// Get the bootstrap secret containing userdata for node initialization
 	bootstrapSecret := &v1.Secret{}
 	if err := r.client.Get(ctx, client.ObjectKey{Namespace: karpenterMachinePool.Namespace, Name: dataSecretName}, bootstrapSecret); err != nil {
-		return fmt.Errorf("bootstrap secret in MachinePool.spec.template.spec.bootstrap.dataSecretName is not found: %w", err)
+		if k8serrors.IsNotFound(err) {
+			conditions.MarkBootstrapDataNotReady(karpenterMachinePool, conditions.BootstrapDataSecretNotFoundReason, fmt.Sprintf("Bootstrap secret %s not found", dataSecretName))
+		} else {
+			conditions.MarkBootstrapDataNotReady(karpenterMachinePool, conditions.BootstrapDataUploadFailedReason, fmt.Sprintf("Failed to get bootstrap secret %s: %v", dataSecretName, err))
+		}
+		return fmt.Errorf("failed to get bootstrap secret in MachinePool.spec.template.spec.bootstrap.dataSecretName: %w", err)
 	}
 
 	bootstrapSecretValue, ok := bootstrapSecret.Data["value"]
 	if !ok {
+		conditions.MarkBootstrapDataNotReady(karpenterMachinePool, conditions.BootstrapDataSecretInvalidReason, "Bootstrap secret value key is missing")
 		return errors.New("error retrieving bootstrap data: secret value key is missing")
 	}
 
@@ -395,12 +435,16 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx co
 			"nodePoolDesiredVersion", nodePoolDesiredVersion,
 			"reason", message)
 
-		// Mark resources as not ready due to version skew
-		conditions.MarkEC2NodeClassNotReady(karpenterMachinePool, VersionSkewBlockedReason, message)
-		conditions.MarkNodePoolNotReady(karpenterMachinePool, VersionSkewBlockedReason, message)
+		// Mark version skew as invalid and resources as not ready
+		conditions.MarkVersionSkewInvalid(karpenterMachinePool, conditions.VersionSkewBlockedReason, message)
+		conditions.MarkEC2NodeClassNotCreated(karpenterMachinePool, conditions.VersionSkewBlockedReason, message)
+		conditions.MarkNodePoolNotCreated(karpenterMachinePool, conditions.VersionSkewBlockedReason, message)
 
 		return fmt.Errorf("version skew policy violation: %s", message)
 	}
+
+	// Mark version skew as valid
+	conditions.MarkVersionSkewValid(karpenterMachinePool)
 
 	workloadClusterClient, err := r.clusterClientGetter(ctx, "", r.client, client.ObjectKeyFromObject(cluster))
 	if err != nil {
@@ -409,19 +453,19 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx co
 
 	// Create or update EC2NodeClass
 	if err := r.createOrUpdateEC2NodeClass(ctx, logger, workloadClusterClient, awsCluster, karpenterMachinePool); err != nil {
-		conditions.MarkEC2NodeClassNotReady(karpenterMachinePool, EC2NodeClassCreationFailedReason, err.Error())
+		conditions.MarkEC2NodeClassNotCreated(karpenterMachinePool, conditions.EC2NodeClassCreationFailedReason, err.Error())
 		return fmt.Errorf("failed to create or update EC2NodeClass: %w", err)
 	}
 
 	// Create or update NodePool
 	if err := r.createOrUpdateNodePool(ctx, logger, workloadClusterClient, cluster, karpenterMachinePool); err != nil {
-		conditions.MarkNodePoolNotReady(karpenterMachinePool, NodePoolCreationFailedReason, err.Error())
+		conditions.MarkNodePoolNotCreated(karpenterMachinePool, conditions.NodePoolCreationFailedReason, err.Error())
 		return fmt.Errorf("failed to create or update NodePool: %w", err)
 	}
 
-	// Mark both resources as ready
-	conditions.MarkEC2NodeClassReady(karpenterMachinePool)
-	conditions.MarkNodePoolReady(karpenterMachinePool)
+	// Mark both resources as successfully created
+	conditions.MarkEC2NodeClassCreated(karpenterMachinePool)
+	conditions.MarkNodePoolCreated(karpenterMachinePool)
 
 	return nil
 }

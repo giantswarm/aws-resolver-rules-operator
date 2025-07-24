@@ -1016,16 +1016,6 @@ spec:
                   - type
                   type: object
                 type: array
-              ec2NodeClassReady:
-                description: EC2NodeClassReady indicates whether the EC2NodeClass
-                  is ready
-                type: boolean
-              nodePoolReady:
-                description: NodePoolReady indicates whether the NodePool is ready
-                type: boolean
-              ready:
-                description: Ready is true when the provider resource is ready.
-                type: boolean
               replicas:
                 description: Replicas is the most recently observed number of replicas
                 format: int32
