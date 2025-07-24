@@ -139,7 +139,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	}
 
 	// Create a deep copy of the reconciled object so we can change it
-	karpenterMachinePoolCopy := karpenterMachinePool.DeepCopy()
+	karpenterMachinePoolFinalizerCopy := karpenterMachinePool.DeepCopy()
 
 	// Initialize conditions - mark as initializing until all steps complete
 	conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.InitializingReason, "KarpenterMachinePool is being initialized")
@@ -147,17 +147,18 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	// Add finalizer to ensure proper cleanup sequence
 	updated := controllerutil.AddFinalizer(karpenterMachinePool, KarpenterFinalizer)
 	if updated {
-		if err := r.client.Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy)); err != nil {
+		if err := r.client.Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolFinalizerCopy)); err != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to add finalizer to KarpenterMachinePool: %w", err)
 		}
 	}
 
 	// Create or update Karpenter custom resources in the workload cluster.
+	karpenterMachinePoolConditionsCopy := karpenterMachinePool.DeepCopy()
 	if err := r.createOrUpdateKarpenterResources(ctx, logger, cluster, awsCluster, karpenterMachinePool, machinePool); err != nil {
 		logger.Error(err, "failed to create or update Karpenter custom resources in the workload cluster")
 
 		// Ensure conditions are persisted even when errors occur
-		if statusErr := r.client.Status().Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy), client.FieldOwner("karpentermachinepool-controller")); statusErr != nil {
+		if statusErr := r.client.Status().Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolConditionsCopy), client.FieldOwner("karpentermachinepool-controller")); statusErr != nil {
 			logger.Error(statusErr, "failed to patch karpenterMachinePool status with error conditions")
 		}
 
@@ -165,11 +166,12 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	}
 
 	// Reconcile bootstrap data - fetch secret and upload to S3 if changed
+	karpenterMachinePoolBootstrapConditionsCopy := karpenterMachinePool.DeepCopy()
 	if err := r.reconcileMachinePoolBootstrapUserData(ctx, logger, awsCluster, karpenterMachinePool, *machinePool.Spec.Template.Spec.Bootstrap.DataSecretName, roleIdentity); err != nil {
 		conditions.MarkBootstrapDataNotReady(karpenterMachinePool, conditions.BootstrapDataUploadFailedReason, fmt.Sprintf("Failed to reconcile bootstrap data: %v", err))
 
 		// Ensure conditions are persisted even when errors occur
-		if statusErr := r.client.Status().Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy), client.FieldOwner("karpentermachinepool-controller")); statusErr != nil {
+		if statusErr := r.client.Status().Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolBootstrapConditionsCopy), client.FieldOwner("karpentermachinepool-controller")); statusErr != nil {
 			logger.Error(statusErr, "failed to patch karpenterMachinePool status with bootstrap error conditions")
 		}
 
@@ -178,7 +180,15 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	conditions.MarkBootstrapDataReady(karpenterMachinePool)
 
 	// Update status with current node information from the workload cluster
+	karpenterMachinePoolStatusCopy := karpenterMachinePool.DeepCopy()
 	if err := r.saveKarpenterInstancesToStatus(ctx, logger, cluster, karpenterMachinePool, machinePool); err != nil {
+		logger.Error(err, "failed to save Karpenter instances to status")
+
+		// Ensure conditions are persisted even when errors occur
+		if statusErr := r.client.Status().Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolStatusCopy), client.FieldOwner("karpentermachinepool-controller")); statusErr != nil {
+			logger.Error(statusErr, "failed to patch karpenterMachinePool status with conditions before returning error")
+		}
+
 		return reconcile.Result{}, err
 	}
 
@@ -186,7 +196,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	conditions.MarkKarpenterMachinePoolReady(karpenterMachinePool)
 
 	// Update the status to persist the Ready condition
-	if err := r.client.Status().Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolCopy), client.FieldOwner("karpentermachinepool-controller")); err != nil {
+	if err := r.client.Status().Patch(ctx, karpenterMachinePool, client.MergeFrom(karpenterMachinePoolStatusCopy), client.FieldOwner("karpentermachinepool-controller")); err != nil {
 		logger.Error(err, "failed to patch karpenterMachinePool status with Ready condition")
 		return reconcile.Result{}, err
 	}
