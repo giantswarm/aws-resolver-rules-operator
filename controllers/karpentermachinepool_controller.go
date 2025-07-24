@@ -453,13 +453,13 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx co
 
 	// Create or update EC2NodeClass
 	if err := r.createOrUpdateEC2NodeClass(ctx, logger, workloadClusterClient, awsCluster, karpenterMachinePool); err != nil {
-		conditions.MarkEC2NodeClassNotCreated(karpenterMachinePool, conditions.EC2NodeClassCreationFailedReason, err.Error())
+		conditions.MarkEC2NodeClassNotCreated(karpenterMachinePool, conditions.EC2NodeClassCreationFailedReason, fmt.Sprintf("%v", err))
 		return fmt.Errorf("failed to create or update EC2NodeClass: %w", err)
 	}
 
 	// Create or update NodePool
 	if err := r.createOrUpdateNodePool(ctx, logger, workloadClusterClient, cluster, karpenterMachinePool); err != nil {
-		conditions.MarkNodePoolNotCreated(karpenterMachinePool, conditions.NodePoolCreationFailedReason, err.Error())
+		conditions.MarkNodePoolNotCreated(karpenterMachinePool, conditions.NodePoolCreationFailedReason, fmt.Sprintf("%v", err))
 		return fmt.Errorf("failed to create or update NodePool: %w", err)
 	}
 
