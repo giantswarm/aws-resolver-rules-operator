@@ -177,6 +177,12 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	}
 	conditions.MarkBootstrapDataReady(karpenterMachinePool)
 
+	// Persist bootstrap data success condition immediately
+	if statusErr := r.client.Status().Update(ctx, karpenterMachinePool); statusErr != nil {
+		logger.Error(statusErr, "failed to update karpenterMachinePool status with bootstrap data success condition")
+		return reconcile.Result{}, fmt.Errorf("failed to persist bootstrap data success condition: %w", statusErr)
+	}
+
 	// Update status with current node information from the workload cluster
 	if err := r.saveKarpenterInstancesToStatus(ctx, logger, cluster, karpenterMachinePool, machinePool); err != nil {
 		logger.Error(err, "failed to save Karpenter instances to status")
@@ -453,6 +459,12 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx co
 	// Mark version skew as valid
 	conditions.MarkVersionSkewPolicySatisfied(karpenterMachinePool)
 
+	// Persist version skew success condition immediately
+	if statusErr := r.client.Status().Update(ctx, karpenterMachinePool); statusErr != nil {
+		logger.Error(statusErr, "failed to update karpenterMachinePool status with version skew success condition")
+		return fmt.Errorf("failed to persist version skew success condition: %w", statusErr)
+	}
+
 	workloadClusterClient, err := r.clusterClientGetter(ctx, "", r.client, client.ObjectKeyFromObject(cluster))
 	if err != nil {
 		return fmt.Errorf("failed to get workload cluster client: %w", err)
@@ -465,12 +477,24 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx co
 	}
 	conditions.MarkEC2NodeClassCreated(karpenterMachinePool)
 
+	// Persist EC2NodeClass success condition immediately
+	if statusErr := r.client.Status().Update(ctx, karpenterMachinePool); statusErr != nil {
+		logger.Error(statusErr, "failed to update karpenterMachinePool status with EC2NodeClass success condition")
+		return fmt.Errorf("failed to persist EC2NodeClass success condition: %w", statusErr)
+	}
+
 	// Create or update NodePool
 	if err := r.createOrUpdateNodePool(ctx, logger, workloadClusterClient, cluster, karpenterMachinePool); err != nil {
 		conditions.MarkNodePoolNotCreated(karpenterMachinePool, conditions.NodePoolCreationFailedReason, fmt.Sprintf("%v", err))
 		return fmt.Errorf("failed to create or update NodePool: %w", err)
 	}
 	conditions.MarkNodePoolCreated(karpenterMachinePool)
+
+	// Persist NodePool success condition immediately
+	if statusErr := r.client.Status().Update(ctx, karpenterMachinePool); statusErr != nil {
+		logger.Error(statusErr, "failed to update karpenterMachinePool status with NodePool success condition")
+		return fmt.Errorf("failed to persist NodePool success condition: %w", statusErr)
+	}
 
 	return nil
 }
