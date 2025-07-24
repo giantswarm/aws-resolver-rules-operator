@@ -94,7 +94,7 @@ func MarkNodePoolCreated(setter capiconditions.Setter) {
 }
 
 func MarkNodePoolNotCreated(setter capiconditions.Setter, reason, message string) {
-	capiconditions.MarkFalse(setter, NodePoolCreatedCondition, reason, capi.ConditionSeverityError, message, nil)
+	capiconditions.MarkFalse(setter, NodePoolCreatedCondition, reason, capi.ConditionSeverityError, message, "")
 }
 
 func MarkEC2NodeClassCreated(setter capiconditions.Setter) {
@@ -106,7 +106,7 @@ func MarkEC2NodeClassCreated(setter capiconditions.Setter) {
 }
 
 func MarkEC2NodeClassNotCreated(setter capiconditions.Setter, reason, message string) {
-	capiconditions.MarkFalse(setter, EC2NodeClassCreatedCondition, reason, capi.ConditionSeverityError, message, nil)
+	capiconditions.MarkFalse(setter, EC2NodeClassCreatedCondition, reason, capi.ConditionSeverityError, message, "")
 }
 
 func MarkBootstrapDataReady(setter capiconditions.Setter) {
@@ -118,7 +118,7 @@ func MarkBootstrapDataReady(setter capiconditions.Setter) {
 }
 
 func MarkBootstrapDataNotReady(setter capiconditions.Setter, reason, message string) {
-	capiconditions.MarkFalse(setter, BootstrapDataReadyCondition, reason, capi.ConditionSeverityError, message, nil)
+	capiconditions.MarkFalse(setter, BootstrapDataReadyCondition, reason, capi.ConditionSeverityError, message, "")
 }
 
 func MarkVersionSkewPolicySatisfied(setter capiconditions.Setter) {
@@ -130,7 +130,7 @@ func MarkVersionSkewPolicySatisfied(setter capiconditions.Setter) {
 }
 
 func MarkVersionSkewInvalid(setter capiconditions.Setter, reason, message string) {
-	capiconditions.MarkFalse(setter, VersionSkewPolicySatisfiedCondition, reason, capi.ConditionSeverityError, message, nil)
+	capiconditions.MarkFalse(setter, VersionSkewPolicySatisfiedCondition, reason, capi.ConditionSeverityError, message, "")
 }
 
 func MarkKarpenterMachinePoolReady(setter capiconditions.Setter) {
@@ -142,5 +142,5 @@ func MarkKarpenterMachinePoolReady(setter capiconditions.Setter) {
 }
 
 func MarkKarpenterMachinePoolNotReady(setter capiconditions.Setter, reason, message string) {
-	capiconditions.MarkFalse(setter, ReadyCondition, reason, capi.ConditionSeverityError, message, nil)
+	capiconditions.MarkFalse(setter, ReadyCondition, reason, capi.ConditionSeverityError, message, "")
 }
