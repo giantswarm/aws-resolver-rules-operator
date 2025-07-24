@@ -1519,7 +1519,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 			Expect(ec2NodeClassCondition.Reason).To(Equal("EC2NodeClassCreated"))
 
 			// Version skew should be valid since we use the same version
-			versionSkewCondition := findCondition(updatedKarpenterMachinePool.Status.Conditions, "VersionSkewValid")
+			versionSkewCondition := findCondition(updatedKarpenterMachinePool.Status.Conditions, "VersionSkewPolicySatisfied")
 			Expect(versionSkewCondition).NotTo(BeNil(), "VersionSkew condition should be persisted even on error")
 			Expect(string(versionSkewCondition.Status)).To(Equal("True"), "Version skew should be valid")
 			Expect(versionSkewCondition.Reason).To(Equal("VersionSkewValid"))
@@ -1716,7 +1716,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify that version skew condition was persisted with the correct state
-			versionSkewCondition := findCondition(updatedKarpenterMachinePool.Status.Conditions, "VersionSkewValid")
+			versionSkewCondition := findCondition(updatedKarpenterMachinePool.Status.Conditions, "VersionSkewPolicySatisfied")
 			Expect(versionSkewCondition).NotTo(BeNil())
 			Expect(string(versionSkewCondition.Status)).To(Equal("False"))
 			Expect(versionSkewCondition.Reason).To(Equal("VersionSkewBlocked"))

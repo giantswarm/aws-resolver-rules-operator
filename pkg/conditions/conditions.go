@@ -28,9 +28,9 @@ const (
 	// successfully uploaded to S3 and is ready for use by Karpenter nodes.
 	BootstrapDataReadyCondition capi.ConditionType = "BootstrapDataReady"
 
-	// VersionSkewValidCondition indicates whether the Kubernetes version skew policy
+	// VersionSkewPolicySatisfiedCondition indicates whether the Kubernetes version skew policy
 	// is satisfied (worker nodes don't use newer versions than control plane).
-	VersionSkewValidCondition capi.ConditionType = "VersionSkewValid"
+	VersionSkewPolicySatisfiedCondition capi.ConditionType = "VersionSkewPolicySatisfied"
 
 	// ReadyCondition indicates the overall readiness of the KarpenterMachinePool.
 	// This is True when all necessary Karpenter resources are created and configured.
@@ -121,16 +121,16 @@ func MarkBootstrapDataNotReady(setter capiconditions.Setter, reason, message str
 	capiconditions.MarkFalse(setter, BootstrapDataReadyCondition, reason, capi.ConditionSeverityError, message, nil)
 }
 
-func MarkVersionSkewValid(setter capiconditions.Setter) {
+func MarkVersionSkewPolicySatisfied(setter capiconditions.Setter) {
 	capiconditions.Set(setter, &capi.Condition{
-		Type:   VersionSkewValidCondition,
+		Type:   VersionSkewPolicySatisfiedCondition,
 		Status: "True",
 		Reason: VersionSkewValidReason,
 	})
 }
 
 func MarkVersionSkewInvalid(setter capiconditions.Setter, reason, message string) {
-	capiconditions.MarkFalse(setter, VersionSkewValidCondition, reason, capi.ConditionSeverityError, message, nil)
+	capiconditions.MarkFalse(setter, VersionSkewPolicySatisfiedCondition, reason, capi.ConditionSeverityError, message, nil)
 }
 
 func MarkKarpenterMachinePoolReady(setter capiconditions.Setter) {

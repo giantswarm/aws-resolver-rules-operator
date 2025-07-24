@@ -20,6 +20,7 @@ rules:
       - list
       - patch
       - watch
+      - update
   - apiGroups:
       - controlplane.cluster.x-k8s.io
     resources:

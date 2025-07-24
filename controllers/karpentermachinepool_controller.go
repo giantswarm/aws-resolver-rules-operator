@@ -451,7 +451,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx co
 	}
 
 	// Mark version skew as valid
-	conditions.MarkVersionSkewValid(karpenterMachinePool)
+	conditions.MarkVersionSkewPolicySatisfied(karpenterMachinePool)
 
 	workloadClusterClient, err := r.clusterClientGetter(ctx, "", r.client, client.ObjectKeyFromObject(cluster))
 	if err != nil {
