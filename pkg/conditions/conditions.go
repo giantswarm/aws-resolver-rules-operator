@@ -40,21 +40,21 @@ const (
 // Condition reasons used by various controllers
 const (
 	// Generic reasons used across controllers
-	InitializingReason = "Initializing"
-	ReadyReason        = "Ready"
-	NotReadyReason     = "NotReady"
+	ReadyReason    = "Ready"
+	NotReadyReason = "NotReady"
 
 	// KarpenterMachinePool controller reasons
-	NodePoolCreationFailedReason        = "NodePoolCreationFailed"
-	NodePoolCreationSucceededReason     = "NodePoolCreated"
-	EC2NodeClassCreationFailedReason    = "EC2NodeClassCreationFailed"
-	EC2NodeClassCreationSucceededReason = "EC2NodeClassCreated"
-	BootstrapDataUploadFailedReason     = "BootstrapDataUploadFailed"
-	BootstrapDataSecretNotFoundReason   = "BootstrapDataSecretNotFound"
-	BootstrapDataSecretInvalidReason    = "BootstrapDataSecretInvalid"
-	BootstrapDataUploadSucceededReason  = "BootstrapDataUploaded"
-	VersionSkewBlockedReason            = "VersionSkewBlocked"
-	VersionSkewValidReason              = "VersionSkewValid"
+	NodePoolCreationFailedReason              = "NodePoolCreationFailed"
+	NodePoolCreationSucceededReason           = "NodePoolCreated"
+	EC2NodeClassCreationFailedReason          = "EC2NodeClassCreationFailed"
+	EC2NodeClassCreationSucceededReason       = "EC2NodeClassCreated"
+	BootstrapDataUploadFailedReason           = "BootstrapDataUploadFailed"
+	BootstrapDataSecretNotFoundReason         = "BootstrapDataSecretNotFound"
+	BootstrapDataSecretInvalidReason          = "BootstrapDataSecretInvalid"
+	BootstrapDataSecretMissingReferenceReason = "BootstrapDataSecretMissingReference"
+	BootstrapDataUploadSucceededReason        = "BootstrapDataUploaded"
+	VersionSkewBlockedReason                  = "VersionSkewBlocked"
+	VersionSkewValidReason                    = "VersionSkewValid"
 )
 
 func MarkReady(setter capiconditions.Setter, condition capi.ConditionType) {

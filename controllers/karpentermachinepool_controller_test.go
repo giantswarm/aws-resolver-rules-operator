@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
+	gomegatypes "github.com/onsi/gomega/types"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -427,7 +428,6 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 					},
 					Spec: capiexp.MachinePoolSpec{
 						ClusterName: ClusterName,
-						// Replicas:    nil,
 						Template: capi.MachineTemplateSpec{
 							ObjectMeta: capi.ObjectMeta{},
 							Spec: capi.MachineSpec{
@@ -499,6 +499,11 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 			})
 			It("returns early", func() {
 				Expect(reconcileErr).NotTo(HaveOccurred())
+
+				updatedKarpenterMachinePool := &karpenterinfra.KarpenterMachinePool{}
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: KarpenterMachinePoolName}, updatedKarpenterMachinePool)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(updatedKarpenterMachinePool.Status.Conditions).To(HaveCondition("BootstrapDataReady", v1.ConditionFalse, "BootstrapDataSecretMissingReference", "Bootstrap data secret reference is not yet available in MachinePool"))
 			})
 		})
 		When("the referenced MachinePool exists and MachinePool.spec.template.spec.bootstrap.dataSecretName is set", func() {
@@ -1066,10 +1071,9 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 									Expect(err).NotTo(HaveOccurred())
 
 									// Check that the Ready condition is True
-									readyCondition := findCondition(updatedKarpenterMachinePool.Status.Conditions, "Ready")
-									Expect(readyCondition).NotTo(BeNil())
-									Expect(string(readyCondition.Status)).To(Equal("True"))
+									Expect(updatedKarpenterMachinePool.Status.Conditions).To(HaveCondition("Ready", v1.ConditionTrue, "Ready", ""))
 
+									// Check karpenter machine pool spec and status
 									Expect(updatedKarpenterMachinePool.Status.Replicas).To(Equal(int32(2)))
 									Expect(updatedKarpenterMachinePool.Spec.ProviderIDList).To(ContainElements("aws:///us-west-2a/i-1234567890abcdef0", "aws:///us-west-2a/i-09876543219fedcba"))
 								})
@@ -1514,22 +1518,13 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// This condition should be properly persisted even though reconciliation failed
-			ec2NodeClassCondition := findCondition(updatedKarpenterMachinePool.Status.Conditions, "EC2NodeClassCreated")
-			Expect(ec2NodeClassCondition).NotTo(BeNil(), "EC2NodeClass condition should be persisted even on error")
-			Expect(string(ec2NodeClassCondition.Status)).To(Equal("True"), "EC2NodeClass was created successfully")
-			Expect(ec2NodeClassCondition.Reason).To(Equal("EC2NodeClassCreated"))
+			Expect(updatedKarpenterMachinePool.Status.Conditions).To(HaveCondition("EC2NodeClassCreated", v1.ConditionTrue, "EC2NodeClassCreated", ""))
 
 			// Version skew should be valid since we use the same version
-			versionSkewCondition := findCondition(updatedKarpenterMachinePool.Status.Conditions, "VersionSkewPolicySatisfied")
-			Expect(versionSkewCondition).NotTo(BeNil(), "VersionSkew condition should be persisted even on error")
-			Expect(string(versionSkewCondition.Status)).To(Equal("True"), "Version skew should be valid")
-			Expect(versionSkewCondition.Reason).To(Equal("VersionSkewValid"))
+			Expect(updatedKarpenterMachinePool.Status.Conditions).To(HaveCondition("VersionSkewPolicySatisfied", v1.ConditionTrue, "VersionSkewValid", ""))
 
-			// NodePool should be False since creation failed
-			nodePoolCondition := findCondition(updatedKarpenterMachinePool.Status.Conditions, "NodePoolCreated")
-			Expect(nodePoolCondition).NotTo(BeNil(), "NodePool condition should be persisted even on error")
-			Expect(string(nodePoolCondition.Status)).To(Equal("False"), "NodePool creation failed")
-			Expect(nodePoolCondition.Reason).To(Equal("NodePoolCreationFailed"))
+			// NodePoolCreated should be False since creation failed
+			Expect(updatedKarpenterMachinePool.Status.Conditions).To(HaveCondition("NodePoolCreated", v1.ConditionFalse, "NodePoolCreationFailed", "failed to create or update NodePool"))
 		})
 	})
 
@@ -1717,23 +1712,14 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify that version skew condition was persisted with the correct state
-			versionSkewCondition := findCondition(updatedKarpenterMachinePool.Status.Conditions, "VersionSkewPolicySatisfied")
-			Expect(versionSkewCondition).NotTo(BeNil())
-			Expect(string(versionSkewCondition.Status)).To(Equal("False"))
-			Expect(versionSkewCondition.Reason).To(Equal("VersionSkewBlocked"))
-			Expect(versionSkewCondition.Message).To(ContainSubstring("control plane version v1.29.0 is older than node pool version v1.30.0"))
+			// Expect(versionSkewCondition.Message).To(ContainSubstring("control plane version v1.29.0 is older than node pool version v1.30.0"))
+			Expect(updatedKarpenterMachinePool.Status.Conditions).To(HaveCondition("VersionSkewPolicySatisfied", v1.ConditionFalse, "VersionSkewBlocked", "Version skew policy violation: control plane version v1.29.0 is older than node pool version v1.30.0"))
 
 			// Verify that EC2NodeClass condition was persisted with error state
-			ec2NodeClassCondition := findCondition(updatedKarpenterMachinePool.Status.Conditions, "EC2NodeClassCreated")
-			Expect(ec2NodeClassCondition).NotTo(BeNil())
-			Expect(string(ec2NodeClassCondition.Status)).To(Equal("False"))
-			Expect(ec2NodeClassCondition.Reason).To(Equal("VersionSkewBlocked"))
+			Expect(updatedKarpenterMachinePool.Status.Conditions).To(HaveCondition("EC2NodeClassCreated", v1.ConditionFalse, "VersionSkewBlocked", ""))
 
 			// Verify that NodePool condition was persisted with error state
-			nodePoolCondition := findCondition(updatedKarpenterMachinePool.Status.Conditions, "NodePoolCreated")
-			Expect(nodePoolCondition).NotTo(BeNil())
-			Expect(string(nodePoolCondition.Status)).To(Equal("False"))
-			Expect(nodePoolCondition.Reason).To(Equal("VersionSkewBlocked"))
+			Expect(updatedKarpenterMachinePool.Status.Conditions).To(HaveCondition("NodePoolCreated", v1.ConditionFalse, "VersionSkewBlocked", ""))
 		})
 	})
 })
@@ -1745,4 +1731,27 @@ func ExpectUnstructured(u unstructured.Unstructured, fields ...string) Assertion
 	Expect(found).To(BeTrue(), "expected to find field %v", fields)
 	Expect(err).NotTo(HaveOccurred(), "error retrieving %v: %v", fields, err)
 	return Expect(v)
+}
+
+// HaveCondition checks for a Condition with the given Type, Status, and Reason.
+func HaveCondition(condType capi.ConditionType, status v1.ConditionStatus, reason, message string) gomegatypes.GomegaMatcher {
+	return WithTransform(func(conditions capi.Conditions) *capi.Condition {
+		for i := range conditions {
+			if conditions[i].Type == condType {
+				return &conditions[i]
+			}
+		}
+		return nil
+	}, And(
+		Not(BeNil()),
+		WithTransform(func(c *capi.Condition) v1.ConditionStatus {
+			return c.Status
+		}, Equal(status)),
+		WithTransform(func(c *capi.Condition) string {
+			return c.Reason
+		}, Equal(reason)),
+		WithTransform(func(c *capi.Condition) string {
+			return c.Message
+		}, ContainSubstring(message)),
+	))
 }
