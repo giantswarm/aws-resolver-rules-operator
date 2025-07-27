@@ -1025,6 +1025,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 									err = unstructured.SetNestedField(nodeClaim1.Object, map[string]interface{}{"providerID": "aws:///us-west-2a/i-1234567890abcdef0"}, "status")
 									Expect(err).NotTo(HaveOccurred())
 									err = k8sClient.Status().Update(ctx, nodeClaim1)
+									Expect(err).NotTo(HaveOccurred())
 
 									nodeClaim2 := &unstructured.Unstructured{}
 									nodeClaim2.Object = map[string]interface{}{

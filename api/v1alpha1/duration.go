@@ -62,7 +62,16 @@ func (d NillableDuration) MarshalJSON() ([]byte, error) {
 // ToUnstructured implements the value.UnstructuredConverter interface.
 func (d NillableDuration) ToUnstructured() interface{} {
 	if d.Raw != nil {
-		return d.Raw
+		// Decode the JSON bytes to get the actual string value
+		var str string
+		if err := json.Unmarshal(d.Raw, &str); err == nil {
+			return str
+		}
+		// Fallback to string conversion if unmarshal fails
+		if d.Duration != nil {
+			return d.Duration.String()
+		}
+		return Never
 	}
 	if d.Duration != nil {
 		return d.Duration.String()
