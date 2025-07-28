@@ -577,6 +577,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 			templateSpec := spec["template"].(map[string]interface{})["spec"].(map[string]interface{})
 
 			templateSpec["taints"] = karpenterMachinePool.Spec.NodePool.Template.Spec.Taints
+			templateSpec["startupTaints"] = karpenterMachinePool.Spec.NodePool.Template.Spec.StartupTaints
 			templateSpec["requirements"] = karpenterMachinePool.Spec.NodePool.Template.Spec.Requirements
 			templateSpec["expireAfter"] = karpenterMachinePool.Spec.NodePool.Template.Spec.ExpireAfter
 

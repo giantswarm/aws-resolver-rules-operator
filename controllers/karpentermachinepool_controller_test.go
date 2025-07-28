@@ -615,6 +615,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 						NodePool: &karpenterinfra.NodePoolSpec{
 							Template: karpenterinfra.NodeClaimTemplate{
 								Spec: karpenterinfra.NodeClaimTemplateSpec{
+									ExpireAfter: karpenterinfra.MustParseNillableDuration("24h"),
 									Requirements: []karpenterinfra.NodeSelectorRequirementWithMinValues{
 										{
 											NodeSelectorRequirement: v1.NodeSelectorRequirement{
@@ -624,7 +625,20 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 											},
 										},
 									},
-									ExpireAfter:            karpenterinfra.MustParseNillableDuration("24h"),
+									StartupTaints: []v1.Taint{
+										{
+											Key:    "karpenter.sh/test-startup-taint",
+											Value:  "test-taint-value",
+											Effect: v1.TaintEffectNoSchedule,
+										},
+									},
+									Taints: []v1.Taint{
+										{
+											Key:    "karpenter.sh/test-taint",
+											Value:  "test-taint-value",
+											Effect: v1.TaintEffectNoSchedule,
+										},
+									},
 									TerminationGracePeriod: &terminationGracePeriod,
 								},
 							},
@@ -986,6 +1000,20 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 								ExpectUnstructured(nodepoolList.Items[0], "spec", "weight").To(BeEquivalentTo(int64(1)))
 								ExpectUnstructured(nodepoolList.Items[0], "spec", "template", "spec", "expireAfter").To(BeEquivalentTo("24h"))
 								ExpectUnstructured(nodepoolList.Items[0], "spec", "template", "spec", "terminationGracePeriod").To(BeEquivalentTo("30s"))
+								ExpectUnstructured(nodepoolList.Items[0], "spec", "template", "spec", "startupTaints").To(BeEquivalentTo([]interface{}{
+									map[string]interface{}{
+										"key":    "karpenter.sh/test-startup-taint",
+										"value":  "test-taint-value",
+										"effect": "NoSchedule",
+									},
+								}))
+								ExpectUnstructured(nodepoolList.Items[0], "spec", "template", "spec", "taints").To(BeEquivalentTo([]interface{}{
+									map[string]interface{}{
+										"key":    "karpenter.sh/test-taint",
+										"value":  "test-taint-value",
+										"effect": "NoSchedule",
+									},
+								}))
 							})
 							It("adds the finalizer to the KarpenterMachinePool", func() {
 								Expect(reconcileErr).NotTo(HaveOccurred())
