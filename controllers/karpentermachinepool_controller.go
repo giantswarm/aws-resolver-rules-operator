@@ -102,6 +102,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	machinePool, err := capiutilexp.GetOwnerMachinePool(ctx, r.client, karpenterMachinePool.ObjectMeta)
 	if err != nil {
 		conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, fmt.Sprintf("Failed to get MachinePool owning the KarpenterMachinePool: %v", err))
+		karpenterMachinePool.Status.Ready = false
 		return reconcile.Result{}, fmt.Errorf("failed to get MachinePool owning the KarpenterMachinePool: %w", err)
 	}
 	if machinePool == nil {
@@ -116,6 +117,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	if machinePool.Spec.Template.Spec.Bootstrap.DataSecretName == nil {
 		conditions.MarkBootstrapDataNotReady(karpenterMachinePool, conditions.BootstrapDataSecretMissingReferenceReason, "Bootstrap data secret reference is not yet available in MachinePool")
 		conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, "Bootstrap data secret reference is not yet available in MachinePool")
+		karpenterMachinePool.Status.Ready = false
 		logger.Info("Bootstrap data secret reference is not yet available")
 		return reconcile.Result{RequeueAfter: time.Duration(10) * time.Second}, nil
 	}
@@ -125,6 +127,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	cluster, err := capiutil.GetClusterFromMetadata(ctx, r.client, machinePool.ObjectMeta)
 	if err != nil {
 		conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, fmt.Sprintf("Failed to get Cluster owning the MachinePool: %v", err))
+		karpenterMachinePool.Status.Ready = false
 		return reconcile.Result{}, fmt.Errorf("failed to get Cluster owning the MachinePool that owns the KarpenterMachinePool: %w", err)
 	}
 
@@ -138,6 +141,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	awsCluster := &capa.AWSCluster{}
 	if err := r.client.Get(ctx, client.ObjectKey{Namespace: cluster.Spec.InfrastructureRef.Namespace, Name: cluster.Spec.InfrastructureRef.Name}, awsCluster); err != nil {
 		conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, fmt.Sprintf("Failed to get AWSCluster: %v", err))
+		karpenterMachinePool.Status.Ready = false
 		return reconcile.Result{}, fmt.Errorf("failed to get AWSCluster referenced in Cluster.spec.infrastructureRef: %w", err)
 	}
 
@@ -149,6 +153,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	// S3 bucket is required for storing bootstrap data that Karpenter nodes will fetch
 	if awsCluster.Spec.S3Bucket == nil {
 		conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, "S3 bucket is required but not configured in AWSCluster.spec.s3Bucket")
+		karpenterMachinePool.Status.Ready = false
 		return reconcile.Result{}, errors.New("a cluster wide object storage configured at `AWSCluster.spec.s3Bucket` is required")
 	}
 
@@ -156,6 +161,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	roleIdentity := &capa.AWSClusterRoleIdentity{}
 	if err = r.client.Get(ctx, client.ObjectKey{Name: awsCluster.Spec.IdentityRef.Name}, roleIdentity); err != nil {
 		conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, fmt.Sprintf("Failed to get AWSClusterRoleIdentity: %v", err))
+		karpenterMachinePool.Status.Ready = false
 		return reconcile.Result{}, fmt.Errorf("failed to get AWSClusterRoleIdentity referenced in AWSCluster: %w", err)
 	}
 
@@ -171,6 +177,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	if err := r.createOrUpdateKarpenterResources(ctx, logger, cluster, awsCluster, karpenterMachinePool, machinePool); err != nil {
 		logger.Error(err, "failed to create or update Karpenter custom resources in the workload cluster")
 		conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, fmt.Sprintf("Failed to create or update Karpenter resources: %v", err))
+		karpenterMachinePool.Status.Ready = false
 		return reconcile.Result{}, err
 	}
 
@@ -178,6 +185,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	if err := r.reconcileMachinePoolBootstrapUserData(ctx, logger, awsCluster, karpenterMachinePool, *machinePool.Spec.Template.Spec.Bootstrap.DataSecretName, roleIdentity); err != nil {
 		conditions.MarkBootstrapDataNotReady(karpenterMachinePool, conditions.BootstrapDataUploadFailedReason, fmt.Sprintf("Failed to reconcile bootstrap data: %v", err))
 		conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, fmt.Sprintf("Failed to reconcile bootstrap data: %v", err))
+		karpenterMachinePool.Status.Ready = false
 		return reconcile.Result{}, err
 	}
 	conditions.MarkBootstrapDataReady(karpenterMachinePool)
@@ -186,11 +194,13 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	if err := r.saveKarpenterInstancesToStatus(ctx, logger, cluster, karpenterMachinePool, machinePool); err != nil {
 		logger.Error(err, "failed to save Karpenter instances to status")
 		conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, fmt.Sprintf("Failed to save Karpenter instances to status: %v", err))
+		karpenterMachinePool.Status.Ready = false
 		return reconcile.Result{}, err
 	}
 
 	// Mark the KarpenterMachinePool as ready when all conditions are satisfied
 	conditions.MarkKarpenterMachinePoolReady(karpenterMachinePool)
+	karpenterMachinePool.Status.Ready = true
 
 	return reconcile.Result{}, nil
 }

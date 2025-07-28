@@ -39,6 +39,10 @@ type KarpenterMachinePoolSpec struct {
 
 // KarpenterMachinePoolStatus defines the observed state of KarpenterMachinePool.
 type KarpenterMachinePoolStatus struct {
+	// Ready denotes that the KarpenterMachinePool is ready and fulfilling the infrastructure contract.
+	// +optional
+	Ready bool `json:"ready"`
+
 	// Replicas is the most recently observed number of replicas
 	// +optional
 	Replicas int32 `json:"replicas"`

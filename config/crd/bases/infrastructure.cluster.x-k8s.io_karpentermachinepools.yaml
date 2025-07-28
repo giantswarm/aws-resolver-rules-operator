@@ -1016,6 +1016,10 @@ spec:
                   - type
                   type: object
                 type: array
+              ready:
+                description: Ready denotes that the KarpenterMachinePool is ready
+                  and fulfilling the infrastructure contract.
+                type: boolean
               replicas:
                 description: Replicas is the most recently observed number of replicas
                 format: int32

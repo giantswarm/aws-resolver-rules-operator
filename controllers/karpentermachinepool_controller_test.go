@@ -1083,6 +1083,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 
 									// Check that the Ready condition is True
 									Expect(updatedKarpenterMachinePool.Status.Conditions).To(HaveCondition("Ready", v1.ConditionTrue, "Ready", ""))
+									Expect(updatedKarpenterMachinePool.Status.Ready).To(BeTrue())
 
 									// Check karpenter machine pool spec and status
 									Expect(updatedKarpenterMachinePool.Status.Replicas).To(Equal(int32(2)))
