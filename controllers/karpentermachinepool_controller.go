@@ -455,21 +455,18 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 	ec2NodeClass.SetNamespace("")
 	ec2NodeClass.SetLabels(map[string]string{"app.kubernetes.io/managed-by": "aws-resolver-rules-operator"})
 
-	// Generate user data for Ignition
+	// Generate Ignition user data
 	userData := r.generateUserData(awsCluster.Spec.S3Bucket.Name, karpenterMachinePool.Name)
 
 	operation, err := controllerutil.CreateOrUpdate(ctx, workloadClusterClient, ec2NodeClass, func() error {
-		// Build the EC2NodeClass spec
 		spec := map[string]interface{}{
 			"amiFamily":           "Custom",
 			"amiSelectorTerms":    karpenterMachinePool.Spec.EC2NodeClass.AMISelectorTerms,
 			"blockDeviceMappings": karpenterMachinePool.Spec.EC2NodeClass.BlockDeviceMappings,
 			"instanceProfile":     karpenterMachinePool.Spec.EC2NodeClass.InstanceProfile,
 			"metadataOptions": map[string]interface{}{
-				"httpEndpoint":            "enabled",
-				"httpProtocolIPv6":        "disabled",
-				"httpPutResponseHopLimit": 1,
-				"httpTokens":              "required",
+				"httpPutResponseHopLimit": karpenterMachinePool.Spec.EC2NodeClass.MetadataOptions.HTTPPutResponseHopLimit,
+				"httpTokens":              karpenterMachinePool.Spec.EC2NodeClass.MetadataOptions.HTTPTokens,
 			},
 			"securityGroupSelectorTerms": karpenterMachinePool.Spec.EC2NodeClass.SecurityGroupSelectorTerms,
 			"subnetSelectorTerms":        karpenterMachinePool.Spec.EC2NodeClass.SubnetSelectorTerms,

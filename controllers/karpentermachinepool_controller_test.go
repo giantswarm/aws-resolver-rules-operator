@@ -556,6 +556,8 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 				volumeSize := resource.MustParse("8Gi")
 				volumeTypeGp3 := "gp3"
 				deleteOnTerminationTrue := true
+				hopLimit := int64(5)
+				metadataOptionsRequired := "required"
 				karpenterMachinePool := &karpenterinfra.KarpenterMachinePool{
 					ObjectMeta: ctrl.ObjectMeta{
 						Namespace: namespace,
@@ -592,6 +594,10 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 								},
 							},
 							InstanceProfile: &instanceProfile,
+							MetadataOptions: &karpenterinfra.MetadataOptions{
+								HTTPPutResponseHopLimit: &hopLimit,
+								HTTPTokens:              &metadataOptionsRequired,
+							},
 							SecurityGroupSelectorTerms: []karpenterinfra.SecurityGroupSelectorTerm{
 								{
 									Tags: map[string]string{"my-target-sg": "is-this"},
@@ -920,6 +926,11 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 										}),
 									),
 								)
+
+								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "metadataOptions").
+									To(HaveKeyWithValue("httpTokens", "required"))
+								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "metadataOptions").
+									To(HaveKeyWithValue("httpPutResponseHopLimit", int64(5)))
 
 								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "amiSelectorTerms").To(HaveLen(1))
 								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "amiSelectorTerms").To(
