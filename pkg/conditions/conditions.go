@@ -13,6 +13,48 @@ const (
 	TransitGatewayCreated    capi.ConditionType = "TransitGatewayCreated"
 	TransitGatewayAttached   capi.ConditionType = "TransitGatewayAttached"
 	PrefixListEntriesReady   capi.ConditionType = "PrefixListEntriesReady"
+
+	// NodePoolCreatedCondition indicates whether the NodePool resource has been successfully
+	// created or updated in the workload cluster. This doesn't mean the NodePool is ready
+	// to provision nodes, just that the resource exists.
+	NodePoolCreatedCondition capi.ConditionType = "NodePoolCreated"
+
+	// EC2NodeClassCreatedCondition indicates whether the EC2NodeClass resource has been
+	// successfully created or updated in the workload cluster. This doesn't mean the
+	// EC2NodeClass is ready for use, just that the resource exists.
+	EC2NodeClassCreatedCondition capi.ConditionType = "EC2NodeClassCreated"
+
+	// BootstrapDataReadyCondition indicates whether the bootstrap user data has been
+	// successfully uploaded to S3 and is ready for use by Karpenter nodes.
+	BootstrapDataReadyCondition capi.ConditionType = "BootstrapDataReady"
+
+	// VersionSkewPolicySatisfiedCondition indicates whether the Kubernetes version skew policy
+	// is satisfied (worker nodes don't use newer versions than control plane).
+	VersionSkewPolicySatisfiedCondition capi.ConditionType = "VersionSkewPolicySatisfied"
+
+	// ReadyCondition indicates the overall readiness of the KarpenterMachinePool.
+	// This is True when all necessary Karpenter resources are created and configured.
+	ReadyCondition capi.ConditionType = "Ready"
+)
+
+// Condition reasons used by various controllers
+const (
+	// Generic reasons used across controllers
+	ReadyReason    = "Ready"
+	NotReadyReason = "NotReady"
+
+	// KarpenterMachinePool controller reasons
+	NodePoolCreationFailedReason              = "NodePoolCreationFailed"
+	NodePoolCreationSucceededReason           = "NodePoolCreated"
+	EC2NodeClassCreationFailedReason          = "EC2NodeClassCreationFailed"
+	EC2NodeClassCreationSucceededReason       = "EC2NodeClassCreated"
+	BootstrapDataUploadFailedReason           = "BootstrapDataUploadFailed"
+	BootstrapDataSecretNotFoundReason         = "BootstrapDataSecretNotFound"
+	BootstrapDataSecretInvalidReason          = "BootstrapDataSecretInvalid"
+	BootstrapDataSecretMissingReferenceReason = "BootstrapDataSecretMissingReference"
+	BootstrapDataUploadSucceededReason        = "BootstrapDataUploaded"
+	VersionSkewBlockedReason                  = "VersionSkewBlocked"
+	VersionSkewValidReason                    = "VersionSkewValid"
 )
 
 func MarkReady(setter capiconditions.Setter, condition capi.ConditionType) {
@@ -41,4 +83,64 @@ func MarkIDNotProvided(cluster *capi.Cluster, id string) {
 		capi.ConditionSeverityError,
 		"The %s ID is missing from the annotations", id,
 	)
+}
+
+func MarkNodePoolCreated(setter capiconditions.Setter) {
+	capiconditions.Set(setter, &capi.Condition{
+		Type:   NodePoolCreatedCondition,
+		Status: "True",
+		Reason: NodePoolCreationSucceededReason,
+	})
+}
+
+func MarkNodePoolNotCreated(setter capiconditions.Setter, reason, message string) {
+	capiconditions.MarkFalse(setter, NodePoolCreatedCondition, reason, capi.ConditionSeverityError, "%s", message)
+}
+
+func MarkEC2NodeClassCreated(setter capiconditions.Setter) {
+	capiconditions.Set(setter, &capi.Condition{
+		Type:   EC2NodeClassCreatedCondition,
+		Status: "True",
+		Reason: EC2NodeClassCreationSucceededReason,
+	})
+}
+
+func MarkEC2NodeClassNotCreated(setter capiconditions.Setter, reason, message string) {
+	capiconditions.MarkFalse(setter, EC2NodeClassCreatedCondition, reason, capi.ConditionSeverityError, "%s", message)
+}
+
+func MarkBootstrapDataReady(setter capiconditions.Setter) {
+	capiconditions.Set(setter, &capi.Condition{
+		Type:   BootstrapDataReadyCondition,
+		Status: "True",
+		Reason: ReadyReason,
+	})
+}
+
+func MarkBootstrapDataNotReady(setter capiconditions.Setter, reason, message string) {
+	capiconditions.MarkFalse(setter, BootstrapDataReadyCondition, reason, capi.ConditionSeverityError, "%s", message)
+}
+
+func MarkVersionSkewPolicySatisfied(setter capiconditions.Setter) {
+	capiconditions.Set(setter, &capi.Condition{
+		Type:   VersionSkewPolicySatisfiedCondition,
+		Status: "True",
+		Reason: VersionSkewValidReason,
+	})
+}
+
+func MarkVersionSkewInvalid(setter capiconditions.Setter, reason, message string) {
+	capiconditions.MarkFalse(setter, VersionSkewPolicySatisfiedCondition, reason, capi.ConditionSeverityError, "%s", message)
+}
+
+func MarkKarpenterMachinePoolReady(setter capiconditions.Setter) {
+	capiconditions.Set(setter, &capi.Condition{
+		Type:   ReadyCondition,
+		Status: "True",
+		Reason: ReadyReason,
+	})
+}
+
+func MarkKarpenterMachinePoolNotReady(setter capiconditions.Setter, reason, message string) {
+	capiconditions.MarkFalse(setter, ReadyCondition, reason, capi.ConditionSeverityError, "%s", message)
 }

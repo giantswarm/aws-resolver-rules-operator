@@ -99,8 +99,6 @@ func (fake *FakeS3Client) PutReturnsOnCall(i int, result1 error) {
 func (fake *FakeS3Client) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.putMutex.RLock()
-	defer fake.putMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value
