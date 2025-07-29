@@ -1741,8 +1741,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 		})
 
 		It("returns a version skew error", func() {
-			Expect(reconcileErr).To(MatchError(ContainSubstring("version skew policy violation")))
-			Expect(reconcileErr).To(MatchError(ContainSubstring("control plane version v1.29.0 is older than node pool version v1.30.0")))
+			Expect(reconcileResult.RequeueAfter).To(Equal(60 * time.Second))
 		})
 
 		It("persists the version skew conditions to the Kubernetes API", func() {
@@ -1756,10 +1755,10 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 			Expect(updatedKarpenterMachinePool.Status.Conditions).To(HaveCondition("VersionSkewPolicySatisfied", v1.ConditionFalse, "VersionSkewBlocked", "Version skew policy violation: control plane version v1.29.0 is older than node pool version v1.30.0"))
 
 			// Verify that EC2NodeClass condition was persisted with error state
-			Expect(updatedKarpenterMachinePool.Status.Conditions).To(HaveCondition("EC2NodeClassCreated", v1.ConditionFalse, "VersionSkewBlocked", ""))
+			Expect(updatedKarpenterMachinePool.Status.Conditions).To(HaveCondition("EC2NodeClassCreated", v1.ConditionFalse, "VersionSkewBlocked", "Version skew policy violation: control plane version v1.29.0 is older than node pool version v1.30.0"))
 
 			// Verify that NodePool condition was persisted with error state
-			Expect(updatedKarpenterMachinePool.Status.Conditions).To(HaveCondition("NodePoolCreated", v1.ConditionFalse, "VersionSkewBlocked", ""))
+			Expect(updatedKarpenterMachinePool.Status.Conditions).To(HaveCondition("NodePoolCreated", v1.ConditionFalse, "VersionSkewBlocked", "Version skew policy violation: control plane version v1.29.0 is older than node pool version v1.30.0"))
 		})
 	})
 })

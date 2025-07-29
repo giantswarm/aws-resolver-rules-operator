@@ -170,6 +170,29 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 		return r.reconcileDelete(ctx, logger, cluster, awsCluster, karpenterMachinePool, roleIdentity, patchHelper)
 	}
 
+	// Validate version skew: ensure worker nodes don't use newer Kubernetes versions than control plane
+	allowed, controlPlaneCurrentVersion, nodePoolDesiredVersion, err := r.IsVersionSkewAllowed(ctx, cluster, machinePool)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	if !allowed {
+		message := fmt.Sprintf("Version skew policy violation: control plane version %s is older than node pool version %s", controlPlaneCurrentVersion, nodePoolDesiredVersion)
+		logger.Info("Blocking Karpenter custom resources update due to version skew policy",
+			"controlPlaneCurrentVersion", controlPlaneCurrentVersion,
+			"nodePoolDesiredVersion", nodePoolDesiredVersion,
+			"reason", message)
+
+		// Mark version skew as invalid and resources as not ready
+		conditions.MarkVersionSkewInvalid(karpenterMachinePool, conditions.VersionSkewBlockedReason, message)
+		conditions.MarkEC2NodeClassNotCreated(karpenterMachinePool, conditions.VersionSkewBlockedReason, message)
+		conditions.MarkNodePoolNotCreated(karpenterMachinePool, conditions.VersionSkewBlockedReason, message)
+
+		return reconcile.Result{RequeueAfter: time.Duration(1) * time.Minute}, nil
+	}
+
+	// Mark version skew as valid
+	conditions.MarkVersionSkewPolicySatisfied(karpenterMachinePool)
 	// Add finalizer to ensure proper cleanup sequence
 	controllerutil.AddFinalizer(karpenterMachinePool, KarpenterFinalizer)
 
@@ -397,32 +420,7 @@ func (r *KarpenterMachinePoolReconciler) getControlPlaneVersion(ctx context.Cont
 }
 
 // createOrUpdateKarpenterResources creates or updates the Karpenter NodePool and EC2NodeClass custom resources in the workload cluster.
-// This method enforces version skew policies and sets appropriate conditions based on success/failure states.
 func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, machinePool *capiexp.MachinePool) error {
-	// Validate version skew: ensure worker nodes don't use newer Kubernetes versions than control plane
-	allowed, controlPlaneCurrentVersion, nodePoolDesiredVersion, err := r.IsVersionSkewAllowed(ctx, cluster, machinePool)
-	if err != nil {
-		return err
-	}
-
-	if !allowed {
-		message := fmt.Sprintf("Version skew policy violation: control plane version %s is older than node pool version %s", controlPlaneCurrentVersion, nodePoolDesiredVersion)
-		logger.Info("Blocking Karpenter custom resources update due to version skew policy",
-			"controlPlaneCurrentVersion", controlPlaneCurrentVersion,
-			"nodePoolDesiredVersion", nodePoolDesiredVersion,
-			"reason", message)
-
-		// Mark version skew as invalid and resources as not ready
-		conditions.MarkVersionSkewInvalid(karpenterMachinePool, conditions.VersionSkewBlockedReason, message)
-		conditions.MarkEC2NodeClassNotCreated(karpenterMachinePool, conditions.VersionSkewBlockedReason, message)
-		conditions.MarkNodePoolNotCreated(karpenterMachinePool, conditions.VersionSkewBlockedReason, message)
-
-		return fmt.Errorf("version skew policy violation: %s", message)
-	}
-
-	// Mark version skew as valid
-	conditions.MarkVersionSkewPolicySatisfied(karpenterMachinePool)
-
 	workloadClusterClient, err := r.clusterClientGetter(ctx, "", r.client, client.ObjectKeyFromObject(cluster))
 	if err != nil {
 		return fmt.Errorf("failed to get workload cluster client: %w", err)
@@ -691,21 +689,16 @@ func (r *KarpenterMachinePoolReconciler) SetupWithManager(ctx context.Context, m
 // The workers can't use a newer k8s version than the one used by the control plane.
 //
 // This implements Kubernetes version skew policy https://kubernetes.io/releases/version-skew-policy/
-//
-// Returns: (allowed bool, controlPlaneVersion string, desiredWorkerVersion string, error)
 func (r *KarpenterMachinePoolReconciler) IsVersionSkewAllowed(ctx context.Context, cluster *capi.Cluster, machinePool *capiexp.MachinePool) (bool, string, string, error) {
 	controlPlaneVersion, err := r.getControlPlaneVersion(ctx, cluster)
 	if err != nil {
 		return true, "", "", fmt.Errorf("failed to get current Control Plane k8s version: %w", err)
 	}
 
-	desiredWorkerVersion := *machinePool.Spec.Template.Spec.Version
-
-	// Use the version package to check skew policy
-	allowed, err := versionskew.IsSkewAllowed(controlPlaneVersion, desiredWorkerVersion)
+	allowed, err := versionskew.IsSkewAllowed(controlPlaneVersion, *machinePool.Spec.Template.Spec.Version)
 	if err != nil {
-		return true, controlPlaneVersion, desiredWorkerVersion, fmt.Errorf("failed to validate version skew: %w", err)
+		return true, controlPlaneVersion, *machinePool.Spec.Template.Spec.Version, fmt.Errorf("failed to validate version skew: %w", err)
 	}
 
-	return allowed, controlPlaneVersion, desiredWorkerVersion, nil
+	return allowed, controlPlaneVersion, *machinePool.Spec.Template.Spec.Version, nil
 }
