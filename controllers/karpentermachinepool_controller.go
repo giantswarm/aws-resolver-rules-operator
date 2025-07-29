@@ -9,7 +9,6 @@ import (
 	"path"
 	"time"
 
-	"github.com/blang/semver/v4"
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -35,6 +34,7 @@ import (
 	"github.com/aws-resolver-rules-operator/api/v1alpha1"
 	"github.com/aws-resolver-rules-operator/pkg/conditions"
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
+	"github.com/aws-resolver-rules-operator/pkg/versionskew"
 )
 
 const (
@@ -208,18 +208,14 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 // saveKarpenterInstancesToStatus updates the KarpenterMachinePool and parent MachinePool with current node information
 // from the workload cluster, including replica counts and provider ID lists.
 func (r *KarpenterMachinePoolReconciler) saveKarpenterInstancesToStatus(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, machinePool *capiexp.MachinePool) error {
-	// Get current node information from the workload cluster
 	providerIDList, numberOfNodeClaims, err := r.computeProviderIDListFromNodeClaimsInWorkloadCluster(ctx, logger, cluster)
 	if err != nil {
 		return err
 	}
 
-	// Update KarpenterMachinePool status with current replica count
+	logger.Info("Updating MachinePool.spec.replicas, KarpenterMachinePool.spec.ProviderIDList and KarpenterMachinePool.status.Replicas", "numberOfNodeClaims", numberOfNodeClaims, "providerIDList", providerIDList)
+
 	karpenterMachinePool.Status.Replicas = numberOfNodeClaims
-
-	logger.Info("Found NodeClaims in workload cluster, updating KarpenterMachinePool", "numberOfNodeClaims", numberOfNodeClaims, "providerIDList", providerIDList)
-
-	// Update KarpenterMachinePool spec with current provider ID list
 	karpenterMachinePool.Spec.ProviderIDList = providerIDList
 
 	// Update the parent MachinePool replica count to match actual node claims
@@ -357,7 +353,7 @@ func (r *KarpenterMachinePoolReconciler) computeProviderIDListFromNodeClaimsInWo
 			logger.Error(err, "error retrieving nodeClaim.status.providerID", "nodeClaim", nc.GetName())
 			continue
 		}
-		logger.Info("nodeClaim.status.providerID", "nodeClaimName", nc.GetName(), "statusFieldFound", found, "nodeClaim", nc.Object)
+
 		if found && providerID != "" {
 			providerIDList = append(providerIDList, providerID)
 		}
@@ -494,9 +490,9 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 
 	switch operation {
 	case controllerutil.OperationResultCreated:
-		logger.Info("Created EC2NodeClass")
+		logger.Info("Created EC2NodeClass in workload cluster")
 	case controllerutil.OperationResultUpdated:
-		logger.Info("Updated EC2NodeClass")
+		logger.Info("Updated EC2NodeClass in workload cluster")
 	}
 
 	return nil
@@ -556,7 +552,6 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 			"disruption": map[string]interface{}{},
 		}
 
-		// Apply user-defined NodePool configuration if provided
 		if karpenterMachinePool.Spec.NodePool != nil {
 			dis := spec["disruption"].(map[string]interface{})
 			dis["budgets"] = karpenterMachinePool.Spec.NodePool.Disruption.Budgets
@@ -597,9 +592,9 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 
 	switch operation {
 	case controllerutil.OperationResultCreated:
-		logger.Info("Created NodePool")
+		logger.Info("Created NodePool in workload cluster")
 	case controllerutil.OperationResultUpdated:
-		logger.Info("Updated NodePool")
+		logger.Info("Updated NodePool in workload cluster")
 	}
 
 	return nil
@@ -704,17 +699,13 @@ func (r *KarpenterMachinePoolReconciler) IsVersionSkewAllowed(ctx context.Contex
 		return true, "", "", fmt.Errorf("failed to get current Control Plane k8s version: %w", err)
 	}
 
-	// Parse versions using semantic versioning for proper comparison
-	controlPlaneCurrentK8sVersion, err := semver.ParseTolerant(controlPlaneVersion)
+	desiredWorkerVersion := *machinePool.Spec.Template.Spec.Version
+
+	// Use the version package to check skew policy
+	allowed, err := versionskew.IsSkewAllowed(controlPlaneVersion, desiredWorkerVersion)
 	if err != nil {
-		return true, "", "", fmt.Errorf("failed to parse current Control Plane k8s version: %w", err)
+		return true, controlPlaneVersion, desiredWorkerVersion, fmt.Errorf("failed to validate version skew: %w", err)
 	}
 
-	machinePoolDesiredK8sVersion, err := semver.ParseTolerant(*machinePool.Spec.Template.Spec.Version)
-	if err != nil {
-		return true, controlPlaneVersion, "", fmt.Errorf("failed to parse node pool desired k8s version: %w", err)
-	}
-
-	// Allow if control plane version >= desired worker version
-	return controlPlaneCurrentK8sVersion.GE(machinePoolDesiredK8sVersion), controlPlaneVersion, *machinePool.Spec.Template.Spec.Version, nil
+	return allowed, controlPlaneVersion, desiredWorkerVersion, nil
 }
