@@ -565,7 +565,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 			}
 
 			templateMetadata := spec["template"].(map[string]interface{})["metadata"].(map[string]interface{})
-			templateMetadata["labels"] = karpenterMachinePool.Spec.NodePool.Template.ObjectMeta.Labels
+			templateMetadata["labels"] = karpenterMachinePool.Spec.NodePool.Template.Labels
 
 			templateSpec := spec["template"].(map[string]interface{})["spec"].(map[string]interface{})
 

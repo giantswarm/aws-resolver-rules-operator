@@ -54,7 +54,7 @@ func (d NillableDuration) MarshalJSON() ([]byte, error) {
 		return d.Raw, nil
 	}
 	if d.Duration != nil {
-		return json.Marshal(d.Duration.String())
+		return json.Marshal((*d.Duration).String())
 	}
 	return json.Marshal(Never)
 }
@@ -69,12 +69,12 @@ func (d NillableDuration) ToUnstructured() interface{} {
 		}
 		// Fallback to string conversion if unmarshal fails
 		if d.Duration != nil {
-			return d.Duration.String()
+			return (*d.Duration).String()
 		}
 		return Never
 	}
 	if d.Duration != nil {
-		return d.Duration.String()
+		return (*d.Duration).String()
 	}
 	return Never
 }

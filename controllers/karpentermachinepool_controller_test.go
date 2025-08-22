@@ -44,16 +44,6 @@ const (
 	KubernetesVersion             = "v1.29.1"
 )
 
-// findCondition returns the condition with the given type from the list of conditions.
-func findCondition(conditions capi.Conditions, conditionType string) *capi.Condition {
-	for i := range conditions {
-		if conditions[i].Type == capi.ConditionType(conditionType) {
-			return &conditions[i]
-		}
-	}
-	return nil
-}
-
 var _ = Describe("KarpenterMachinePool reconciler", func() {
 	var (
 		capiBootstrapSecretContent []byte
