@@ -26,14 +26,8 @@ crds: controller-gen ## Generate CustomResourceDefinition.
 generate: controller-gen crds ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	go generate ./...
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
-
-.PHONY: fmt
-fmt: ## Run go fmt against code.
-	go fmt ./...
-
-.PHONY: vet
-vet: ## Run go vet against code.
-	go vet ./...
+# We need to run goimports after controller-gen to avoid CI complains about goimports in the generated files
+	@go run golang.org/x/tools/cmd/goimports -w ./api/v1alpha1
 
 .PHONY: create-acceptance-cluster
 create-acceptance-cluster: kind
@@ -127,7 +121,7 @@ coverage-html: test-unit
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 .PHONY: controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.16.5)
+	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.18.0)
 
 ENVTEST = $(shell pwd)/bin/setup-envtest
 .PHONY: envtest

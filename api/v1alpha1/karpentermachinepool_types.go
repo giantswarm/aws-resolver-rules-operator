@@ -18,14 +18,19 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 // KarpenterMachinePoolSpec defines the desired state of KarpenterMachinePool.
 type KarpenterMachinePoolSpec struct {
-	// The name or the Amazon Resource Name (ARN) of the instance profile associated
-	// with the IAM role for the instance. The instance profile contains the IAM
-	// role.
-	IamInstanceProfile string `json:"iamInstanceProfile,omitempty"`
+	// NodePool specifies the configuration for the Karpenter NodePool
+	// +optional
+	NodePool *NodePoolSpec `json:"nodePool,omitempty"`
+
+	// EC2NodeClass specifies the configuration for the Karpenter EC2NodeClass
+	// +optional
+	EC2NodeClass *EC2NodeClassSpec `json:"ec2NodeClass,omitempty"`
+
 	// ProviderIDList are the identification IDs of machine instances provided by the provider.
 	// This field must match the provider IDs as seen on the node objects corresponding to a machine pool's machine instances.
 	// +optional
@@ -34,13 +39,17 @@ type KarpenterMachinePoolSpec struct {
 
 // KarpenterMachinePoolStatus defines the observed state of KarpenterMachinePool.
 type KarpenterMachinePoolStatus struct {
-	// Ready is true when the provider resource is ready.
+	// Ready denotes that the KarpenterMachinePool is ready and fulfilling the infrastructure contract.
 	// +optional
 	Ready bool `json:"ready"`
 
 	// Replicas is the most recently observed number of replicas
 	// +optional
 	Replicas int32 `json:"replicas"`
+
+	// Conditions defines current service state of the KarpenterMachinePool.
+	// +optional
+	Conditions capi.Conditions `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -71,4 +80,12 @@ type KarpenterMachinePoolList struct {
 
 func init() {
 	SchemeBuilder.Register(&KarpenterMachinePool{}, &KarpenterMachinePoolList{})
+}
+
+func (in *KarpenterMachinePool) GetConditions() capi.Conditions {
+	return in.Status.Conditions
+}
+
+func (in *KarpenterMachinePool) SetConditions(conditions capi.Conditions) {
+	in.Status.Conditions = conditions
 }
