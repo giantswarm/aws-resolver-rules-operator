@@ -195,6 +195,10 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	conditions.MarkVersionSkewPolicySatisfied(karpenterMachinePool)
 	// Add finalizer to ensure proper cleanup sequence
 	controllerutil.AddFinalizer(karpenterMachinePool, KarpenterFinalizer)
+	// Patching the object to the API is required to ensure the finalizer is added.
+	if err := patchHelper.Patch(ctx, karpenterMachinePool); err != nil {
+		return reconcile.Result{}, fmt.Errorf("failed to patch KarpenterMachinePool: %w", err)
+	}
 
 	// Create or update Karpenter custom resources in the workload cluster.
 	if err := r.createOrUpdateKarpenterResources(ctx, logger, cluster, awsCluster, karpenterMachinePool, machinePool); err != nil {
