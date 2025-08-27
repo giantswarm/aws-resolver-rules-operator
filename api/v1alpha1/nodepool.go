@@ -1,5 +1,7 @@
 package v1alpha1
 
+// Crafted by hand from https://github.com/kubernetes-sigs/karpenter
+
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"

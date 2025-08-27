@@ -1,5 +1,7 @@
 package v1alpha1
 
+// Taken from https://github.com/aws/karpenter-provider-aws/blob/main/pkg/apis/v1/ec2nodeclass.go
+
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,13 +58,9 @@ type EC2NodeClassSpec struct {
 	// this UserData to ensure nodes are being provisioned with the correct configuration.
 	// +optional
 	UserData *string `json:"userData,omitempty"`
-	// Role is the AWS identity that nodes use. This field is immutable.
+	// Role is the AWS identity that nodes use.
 	// This field is mutually exclusive from instanceProfile.
-	// Marking this field as immutable avoids concerns around terminating managed instance profiles from running instances.
-	// This field may be made mutable in the future, assuming the correct garbage collection and drift handling is implemented
-	// for the old instance profiles on an update.
 	// +kubebuilder:validation:XValidation:rule="self != ''",message="role cannot be empty"
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="immutable field changed"
 	// +optional
 	Role string `json:"role,omitempty"`
 	// InstanceProfile is the AWS entity that instances use.
@@ -206,7 +204,7 @@ type AMISelectorTerm struct {
 	// You can specify a combination of AWS account IDs, "self", "amazon", and "aws-marketplace"
 	// +optional
 	Owner string `json:"owner,omitempty"`
-	// SSMParameter is the name (or ARN) of the SSM parameter containing the Image ID.
+	//SSMParameter is the name (or ARN) of the SSM parameter containing the Image ID.
 	// +optional
 	SSMParameter string `json:"ssmParameter,omitempty"`
 }
