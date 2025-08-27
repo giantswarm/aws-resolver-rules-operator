@@ -429,21 +429,3 @@ const (
 	// pods that request ephemeral storage and container images that are downloaded to the node.
 	InstanceStorePolicyRAID0 InstanceStorePolicy = "RAID0"
 )
-
-// // EC2NodeClassSpec defines the configuration for a Karpenter EC2NodeClass
-// type EC2NodeClassSpec struct {
-// 	// Name is the ami name in EC2.
-// 	// This value is the name field, which is different from the name tag.
-// 	AMIName string `json:"amiName,omitempty"`
-// 	// Owner is the owner for the ami.
-// 	// You can specify a combination of AWS account IDs, "self", "amazon", and "aws-marketplace"
-// 	AMIOwner string `json:"amiOwner,omitempty"`
-//
-// 	// SecurityGroups specifies the security groups to use
-// 	// +optional
-// 	SecurityGroups map[string]string `json:"securityGroups,omitempty"`
-//
-// 	// Subnets specifies the subnets to use
-// 	// +optional
-// 	Subnets map[string]string `json:"subnets,omitempty"`
-// }
