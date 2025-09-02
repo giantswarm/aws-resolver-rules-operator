@@ -164,10 +164,6 @@ func (fake *FakeRAMClient) DeleteResourceShareReturnsOnCall(i int, result1 error
 func (fake *FakeRAMClient) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.applyResourceShareMutex.RLock()
-	defer fake.applyResourceShareMutex.RUnlock()
-	fake.deleteResourceShareMutex.RLock()
-	defer fake.deleteResourceShareMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

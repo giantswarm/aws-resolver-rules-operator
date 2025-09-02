@@ -319,14 +319,6 @@ func (fake *FakePrefixListClient) DeleteEntryReturnsOnCall(i int, result1 error)
 func (fake *FakePrefixListClient) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.applyMutex.RLock()
-	defer fake.applyMutex.RUnlock()
-	fake.applyEntryMutex.RLock()
-	defer fake.applyEntryMutex.RUnlock()
-	fake.deleteMutex.RLock()
-	defer fake.deleteMutex.RUnlock()
-	fake.deleteEntryMutex.RLock()
-	defer fake.deleteEntryMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

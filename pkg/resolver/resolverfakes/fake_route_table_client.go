@@ -168,10 +168,6 @@ func (fake *FakeRouteTableClient) RemoveRoutesReturnsOnCall(i int, result1 error
 func (fake *FakeRouteTableClient) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.addRoutesMutex.RLock()
-	defer fake.addRoutesMutex.RUnlock()
-	fake.removeRoutesMutex.RLock()
-	defer fake.removeRoutesMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

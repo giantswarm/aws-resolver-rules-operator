@@ -74,8 +74,6 @@ workflows:
             only: /^v.*/
 
     - architect/go-build:
-        requires:
-        - hold
         context: architect
         name: go-build
         binary: aws-resolver-rules-operator
