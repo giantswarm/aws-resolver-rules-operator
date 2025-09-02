@@ -20,12 +20,16 @@ rules:
       - list
       - patch
       - watch
-      - update
+  - apiGroups:
+      - controlplane.cluster.x-k8s.io
+    resources:
+      - kubeadmcontrolplanes
+    verbs:
+      - get
   - apiGroups:
       - controlplane.cluster.x-k8s.io
     resources:
       - awsmanagedcontrolplanes
-      - kubeadmcontrolplanes
     verbs:
       - get
       - list
