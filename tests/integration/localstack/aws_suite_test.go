@@ -91,6 +91,7 @@ var _ = BeforeSuite(func() {
 	rawRoute53Client, err = NewRoute53Client(Region, AwsIamArn, "")
 	Expect(err).NotTo(HaveOccurred())
 
+	ctx := context.Background()
 	createMCVPCResponse, err := rawEC2Client.CreateVpc(ctx, &ec2.CreateVpcInput{
 		CidrBlock: awssdk.String("10.0.0.0/16"),
 	})
@@ -118,19 +119,14 @@ var _ = BeforeSuite(func() {
 })
 
 func NewEC2Client(region, arn, externalId string) (*ec2.Client, error) {
-	cfg, err := awsconfig.LoadDefaultConfig(ctx,
+	cfg, err := awsconfig.LoadDefaultConfig(context.Background(),
 		awsconfig.WithRegion(region),
 	)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	stsClient := sts.NewFromConfig(cfg, func(o *sts.Options) {
-		endpoint, ok := os.LookupEnv("AWS_ENDPOINT")
-		if ok {
-			o.BaseEndpoint = awssdk.String(endpoint)
-		}
-	})
+	stsClient := NewSTSClient(cfg)
 	client := ec2.NewFromConfig(cfg, func(o *ec2.Options) {
 		endpoint, ok := os.LookupEnv("AWS_ENDPOINT")
 		if ok {
@@ -147,19 +143,14 @@ func NewEC2Client(region, arn, externalId string) (*ec2.Client, error) {
 }
 
 func NewResolverClient(region, arn, externalId string) (*route53resolver.Client, error) {
-	cfg, err := awsconfig.LoadDefaultConfig(ctx,
+	cfg, err := awsconfig.LoadDefaultConfig(context.Background(),
 		awsconfig.WithRegion(region),
 	)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	stsClient := sts.NewFromConfig(cfg, func(o *sts.Options) {
-		endpoint, ok := os.LookupEnv("AWS_ENDPOINT")
-		if ok {
-			o.BaseEndpoint = awssdk.String(endpoint)
-		}
-	})
+	stsClient := NewSTSClient(cfg)
 	client := route53resolver.NewFromConfig(cfg, func(o *route53resolver.Options) {
 		endpoint, ok := os.LookupEnv("AWS_ENDPOINT")
 		if ok {
@@ -176,19 +167,14 @@ func NewResolverClient(region, arn, externalId string) (*route53resolver.Client,
 }
 
 func NewRoute53Client(region, arn, externalId string) (*route53.Client, error) {
-	cfg, err := awsconfig.LoadDefaultConfig(ctx,
+	cfg, err := awsconfig.LoadDefaultConfig(context.Background(),
 		awsconfig.WithRegion(region),
 	)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	stsClient := sts.NewFromConfig(cfg, func(o *sts.Options) {
-		endpoint, ok := os.LookupEnv("AWS_ENDPOINT")
-		if ok {
-			o.BaseEndpoint = awssdk.String(endpoint)
-		}
-	})
+	stsClient := NewSTSClient(cfg)
 	client := route53.NewFromConfig(cfg, func(o *route53.Options) {
 		endpoint, ok := os.LookupEnv("AWS_ENDPOINT")
 		if ok {
@@ -202,4 +188,13 @@ func NewRoute53Client(region, arn, externalId string) (*route53.Client, error) {
 	})
 
 	return client, nil
+}
+
+func NewSTSClient(cfg awssdk.Config) *sts.Client {
+	return sts.NewFromConfig(cfg, func(o *sts.Options) {
+		endpoint, ok := os.LookupEnv("AWS_ENDPOINT")
+		if ok {
+			o.BaseEndpoint = awssdk.String(endpoint)
+		}
+	})
 }
