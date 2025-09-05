@@ -3,8 +3,8 @@ package aws_test
 import (
 	"context"
 
-	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -29,14 +29,14 @@ var _ = Describe("RouteTable", func() {
 		routeTableClient, err = awsClients.NewRouteTableClient(Region, AwsIamArn)
 		Expect(err).NotTo(HaveOccurred())
 
-		ec2Output, err := rawEC2Client.CreateRouteTable(&ec2.CreateRouteTableInput{
+		ec2Output, err := rawEC2Client.CreateRouteTable(ctx, &ec2.CreateRouteTableInput{
 			VpcId: &VPCId,
 		})
 		Expect(err).NotTo(HaveOccurred())
 
 		routeTableId = *ec2Output.RouteTable.RouteTableId
 
-		_, err = rawEC2Client.AssociateRouteTable(&ec2.AssociateRouteTableInput{
+		_, err = rawEC2Client.AssociateRouteTable(ctx, &ec2.AssociateRouteTableInput{
 			RouteTableId: awssdk.String(routeTableId),
 			SubnetId:     awssdk.String(subnets[0]),
 		})
@@ -54,8 +54,8 @@ var _ = Describe("RouteTable", func() {
 		transitGatewayID, err = aws.GetARNResourceID(arn)
 		Expect(err).NotTo(HaveOccurred())
 
-		out, err := rawEC2Client.DescribeTransitGateways(&ec2.DescribeTransitGatewaysInput{
-			TransitGatewayIds: awssdk.StringSlice([]string{transitGatewayID}),
+		out, err := rawEC2Client.DescribeTransitGateways(ctx, &ec2.DescribeTransitGatewaysInput{
+			TransitGatewayIds: []string{transitGatewayID},
 		})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(out.TransitGateways).To(HaveLen(1))
@@ -92,7 +92,7 @@ var _ = Describe("RouteTable", func() {
 
 		When("the route exists", func() {
 			JustBeforeEach(func() {
-				_, err := rawEC2Client.CreateRoute(&ec2.CreateRouteInput{
+				_, err := rawEC2Client.CreateRoute(ctx, &ec2.CreateRouteInput{
 					RouteTableId:            &routeTableId,
 					DestinationPrefixListId: &prefixListID,
 					TransitGatewayId:        &transitGatewayID,

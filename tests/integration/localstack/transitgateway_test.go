@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -26,10 +27,10 @@ var _ = Describe("Transitgateway", func() {
 
 	createTransitGateway := func() string {
 		input := &ec2.CreateTransitGatewayInput{
-			TagSpecifications: []*ec2.TagSpecification{
+			TagSpecifications: []ec2types.TagSpecification{
 				{
-					ResourceType: awssdk.String(ec2.ResourceTypeTransitGateway),
-					Tags: []*ec2.Tag{
+					ResourceType: ec2types.ResourceTypeTransitGateway,
+					Tags: []ec2types.Tag{
 						{
 							Key:   awssdk.String(fmt.Sprintf("kubernetes.io/cluster/%s", name)),
 							Value: awssdk.String("owned"),
@@ -38,17 +39,17 @@ var _ = Describe("Transitgateway", func() {
 				},
 			},
 		}
-		out, err := rawEC2Client.CreateTransitGateway(input)
+		out, err := rawEC2Client.CreateTransitGateway(ctx, input)
 		Expect(err).NotTo(HaveOccurred())
 
 		return *out.TransitGateway.TransitGatewayId
 	}
 
 	attachTransitGateway := func(transitGatewayID, vpcID string) {
-		_, err = rawEC2Client.CreateTransitGatewayVpcAttachmentWithContext(ctx, &ec2.CreateTransitGatewayVpcAttachmentInput{
+		_, err = rawEC2Client.CreateTransitGatewayVpcAttachment(ctx, &ec2.CreateTransitGatewayVpcAttachmentInput{
 			TransitGatewayId: awssdk.String(transitGatewayID),
 			VpcId:            awssdk.String(vpcID),
-			SubnetIds:        awssdk.StringSlice([]string{"sub-1"}),
+			SubnetIds:        []string{"sub-1"},
 		})
 		Expect(err).NotTo(HaveOccurred())
 	}
@@ -78,8 +79,8 @@ var _ = Describe("Transitgateway", func() {
 			transitGatewayID, err := aws.GetARNResourceID(arn)
 			Expect(err).NotTo(HaveOccurred())
 
-			out, err := rawEC2Client.DescribeTransitGateways(&ec2.DescribeTransitGatewaysInput{
-				TransitGatewayIds: awssdk.StringSlice([]string{transitGatewayID}),
+			out, err := rawEC2Client.DescribeTransitGateways(ctx, &ec2.DescribeTransitGatewaysInput{
+				TransitGatewayIds: []string{transitGatewayID},
 			})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(out.TransitGateways).To(HaveLen(1))
@@ -104,8 +105,8 @@ var _ = Describe("Transitgateway", func() {
 
 				Expect(actualID).To(Equal(originalID))
 
-				out, err := rawEC2Client.DescribeTransitGateways(&ec2.DescribeTransitGatewaysInput{
-					TransitGatewayIds: awssdk.StringSlice([]string{actualID}),
+				out, err := rawEC2Client.DescribeTransitGateways(ctx, &ec2.DescribeTransitGatewaysInput{
+					TransitGatewayIds: []string{actualID},
 				})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(out.TransitGateways).To(HaveLen(1))
@@ -161,18 +162,18 @@ var _ = Describe("Transitgateway", func() {
 			Expect(applyError).NotTo(HaveOccurred())
 
 			describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
-				Filters: []*ec2.Filter{
+				Filters: []ec2types.Filter{
 					{
 						Name:   awssdk.String("transit-gateway-id"),
-						Values: awssdk.StringSlice([]string{transitGatewayID}),
+						Values: []string{transitGatewayID},
 					},
 					{
 						Name:   awssdk.String("vpc-id"),
-						Values: awssdk.StringSlice([]string{vpcID}),
+						Values: []string{vpcID},
 					},
 				},
 			}
-			attachments, err := rawEC2Client.DescribeTransitGatewayVpcAttachments(describeTGWattachmentInput)
+			attachments, err := rawEC2Client.DescribeTransitGatewayVpcAttachments(ctx, describeTGWattachmentInput)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(attachments.TransitGatewayVpcAttachments).To(HaveLen(1))
 
@@ -210,18 +211,18 @@ var _ = Describe("Transitgateway", func() {
 				Expect(applyError).NotTo(HaveOccurred())
 
 				describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
-					Filters: []*ec2.Filter{
+					Filters: []ec2types.Filter{
 						{
 							Name:   awssdk.String("transit-gateway-id"),
-							Values: awssdk.StringSlice([]string{transitGatewayID}),
+							Values: []string{transitGatewayID},
 						},
 						{
 							Name:   awssdk.String("vpc-id"),
-							Values: awssdk.StringSlice([]string{vpcID}),
+							Values: []string{vpcID},
 						},
 					},
 				}
-				attachments, err := rawEC2Client.DescribeTransitGatewayVpcAttachments(describeTGWattachmentInput)
+				attachments, err := rawEC2Client.DescribeTransitGatewayVpcAttachments(ctx, describeTGWattachmentInput)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(attachments.TransitGatewayVpcAttachments).To(HaveLen(1))
 			})
@@ -271,15 +272,15 @@ var _ = Describe("Transitgateway", func() {
 		It("detaches the transit gateway", func() {
 			Expect(detachErr).NotTo(HaveOccurred())
 
-			out, err := rawEC2Client.DescribeTransitGatewayVpcAttachments(&ec2.DescribeTransitGatewayVpcAttachmentsInput{
-				Filters: []*ec2.Filter{
+			out, err := rawEC2Client.DescribeTransitGatewayVpcAttachments(ctx, &ec2.DescribeTransitGatewayVpcAttachmentsInput{
+				Filters: []ec2types.Filter{
 					{
 						Name:   awssdk.String("transit-gateway-id"),
-						Values: awssdk.StringSlice([]string{transitGatewayID}),
+						Values: []string{transitGatewayID},
 					},
 					{
 						Name:   awssdk.String("vpc-id"),
-						Values: awssdk.StringSlice([]string{vpcID}),
+						Values: []string{vpcID},
 					},
 				},
 			})
@@ -338,8 +339,8 @@ var _ = Describe("Transitgateway", func() {
 		It("deletes the transit gateway", func() {
 			Expect(deleteErr).NotTo(HaveOccurred())
 
-			out, err := rawEC2Client.DescribeTransitGateways(&ec2.DescribeTransitGatewaysInput{
-				TransitGatewayIds: awssdk.StringSlice([]string{gatewayID}),
+			out, err := rawEC2Client.DescribeTransitGateways(ctx, &ec2.DescribeTransitGatewaysInput{
+				TransitGatewayIds: []string{gatewayID},
 			})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(out.TransitGateways).To(HaveLen(0))
@@ -347,7 +348,7 @@ var _ = Describe("Transitgateway", func() {
 
 		When("the gateway has already been deleted", func() {
 			BeforeEach(func() {
-				_, err := rawEC2Client.DeleteTransitGateway(&ec2.DeleteTransitGatewayInput{
+				_, err := rawEC2Client.DeleteTransitGateway(ctx, &ec2.DeleteTransitGatewayInput{
 					TransitGatewayId: awssdk.String(gatewayID),
 				})
 				Expect(err).NotTo(HaveOccurred())

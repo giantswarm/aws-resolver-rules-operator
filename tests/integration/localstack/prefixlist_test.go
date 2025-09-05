@@ -3,8 +3,8 @@ package aws_test
 import (
 	"context"
 
-	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -27,10 +27,10 @@ var _ = Describe("Prefix Lists", func() {
 	createPrefixList := func() string {
 		input := &ec2.CreateManagedPrefixListInput{
 			AddressFamily:  awssdk.String("IPv4"),
-			MaxEntries:     awssdk.Int64(4),
+			MaxEntries:     awssdk.Int32(4),
 			PrefixListName: awssdk.String(aws.GetPrefixListName(cluster.Name)),
 		}
-		out, err := rawEC2Client.CreateManagedPrefixList(input)
+		out, err := rawEC2Client.CreateManagedPrefixList(ctx, input)
 		Expect(err).NotTo(HaveOccurred())
 
 		return *out.PrefixList.PrefixListArn
@@ -60,8 +60,8 @@ var _ = Describe("Prefix Lists", func() {
 			prefixListID, err := aws.GetARNResourceID(arn)
 			Expect(err).NotTo(HaveOccurred())
 
-			out, err := rawEC2Client.DescribeManagedPrefixLists(&ec2.DescribeManagedPrefixListsInput{
-				PrefixListIds: awssdk.StringSlice([]string{prefixListID}),
+			out, err := rawEC2Client.DescribeManagedPrefixLists(ctx, &ec2.DescribeManagedPrefixListsInput{
+				PrefixListIds: []string{prefixListID},
 			})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(out.PrefixLists).To(HaveLen(1))
@@ -87,8 +87,8 @@ var _ = Describe("Prefix Lists", func() {
 
 				Expect(actualID).To(Equal(originalID))
 
-				out, err := rawEC2Client.DescribeManagedPrefixLists(&ec2.DescribeManagedPrefixListsInput{
-					PrefixListIds: awssdk.StringSlice([]string{actualID}),
+				out, err := rawEC2Client.DescribeManagedPrefixLists(ctx, &ec2.DescribeManagedPrefixListsInput{
+					PrefixListIds: []string{actualID},
 				})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(out.PrefixLists).To(HaveLen(1))
@@ -133,7 +133,7 @@ var _ = Describe("Prefix Lists", func() {
 			err := prefixLists.ApplyEntry(ctx, entry)
 			Expect(err).NotTo(HaveOccurred())
 
-			out, err := rawEC2Client.GetManagedPrefixListEntries(&ec2.GetManagedPrefixListEntriesInput{
+			out, err := rawEC2Client.GetManagedPrefixListEntries(ctx, &ec2.GetManagedPrefixListEntriesInput{
 				PrefixListId: awssdk.String(prefixListID),
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -203,7 +203,7 @@ var _ = Describe("Prefix Lists", func() {
 			err = prefixLists.DeleteEntry(ctx, entry)
 			Expect(err).NotTo(HaveOccurred())
 
-			out, err := rawEC2Client.GetManagedPrefixListEntries(&ec2.GetManagedPrefixListEntriesInput{
+			out, err := rawEC2Client.GetManagedPrefixListEntries(ctx, &ec2.GetManagedPrefixListEntriesInput{
 				PrefixListId: awssdk.String(prefixListID),
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -266,18 +266,18 @@ var _ = Describe("Prefix Lists", func() {
 			err := prefixLists.Delete(ctx, cluster.Name)
 			Expect(err).NotTo(HaveOccurred())
 
-			out, err := rawEC2Client.DescribeManagedPrefixLists(&ec2.DescribeManagedPrefixListsInput{
-				PrefixListIds: awssdk.StringSlice([]string{prefixListID}),
+			out, err := rawEC2Client.DescribeManagedPrefixLists(ctx, &ec2.DescribeManagedPrefixListsInput{
+				PrefixListIds: []string{prefixListID},
 			})
 			Expect(err).NotTo(HaveOccurred())
 			for _, prefixList := range out.PrefixLists {
-				Expect(*prefixList.State).To(Equal("delete-complete"))
+				Expect(prefixList.State).To(Equal("delete-complete"))
 			}
 		})
 
 		When("the prefix list has already been deleted", func() {
 			BeforeEach(func() {
-				_, err := rawEC2Client.DeleteManagedPrefixList(&ec2.DeleteManagedPrefixListInput{
+				_, err := rawEC2Client.DeleteManagedPrefixList(ctx, &ec2.DeleteManagedPrefixListInput{
 					PrefixListId: awssdk.String(prefixListID),
 				})
 				Expect(err).NotTo(HaveOccurred())

@@ -3,8 +3,9 @@ package aws_test
 import (
 	"context"
 
-	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -23,7 +24,7 @@ var _ = Describe("EC2 client", func() {
 	})
 
 	AfterEach(func() {
-		_, err = rawEC2Client.DeleteSecurityGroup(&ec2.DeleteSecurityGroupInput{GroupId: awssdk.String(resolverEndpointsSecurityGroup)})
+		_, err = rawEC2Client.DeleteSecurityGroup(ctx, &ec2.DeleteSecurityGroupInput{GroupId: awssdk.String(resolverEndpointsSecurityGroup)})
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -31,15 +32,15 @@ var _ = Describe("EC2 client", func() {
 		resolverEndpointsSecurityGroup, err = ec2Client.CreateSecurityGroupForResolverEndpoints(ctx, VPCId, "my-security-group", additionalTags)
 		Expect(err).NotTo(HaveOccurred())
 
-		securityGroupsResponse, err := rawEC2Client.DescribeSecurityGroupsWithContext(ctx, &ec2.DescribeSecurityGroupsInput{
-			Filters: []*ec2.Filter{
+		securityGroupsResponse, err := rawEC2Client.DescribeSecurityGroups(ctx, &ec2.DescribeSecurityGroupsInput{
+			Filters: []ec2types.Filter{
 				{
 					Name:   awssdk.String("vpc-id"),
-					Values: awssdk.StringSlice([]string{VPCId}),
+					Values: []string{VPCId},
 				},
 				{
 					Name:   awssdk.String("group-name"),
-					Values: awssdk.StringSlice([]string{"my-security-group"}),
+					Values: []string{"my-security-group"},
 				},
 			},
 		})
@@ -55,15 +56,15 @@ var _ = Describe("EC2 client", func() {
 			_, err = ec2Client.CreateSecurityGroupForResolverEndpoints(ctx, VPCId, "my-security-group", additionalTags)
 			Expect(err).NotTo(HaveOccurred())
 
-			securityGroupsResponse, err = rawEC2Client.DescribeSecurityGroupsWithContext(ctx, &ec2.DescribeSecurityGroupsInput{
-				Filters: []*ec2.Filter{
+			securityGroupsResponse, err = rawEC2Client.DescribeSecurityGroups(ctx, &ec2.DescribeSecurityGroupsInput{
+				Filters: []ec2types.Filter{
 					{
 						Name:   awssdk.String("vpc-id"),
-						Values: awssdk.StringSlice([]string{VPCId}),
+						Values: []string{VPCId},
 					},
 					{
 						Name:   awssdk.String("group-name"),
-						Values: awssdk.StringSlice([]string{"my-security-group"}),
+						Values: []string{"my-security-group"},
 					},
 				},
 			})
