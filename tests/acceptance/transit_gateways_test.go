@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gstruct"
@@ -55,28 +56,28 @@ var _ = Describe("Transit Gateways", func() {
 	})
 
 	It("creates the transit gateway", func() {
-		output, err := testFixture.EC2Client.DescribeTransitGateways(&ec2.DescribeTransitGatewaysInput{
-			TransitGatewayIds: []*string{awssdk.String(transitGatewayID)},
+		output, err := testFixture.EC2Client.DescribeTransitGateways(context.TODO(), &ec2.DescribeTransitGatewaysInput{
+			TransitGatewayIds: []string{transitGatewayID},
 		})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(output.TransitGateways).To(HaveLen(1))
 	})
 
 	It("attaches the transit gateway", func() {
-		getTGWAttachments := func() []*ec2.TransitGatewayVpcAttachment {
+		getTGWAttachments := func() []ec2types.TransitGatewayVpcAttachment {
 			describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
-				Filters: []*ec2.Filter{
+				Filters: []ec2types.Filter{
 					{
 						Name:   awssdk.String("transit-gateway-id"),
-						Values: []*string{awssdk.String(transitGatewayID)},
+						Values: []string{transitGatewayID},
 					},
 					{
 						Name:   awssdk.String("vpc-id"),
-						Values: []*string{awssdk.String(testFixture.Network.VpcID)},
+						Values: []string{testFixture.Network.VpcID},
 					},
 				},
 			}
-			describeTGWattachmentOutput, err := testFixture.EC2Client.DescribeTransitGatewayVpcAttachments(describeTGWattachmentInput)
+			describeTGWattachmentOutput, err := testFixture.EC2Client.DescribeTransitGatewayVpcAttachments(context.TODO(), describeTGWattachmentInput)
 			Expect(err).NotTo(HaveOccurred())
 			return describeTGWattachmentOutput.TransitGatewayVpcAttachments
 		}
@@ -90,10 +91,10 @@ var _ = Describe("Transit Gateways", func() {
 
 		managementAWSCluster := testFixture.ManagementCluster.AWSCluster
 		prefixListDescription := fmt.Sprintf("CIDR block for cluster %s", managementAWSCluster.Name)
-		Eventually(func(g Gomega) []*ec2.PrefixListEntry {
-			result, err := testFixture.EC2Client.GetManagedPrefixListEntries(&ec2.GetManagedPrefixListEntriesInput{
+		Eventually(func(g Gomega) []ec2types.PrefixListEntry {
+			result, err := testFixture.EC2Client.GetManagedPrefixListEntries(context.TODO(), &ec2.GetManagedPrefixListEntriesInput{
 				PrefixListId: awssdk.String(prefixListID),
-				MaxResults:   awssdk.Int64(100),
+				MaxResults:   awssdk.Int32(100),
 			})
 			g.Expect(err).NotTo(HaveOccurred())
 			return result.Entries
@@ -105,14 +106,14 @@ var _ = Describe("Transit Gateways", func() {
 
 	It("creates a route in explicitly attached route tables", func() {
 		managementAWSCluster := testFixture.ManagementCluster.AWSCluster
-		getRouteTables := func() []*ec2.RouteTable {
-			subnets := []*string{}
+		getRouteTables := func() []ec2types.RouteTable {
+			subnets := []string{}
 			for _, s := range managementAWSCluster.Spec.NetworkSpec.Subnets {
-				subnets = append(subnets, awssdk.String(s.ResourceID))
+				subnets = append(subnets, s.ResourceID)
 			}
 
-			routeTablesOutput, err := testFixture.EC2Client.DescribeRouteTables(&ec2.DescribeRouteTablesInput{
-				Filters: []*ec2.Filter{
+			routeTablesOutput, err := testFixture.EC2Client.DescribeRouteTables(context.TODO(), &ec2.DescribeRouteTablesInput{
+				Filters: []ec2types.Filter{
 					{Name: awssdk.String("association.subnet-id"), Values: subnets},
 				},
 			})
