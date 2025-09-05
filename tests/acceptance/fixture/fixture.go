@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"time"
 
-	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/ram"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/ram"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -38,19 +40,19 @@ type Data struct {
 }
 
 func NewFixture(k8sClient client.Client, config Config) *Fixture {
-	session, err := session.NewSession(&awssdk.Config{
-		Region: awssdk.String(config.AWSRegion),
-	})
+	cfg, err := awsconfig.LoadDefaultConfig(context.TODO(),
+		awsconfig.WithRegion(config.AWSRegion),
+	)
 	Expect(err).NotTo(HaveOccurred())
 
-	ec2Client := ec2.New(session,
-		&awssdk.Config{
-			Credentials: stscreds.NewCredentials(session, config.AWSIAMRoleARN),
-		},
-	)
+	stsClient := sts.NewFromConfig(cfg)
 
-	ramClient := ram.New(session, &awssdk.Config{
-		Credentials: stscreds.NewCredentials(session, config.AWSIAMRoleARN),
+	ec2Client := ec2.NewFromConfig(cfg, func(o *ec2.Options) {
+		o.Credentials = stscreds.NewAssumeRoleProvider(stsClient, config.AWSIAMRoleARN)
+	})
+
+	ramClient := ram.NewFromConfig(cfg, func(o *ram.Options) {
+		o.Credentials = stscreds.NewAssumeRoleProvider(stsClient, config.AWSIAMRoleARN)
 	})
 
 	return &Fixture{
@@ -93,8 +95,8 @@ type Config struct {
 
 type Fixture struct {
 	K8sClient client.Client
-	EC2Client *ec2.EC2
-	RamClient *ram.RAM
+	EC2Client *ec2.Client
+	RamClient *ram.Client
 
 	ManagementCluster Cluster
 
@@ -155,12 +157,12 @@ func (f *Fixture) Teardown() error {
 }
 
 func (f *Fixture) createNetwork() Network {
-	createVpcOutput, err := f.EC2Client.CreateVpc(&ec2.CreateVpcInput{
+	createVpcOutput, err := f.EC2Client.CreateVpc(context.TODO(), &ec2.CreateVpcInput{
 		CidrBlock: awssdk.String(ClusterVCPCIDR),
-		TagSpecifications: []*ec2.TagSpecification{
+		TagSpecifications: []ec2types.TagSpecification{
 			{
-				ResourceType: awssdk.String(ec2.ResourceTypeVpc),
-				Tags: []*ec2.Tag{
+				ResourceType: ec2types.ResourceTypeVpc,
+				Tags: []ec2types.Tag{
 					{
 						Key:   awssdk.String("aws-resolver-rules-operator.giantswarm.io/tests"),
 						Value: awssdk.String("acceptance"),
@@ -173,7 +175,7 @@ func (f *Fixture) createNetwork() Network {
 
 	vpcID := *createVpcOutput.Vpc.VpcId
 
-	createSubnetOutput, err := f.EC2Client.CreateSubnet(&ec2.CreateSubnetInput{
+	createSubnetOutput, err := f.EC2Client.CreateSubnet(context.TODO(), &ec2.CreateSubnetInput{
 		CidrBlock:         awssdk.String(ClusterSubnetCIDR),
 		VpcId:             awssdk.String(vpcID),
 		AvailabilityZone:  awssdk.String(getAvailabilityZone(f.config.AWSRegion)),
@@ -182,14 +184,14 @@ func (f *Fixture) createNetwork() Network {
 	Expect(err).NotTo(HaveOccurred())
 	subnetID := *createSubnetOutput.Subnet.SubnetId
 
-	createRouteTableOutput, err := f.EC2Client.CreateRouteTable(&ec2.CreateRouteTableInput{
+	createRouteTableOutput, err := f.EC2Client.CreateRouteTable(context.TODO(), &ec2.CreateRouteTableInput{
 		VpcId: awssdk.String(vpcID),
 	})
 	Expect(err).NotTo(HaveOccurred())
 
 	routeTableID := *createRouteTableOutput.RouteTable.RouteTableId
 
-	assocRouteTableOutput, err := f.EC2Client.AssociateRouteTable(&ec2.AssociateRouteTableInput{
+	assocRouteTableOutput, err := f.EC2Client.AssociateRouteTable(context.TODO(), &ec2.AssociateRouteTableInput{
 		RouteTableId: awssdk.String(routeTableID),
 		SubnetId:     awssdk.String(subnetID),
 	})
@@ -351,10 +353,10 @@ func getAvailabilityZone(region string) string {
 	return fmt.Sprintf("%sa", region)
 }
 
-func generateTagSpecifications(name string) []*ec2.TagSpecification {
-	tagSpec := &ec2.TagSpecification{
-		ResourceType: awssdk.String(ec2.ResourceTypeSubnet),
-		Tags: []*ec2.Tag{
+func generateTagSpecifications(name string) []ec2types.TagSpecification {
+	tagSpec := ec2types.TagSpecification{
+		ResourceType: ec2types.ResourceTypeSubnet,
+		Tags: []ec2types.Tag{
 			{
 				Key:   awssdk.String(controllers.TagSubnetTGWAttachements),
 				Value: awssdk.String("true"),
@@ -366,7 +368,7 @@ func generateTagSpecifications(name string) []*ec2.TagSpecification {
 		},
 	}
 
-	tagSpecifications := make([]*ec2.TagSpecification, 0)
+	tagSpecifications := make([]ec2types.TagSpecification, 0)
 	tagSpecifications = append(tagSpecifications, tagSpec)
 	return tagSpecifications
 }

@@ -21,12 +21,13 @@ import (
 	"os"
 	"testing"
 
-	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
-	awssession "github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/route53"
-	"github.com/aws/aws-sdk-go/service/route53resolver"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
+	"github.com/aws/aws-sdk-go-v2/service/route53resolver"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -63,9 +64,9 @@ var (
 	resolverClient    resolver.ResolverClient
 	route53Client     resolver.Route53Client
 	err               error
-	rawEC2Client      *ec2.EC2
-	rawResolverClient *route53resolver.Route53Resolver
-	rawRoute53Client  *route53.Route53
+	rawEC2Client      *ec2.Client
+	rawResolverClient *route53resolver.Client
+	rawRoute53Client  *route53.Client
 	subnets           []string
 	MCVPCId           string
 	VPCId             string
@@ -90,25 +91,26 @@ var _ = BeforeSuite(func() {
 	rawRoute53Client, err = NewRoute53Client(Region, AwsIamArn, "")
 	Expect(err).NotTo(HaveOccurred())
 
-	createMCVPCResponse, err := rawEC2Client.CreateVpc(&ec2.CreateVpcInput{
+	ctx := context.Background()
+	createMCVPCResponse, err := rawEC2Client.CreateVpc(ctx, &ec2.CreateVpcInput{
 		CidrBlock: awssdk.String("10.0.0.0/16"),
 	})
 	Expect(err).NotTo(HaveOccurred())
 	MCVPCId = *createMCVPCResponse.Vpc.VpcId
 
-	createVPCResponse, err := rawEC2Client.CreateVpc(&ec2.CreateVpcInput{
+	createVPCResponse, err := rawEC2Client.CreateVpc(ctx, &ec2.CreateVpcInput{
 		CidrBlock: awssdk.String("10.0.0.0/16"),
 	})
 	Expect(err).NotTo(HaveOccurred())
 	VPCId = *createVPCResponse.Vpc.VpcId
 
-	createSubnetResponse1, err := rawEC2Client.CreateSubnet(&ec2.CreateSubnetInput{
+	createSubnetResponse1, err := rawEC2Client.CreateSubnet(ctx, &ec2.CreateSubnetInput{
 		CidrBlock: awssdk.String("10.0.0.0/24"),
 		VpcId:     awssdk.String(VPCId),
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	createSubnetResponse2, err := rawEC2Client.CreateSubnet(&ec2.CreateSubnetInput{
+	createSubnetResponse2, err := rawEC2Client.CreateSubnet(ctx, &ec2.CreateSubnetInput{
 		CidrBlock: awssdk.String("10.0.1.0/24"),
 		VpcId:     awssdk.String(VPCId),
 	})
@@ -116,56 +118,83 @@ var _ = BeforeSuite(func() {
 	subnets = []string{*createSubnetResponse1.Subnet.SubnetId, *createSubnetResponse2.Subnet.SubnetId}
 })
 
-func NewEC2Client(region, arn, externalId string) (*ec2.EC2, error) {
-	session, err := awssession.NewSession(&awssdk.Config{
-		Region:   awssdk.String(region),
-		Endpoint: awssdk.String(os.Getenv("AWS_ENDPOINT")),
-	})
+func NewEC2Client(region, arn, externalId string) (*ec2.Client, error) {
+	cfg, err := awsconfig.LoadDefaultConfig(context.Background(),
+		awsconfig.WithRegion(region),
+	)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	client := ec2.New(session, &awssdk.Config{Credentials: stscreds.NewCredentials(session, arn, func(assumeRoleProvider *stscreds.AssumeRoleProvider) {
-		if externalId != "" {
-			assumeRoleProvider.ExternalID = awssdk.String(externalId)
+	stsClient := NewSTSClient(cfg)
+	client := ec2.NewFromConfig(cfg, func(o *ec2.Options) {
+		endpoint, ok := os.LookupEnv("AWS_ENDPOINT")
+		if ok {
+			o.BaseEndpoint = awssdk.String(endpoint)
 		}
-	})})
+		o.Credentials = stscreds.NewAssumeRoleProvider(stsClient, arn, func(aro *stscreds.AssumeRoleOptions) {
+			if externalId != "" {
+				aro.ExternalID = awssdk.String(externalId)
+			}
+		})
+	})
 
 	return client, nil
 }
 
-func NewResolverClient(region, arn, externalId string) (*route53resolver.Route53Resolver, error) {
-	session, err := awssession.NewSession(&awssdk.Config{
-		Region:   awssdk.String(region),
-		Endpoint: awssdk.String(os.Getenv("AWS_ENDPOINT")),
-	})
+func NewResolverClient(region, arn, externalId string) (*route53resolver.Client, error) {
+	cfg, err := awsconfig.LoadDefaultConfig(context.Background(),
+		awsconfig.WithRegion(region),
+	)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	client := route53resolver.New(session, &awssdk.Config{Credentials: stscreds.NewCredentials(session, arn, func(assumeRoleProvider *stscreds.AssumeRoleProvider) {
-		if externalId != "" {
-			assumeRoleProvider.ExternalID = awssdk.String(externalId)
+	stsClient := NewSTSClient(cfg)
+	client := route53resolver.NewFromConfig(cfg, func(o *route53resolver.Options) {
+		endpoint, ok := os.LookupEnv("AWS_ENDPOINT")
+		if ok {
+			o.BaseEndpoint = awssdk.String(endpoint)
 		}
-	})})
+		o.Credentials = stscreds.NewAssumeRoleProvider(stsClient, arn, func(aro *stscreds.AssumeRoleOptions) {
+			if externalId != "" {
+				aro.ExternalID = awssdk.String(externalId)
+			}
+		})
+	})
 
 	return client, nil
 }
 
-func NewRoute53Client(region, arn, externalId string) (*route53.Route53, error) {
-	session, err := awssession.NewSession(&awssdk.Config{
-		Region:   awssdk.String(region),
-		Endpoint: awssdk.String(os.Getenv("AWS_ENDPOINT")),
-	})
+func NewRoute53Client(region, arn, externalId string) (*route53.Client, error) {
+	cfg, err := awsconfig.LoadDefaultConfig(context.Background(),
+		awsconfig.WithRegion(region),
+	)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	client := route53.New(session, &awssdk.Config{Credentials: stscreds.NewCredentials(session, arn, func(assumeRoleProvider *stscreds.AssumeRoleProvider) {
-		if externalId != "" {
-			assumeRoleProvider.ExternalID = awssdk.String(externalId)
+	stsClient := NewSTSClient(cfg)
+	client := route53.NewFromConfig(cfg, func(o *route53.Options) {
+		endpoint, ok := os.LookupEnv("AWS_ENDPOINT")
+		if ok {
+			o.BaseEndpoint = awssdk.String(endpoint)
 		}
-	})})
+		o.Credentials = stscreds.NewAssumeRoleProvider(stsClient, arn, func(aro *stscreds.AssumeRoleOptions) {
+			if externalId != "" {
+				aro.ExternalID = awssdk.String(externalId)
+			}
+		})
+	})
 
 	return client, nil
+}
+
+func NewSTSClient(cfg awssdk.Config) *sts.Client {
+	return sts.NewFromConfig(cfg, func(o *sts.Options) {
+		endpoint, ok := os.LookupEnv("AWS_ENDPOINT")
+		if ok {
+			o.BaseEndpoint = awssdk.String(endpoint)
+		}
+	})
 }
