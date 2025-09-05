@@ -35,10 +35,10 @@ var _ = Describe("RAM client", func() {
 		// principal are in a final state like Associated. If we don't
 		// wait for this state the tests will flake
 		Eventually(getResourceAssociationStatus(name, prefixList)).
-			Should(PointTo(Equal(ramtypes.ResourceShareAssociationStatusAssociated)))
+			Should(Equal(ramtypes.ResourceShareAssociationStatusAssociated))
 
 		Eventually(getPrincipalAssociationStatus(name)).
-			Should(PointTo(Equal(ramtypes.ResourceShareAssociationStatusAssociated)))
+			Should(Equal(ramtypes.ResourceShareAssociationStatusAssociated))
 	}
 
 	BeforeEach(func() {
