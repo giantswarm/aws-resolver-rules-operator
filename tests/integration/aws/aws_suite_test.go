@@ -1,21 +1,24 @@
 package aws_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
-	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/ram"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/ram"
+	ramtypes "github.com/aws/aws-sdk-go-v2/service/ram/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap/zapcore"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/aws-resolver-rules-operator/pkg/aws"
 	"github.com/aws-resolver-rules-operator/tests"
 )
 
@@ -30,8 +33,8 @@ var (
 	mcIAMRoleARN string
 	wcIAMRoleARN string
 
-	rawEC2Client *ec2.EC2
-	rawRamClient *ram.RAM
+	rawEC2Client *ec2.Client
+	rawRamClient *ram.Client
 )
 
 func TestAws(t *testing.T) {
@@ -56,31 +59,29 @@ var _ = BeforeSuite(func() {
 	mcIAMRoleARN = fmt.Sprintf("arn:aws:iam::%s:role/%s", mcAccount, iamRoleId)
 	wcIAMRoleARN = fmt.Sprintf("arn:aws:iam::%s:role/%s", wcAccount, iamRoleId)
 
-	session, err := session.NewSession(&awssdk.Config{
-		Region: awssdk.String(awsRegion),
-	})
+	cfg, err := awsconfig.LoadDefaultConfig(context.TODO(),
+		awsconfig.WithRegion(awsRegion),
+	)
 	Expect(err).NotTo(HaveOccurred())
 
-	rawEC2Client = ec2.New(session,
-		&awssdk.Config{
-			Credentials: stscreds.NewCredentials(session, mcIAMRoleARN),
-		},
-	)
-	rawRamClient = ram.New(session,
-		&awssdk.Config{
-			Credentials: stscreds.NewCredentials(session, mcIAMRoleARN),
-		},
-	)
+	stsClient := sts.NewFromConfig(cfg)
+	rawEC2Client = ec2.NewFromConfig(cfg, func(o *ec2.Options) {
+		o.Credentials = stscreds.NewAssumeRoleProvider(stsClient, mcIAMRoleARN)
+	})
+
+	rawRamClient = ram.NewFromConfig(cfg, func(o *ram.Options) {
+		o.Credentials = stscreds.NewAssumeRoleProvider(stsClient, mcIAMRoleARN)
+	})
 })
 
-func getResourceAssociationStatus(resourceShareName string, prefixList *ec2.ManagedPrefixList) func(g Gomega) *string {
-	return func(g Gomega) *string {
-		getResourceShareOutput, err := rawRamClient.GetResourceShares(&ram.GetResourceSharesInput{
+func getResourceAssociationStatus(resourceShareName string, prefixList *ec2types.ManagedPrefixList) func(g Gomega) ramtypes.ResourceShareAssociationStatus {
+	return func(g Gomega) ramtypes.ResourceShareAssociationStatus {
+		getResourceShareOutput, err := rawRamClient.GetResourceShares(context.TODO(), &ram.GetResourceSharesInput{
 			Name:          awssdk.String(resourceShareName),
-			ResourceOwner: awssdk.String(aws.ResourceOwnerSelf),
+			ResourceOwner: ramtypes.ResourceOwnerSelf,
 		})
 		Expect(err).NotTo(HaveOccurred())
-		resourceShares := []*ram.ResourceShare{}
+		resourceShares := []ramtypes.ResourceShare{}
 		for _, share := range getResourceShareOutput.ResourceShares {
 			if !isResourceShareDeleted(share) {
 				resourceShares = append(resourceShares, share)
@@ -90,10 +91,10 @@ func getResourceAssociationStatus(resourceShareName string, prefixList *ec2.Mana
 
 		resourceShare := resourceShares[0]
 
-		listAssociationsOutput, err := rawRamClient.GetResourceShareAssociations(&ram.GetResourceShareAssociationsInput{
-			AssociationType:   awssdk.String(ram.ResourceShareAssociationTypeResource),
+		listAssociationsOutput, err := rawRamClient.GetResourceShareAssociations(context.TODO(), &ram.GetResourceShareAssociationsInput{
+			AssociationType:   ramtypes.ResourceShareAssociationTypeResource,
 			ResourceArn:       prefixList.PrefixListArn,
-			ResourceShareArns: []*string{resourceShare.ResourceShareArn},
+			ResourceShareArns: []string{*resourceShare.ResourceShareArn},
 		})
 		Expect(err).NotTo(HaveOccurred())
 
@@ -102,14 +103,14 @@ func getResourceAssociationStatus(resourceShareName string, prefixList *ec2.Mana
 	}
 }
 
-func getPrincipalAssociationStatus(resourceShareName string) func(g Gomega) *string {
-	return func(g Gomega) *string {
-		getResourceShareOutput, err := rawRamClient.GetResourceShares(&ram.GetResourceSharesInput{
+func getPrincipalAssociationStatus(resourceShareName string) func(g Gomega) ramtypes.ResourceShareAssociationStatus {
+	return func(g Gomega) ramtypes.ResourceShareAssociationStatus {
+		getResourceShareOutput, err := rawRamClient.GetResourceShares(context.TODO(), &ram.GetResourceSharesInput{
 			Name:          awssdk.String(resourceShareName),
-			ResourceOwner: awssdk.String(aws.ResourceOwnerSelf),
+			ResourceOwner: ramtypes.ResourceOwnerSelf,
 		})
 		Expect(err).NotTo(HaveOccurred())
-		resourceShares := []*ram.ResourceShare{}
+		resourceShares := []ramtypes.ResourceShare{}
 		for _, share := range getResourceShareOutput.ResourceShares {
 			if !isResourceShareDeleted(share) {
 				resourceShares = append(resourceShares, share)
@@ -118,10 +119,10 @@ func getPrincipalAssociationStatus(resourceShareName string) func(g Gomega) *str
 		Expect(resourceShares).To(HaveLen(1))
 
 		resourceShare := resourceShares[0]
-		listAssociationsOutput, err := rawRamClient.GetResourceShareAssociations(&ram.GetResourceShareAssociationsInput{
-			AssociationType:   awssdk.String(ram.ResourceShareAssociationTypePrincipal),
+		listAssociationsOutput, err := rawRamClient.GetResourceShareAssociations(context.TODO(), &ram.GetResourceShareAssociationsInput{
+			AssociationType:   ramtypes.ResourceShareAssociationTypePrincipal,
 			Principal:         awssdk.String(wcAccount),
-			ResourceShareArns: []*string{resourceShare.ResourceShareArn},
+			ResourceShareArns: []string{*resourceShare.ResourceShareArn},
 		})
 		Expect(err).NotTo(HaveOccurred())
 
@@ -130,54 +131,54 @@ func getPrincipalAssociationStatus(resourceShareName string) func(g Gomega) *str
 	}
 }
 
-func getResourceShares(ramClient *ram.RAM, name string) func(g Gomega) []*ram.ResourceShare {
-	return func(g Gomega) []*ram.ResourceShare {
-		resourceShareOutput, err := ramClient.GetResourceShares(&ram.GetResourceSharesInput{
+func getResourceShares(ramClient *ram.Client, name string) func(g Gomega) []ramtypes.ResourceShare {
+	return func(g Gomega) []ramtypes.ResourceShare {
+		resourceShareOutput, err := ramClient.GetResourceShares(context.TODO(), &ram.GetResourceSharesInput{
 			Name:          awssdk.String(name),
-			ResourceOwner: awssdk.String(aws.ResourceOwnerSelf),
+			ResourceOwner: ramtypes.ResourceOwnerSelf,
 		})
 		g.Expect(err).NotTo(HaveOccurred())
 		return resourceShareOutput.ResourceShares
 	}
 }
 
-func getSharedResources(ramClient *ram.RAM, prefixList *ec2.ManagedPrefixList) func(g Gomega) []*ram.Resource {
-	return func(g Gomega) []*ram.Resource {
-		listResourcesOutput, err := ramClient.ListResources(&ram.ListResourcesInput{
+func getSharedResources(ramClient *ram.Client, prefixList *ec2types.ManagedPrefixList) func(g Gomega) []ramtypes.Resource {
+	return func(g Gomega) []ramtypes.Resource {
+		listResourcesOutput, err := ramClient.ListResources(context.TODO(), &ram.ListResourcesInput{
 			Principal:     awssdk.String(wcAccount),
-			ResourceArns:  awssdk.StringSlice([]string{*prefixList.PrefixListArn}),
-			ResourceOwner: awssdk.String(aws.ResourceOwnerSelf),
+			ResourceArns:  []string{*prefixList.PrefixListArn},
+			ResourceOwner: ramtypes.ResourceOwnerSelf,
 		})
 		g.Expect(err).NotTo(HaveOccurred())
 		return listResourcesOutput.Resources
 	}
 }
 
-func createManagedPrefixList(ec2Client *ec2.EC2, name string) *ec2.ManagedPrefixList {
-	createPrefixListOutput, err := ec2Client.CreateManagedPrefixList(&ec2.CreateManagedPrefixListInput{
+func createManagedPrefixList(ec2Client *ec2.Client, name string) *ec2types.ManagedPrefixList {
+	createPrefixListOutput, err := ec2Client.CreateManagedPrefixList(context.TODO(), &ec2.CreateManagedPrefixListInput{
 		AddressFamily:  awssdk.String("IPv4"),
-		MaxEntries:     awssdk.Int64(2),
+		MaxEntries:     awssdk.Int32(2),
 		PrefixListName: awssdk.String(name),
 	})
 	Expect(err).NotTo(HaveOccurred())
 	prefixList := createPrefixListOutput.PrefixList
-	Eventually(func() string {
-		prefixListOutput, err := ec2Client.DescribeManagedPrefixLists(&ec2.DescribeManagedPrefixListsInput{
-			PrefixListIds: []*string{prefixList.PrefixListId},
+	Eventually(func() ec2types.PrefixListState {
+		prefixListOutput, err := ec2Client.DescribeManagedPrefixLists(context.TODO(), &ec2.DescribeManagedPrefixListsInput{
+			PrefixListIds: []string{*prefixList.PrefixListId},
 		})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(prefixListOutput.PrefixLists).To(HaveLen(1))
-		return *prefixListOutput.PrefixLists[0].State
+		return prefixListOutput.PrefixLists[0].State
 	}).Should(Equal("create-complete"))
 
 	return prefixList
 }
 
-func isResourceShareDeleted(resourceShare *ram.ResourceShare) bool {
-	if resourceShare.Status == nil {
+func isResourceShareDeleted(resourceShare ramtypes.ResourceShare) bool {
+	if resourceShare.Status == "" {
 		return false
 	}
 
-	status := *resourceShare.Status
-	return status == ram.ResourceShareStatusDeleted || status == ram.ResourceShareStatusDeleting
+	status := resourceShare.Status
+	return status == ramtypes.ResourceShareStatusDeleted || status == ramtypes.ResourceShareStatusDeleting
 }
