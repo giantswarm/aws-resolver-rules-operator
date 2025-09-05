@@ -81,9 +81,9 @@ var _ = Describe("Transit Gateways", func() {
 			Expect(err).NotTo(HaveOccurred())
 			return describeTGWattachmentOutput.TransitGatewayVpcAttachments
 		}
-		Eventually(getTGWAttachments).Should(ContainElement(PointTo(MatchFields(IgnoreExtras, Fields{
+		Eventually(getTGWAttachments).Should(ContainElement(MatchFields(IgnoreExtras, Fields{
 			"State": Equal(ec2types.TransitGatewayStateAvailable),
-		}))))
+		})))
 	})
 
 	It("creates the prefix list", func() {
@@ -98,10 +98,10 @@ var _ = Describe("Transit Gateways", func() {
 			})
 			g.Expect(err).NotTo(HaveOccurred())
 			return result.Entries
-		}).Should(ContainElement(PointTo(MatchFields(IgnoreExtras, Fields{
+		}).Should(ContainElement(MatchFields(IgnoreExtras, Fields{
 			"Cidr":        PointTo(Equal(managementAWSCluster.Spec.NetworkSpec.VPC.CidrBlock)),
 			"Description": PointTo(Equal(prefixListDescription)),
-		}))))
+		})))
 	})
 
 	It("creates a route in explicitly attached route tables", func() {
@@ -123,10 +123,10 @@ var _ = Describe("Transit Gateways", func() {
 			return routeTablesOutput.RouteTables
 		}
 		Eventually(getRouteTables).Should(ContainElement(MatchFields(IgnoreExtras, Fields{
-			"Routes": ContainElement(PointTo(MatchFields(IgnoreExtras, Fields{
+			"Routes": ContainElement(MatchFields(IgnoreExtras, Fields{
 				"DestinationPrefixListId": PointTo(Equal(prefixListID)),
 				"TransitGatewayId":        PointTo(Equal(transitGatewayID)),
-			}))),
+			})),
 		})))
 	})
 })
