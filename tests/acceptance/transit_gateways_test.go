@@ -82,7 +82,7 @@ var _ = Describe("Transit Gateways", func() {
 			return describeTGWattachmentOutput.TransitGatewayVpcAttachments
 		}
 		Eventually(getTGWAttachments).Should(ContainElement(PointTo(MatchFields(IgnoreExtras, Fields{
-			"State": PointTo(Equal("available")),
+			"State": Equal(ec2types.TransitGatewayStateAvailable),
 		}))))
 	})
 
@@ -122,11 +122,11 @@ var _ = Describe("Transit Gateways", func() {
 
 			return routeTablesOutput.RouteTables
 		}
-		Eventually(getRouteTables).Should(ContainElement(PointTo(MatchFields(IgnoreExtras, Fields{
+		Eventually(getRouteTables).Should(ContainElement(MatchFields(IgnoreExtras, Fields{
 			"Routes": ContainElement(PointTo(MatchFields(IgnoreExtras, Fields{
 				"DestinationPrefixListId": PointTo(Equal(prefixListID)),
 				"TransitGatewayId":        PointTo(Equal(transitGatewayID)),
 			}))),
-		}))))
+		})))
 	})
 })

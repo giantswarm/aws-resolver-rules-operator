@@ -178,16 +178,16 @@ var _ = Describe("Transitgateway", func() {
 			Expect(attachments.TransitGatewayVpcAttachments).To(HaveLen(1))
 
 			actualAttachment := attachments.TransitGatewayVpcAttachments[0]
-			Expect(actualAttachment.SubnetIds).To(ConsistOf(PointTo(Equal("sub-1")), PointTo(Equal("sub-2"))))
+			Expect(actualAttachment.SubnetIds).To(ConsistOf(Equal("sub-1"), Equal("sub-2")))
 			Expect(actualAttachment.Tags).To(ConsistOf(
-				PointTo(MatchFields(IgnoreExtras, Fields{
+				MatchFields(IgnoreExtras, Fields{
 					"Key":   PointTo(Equal("tag-1")),
 					"Value": PointTo(Equal("value-1")),
-				})),
-				PointTo(MatchFields(IgnoreExtras, Fields{
+				}),
+				MatchFields(IgnoreExtras, Fields{
 					"Key":   PointTo(Equal("tag-2")),
 					"Value": PointTo(Equal("value-2")),
-				})),
+				}),
 			))
 		})
 
@@ -285,7 +285,7 @@ var _ = Describe("Transitgateway", func() {
 				},
 			})
 			Expect(err).NotTo(HaveOccurred())
-			Expect(out.TransitGatewayVpcAttachments[0].State).To(PointTo(Equal("deleted")))
+			Expect(out.TransitGatewayVpcAttachments[0].State).To(Equal(ec2types.TransitGatewayAttachmentStateDeleted))
 		})
 
 		When("the gateway has already been detached", func() {
