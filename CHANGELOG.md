@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Change controllers sync period to 2 minutes.
+
 ## [0.21.0] - 2025-09-02
 
 ### Changed
