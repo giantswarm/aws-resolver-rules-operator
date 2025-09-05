@@ -5,6 +5,7 @@ import (
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -271,7 +272,7 @@ var _ = Describe("Prefix Lists", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 			for _, prefixList := range out.PrefixLists {
-				Expect(prefixList.State).To(Equal("delete-complete"))
+				Expect(prefixList.State).To(Equal(ec2types.PrefixListStateDeleteComplete))
 			}
 		})
 

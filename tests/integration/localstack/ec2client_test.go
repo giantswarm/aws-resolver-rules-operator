@@ -47,9 +47,9 @@ var _ = Describe("EC2 client", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(securityGroupsResponse.SecurityGroups)).To(Equal(1))
 		Expect(*securityGroupsResponse.SecurityGroups[0].GroupName).To(Equal("my-security-group"))
-		Expect(*securityGroupsResponse.SecurityGroups[0].IpPermissions[0].FromPort).To(Equal(int64(53)))
+		Expect(*securityGroupsResponse.SecurityGroups[0].IpPermissions[0].FromPort).To(Equal(int32(53)))
 		Expect(*securityGroupsResponse.SecurityGroups[0].IpPermissions[0].IpProtocol).To(Equal("udp"))
-		Expect(*securityGroupsResponse.SecurityGroups[0].IpPermissions[1].FromPort).To(Equal(int64(53)))
+		Expect(*securityGroupsResponse.SecurityGroups[0].IpPermissions[1].FromPort).To(Equal(int32(53)))
 		Expect(*securityGroupsResponse.SecurityGroups[0].IpPermissions[1].IpProtocol).To(Equal("tcp"))
 
 		By("creating the security group again it doesn't fail", func() {
