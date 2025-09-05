@@ -55,11 +55,11 @@ var _ = Describe("Route53 Resolver client", func() {
 				})
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(actualTags.ResourceTagSet.Tags).To(ContainElement(&route53types.Tag{
+				Expect(actualTags.ResourceTagSet.Tags).To(ContainElement(route53types.Tag{
 					Key:   awssdk.String("Name"),
 					Value: awssdk.String("jose"),
 				}))
-				Expect(actualTags.ResourceTagSet.Tags).To(ContainElement(&route53types.Tag{
+				Expect(actualTags.ResourceTagSet.Tags).To(ContainElement(route53types.Tag{
 					Key:   awssdk.String("something"),
 					Value: awssdk.String("else"),
 				}))
@@ -119,7 +119,7 @@ var _ = Describe("Route53 Resolver client", func() {
 				})
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(actualTags.ResourceTagSet.Tags).To(ContainElement(&route53types.Tag{
+				Expect(actualTags.ResourceTagSet.Tags).To(ContainElement(route53types.Tag{
 					Key:   awssdk.String("Name"),
 					Value: awssdk.String("jose"),
 				}))
@@ -129,7 +129,7 @@ var _ = Describe("Route53 Resolver client", func() {
 					VPCRegion: route53types.VPCRegion(Region),
 				})
 				Expect(err).NotTo(HaveOccurred())
-				Expect(associatedHostedZones.HostedZoneSummaries).To(ContainElement(&route53types.HostedZoneSummary{
+				Expect(associatedHostedZones.HostedZoneSummaries).To(ContainElement(route53types.HostedZoneSummary{
 					HostedZoneId: trimHostedZonePrefix(privateHostedZoneResponse.HostedZones[0].Id),
 					Name:         awssdk.String("aprivate.test.example.com."),
 					Owner: &route53types.HostedZoneOwner{
