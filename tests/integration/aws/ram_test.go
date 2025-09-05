@@ -11,7 +11,6 @@ import (
 	ramtypes "github.com/aws/aws-sdk-go-v2/service/ram/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	. "github.com/onsi/gomega/gstruct"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/aws-resolver-rules-operator/pkg/aws"
