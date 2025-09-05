@@ -82,7 +82,7 @@ var _ = Describe("Transit Gateways", func() {
 			return describeTGWattachmentOutput.TransitGatewayVpcAttachments
 		}
 		Eventually(getTGWAttachments).Should(ContainElement(MatchFields(IgnoreExtras, Fields{
-			"State": Equal(ec2types.TransitGatewayStateAvailable),
+			"State": Equal(ec2types.TransitGatewayAttachmentStateAvailable),
 		})))
 	})
 
