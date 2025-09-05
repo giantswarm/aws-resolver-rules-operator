@@ -50,7 +50,7 @@ var _ = Describe("Route53 Resolver client", func() {
 				}, "2s", "100ms").Should(Equal(1))
 
 				actualTags, err := rawRoute53Client.ListTagsForResource(ctx, &route53.ListTagsForResourceInput{
-					ResourceId:   publicListHostedZoneResponse.HostedZones[0].Id,
+					ResourceId:   trimHostedZonePrefix(publicListHostedZoneResponse.HostedZones[0].Id),
 					ResourceType: route53types.TagResourceTypeHostedzone,
 				})
 				Expect(err).NotTo(HaveOccurred())
@@ -114,7 +114,7 @@ var _ = Describe("Route53 Resolver client", func() {
 				}, "3s", "100ms").Should(Equal("aprivate.test.example.com."))
 
 				actualTags, err := rawRoute53Client.ListTagsForResource(ctx, &route53.ListTagsForResourceInput{
-					ResourceId:   privateHostedZoneResponse.HostedZones[0].Id,
+					ResourceId:   trimHostedZonePrefix(privateHostedZoneResponse.HostedZones[0].Id),
 					ResourceType: route53types.TagResourceTypeHostedzone,
 				})
 				Expect(err).NotTo(HaveOccurred())
@@ -130,7 +130,7 @@ var _ = Describe("Route53 Resolver client", func() {
 				})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(associatedHostedZones.HostedZoneSummaries).To(ContainElement(&route53types.HostedZoneSummary{
-					HostedZoneId: awssdk.String(strings.TrimPrefix(*privateHostedZoneResponse.HostedZones[0].Id, "/hostedzone/")),
+					HostedZoneId: trimHostedZonePrefix(privateHostedZoneResponse.HostedZones[0].Id),
 					Name:         awssdk.String("aprivate.test.example.com."),
 					Owner: &route53types.HostedZoneOwner{
 						OwningAccount: awssdk.String("000000000000"),
@@ -588,3 +588,7 @@ var _ = Describe("Route53 Resolver client", func() {
 		})
 	})
 })
+
+func trimHostedZonePrefix(id *string) *string {
+	return awssdk.String(strings.TrimPrefix(*id, "/hostedzone/"))
+}
