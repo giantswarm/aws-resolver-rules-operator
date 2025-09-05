@@ -125,9 +125,17 @@ func NewEC2Client(region, arn, externalId string) (*ec2.Client, error) {
 		return nil, errors.WithStack(err)
 	}
 
-	stsClient := sts.NewFromConfig(cfg)
+	stsClient := sts.NewFromConfig(cfg, func(o *sts.Options) {
+		endpoint, ok := os.LookupEnv("AWS_ENDPOINT")
+		if ok {
+			o.BaseEndpoint = awssdk.String(endpoint)
+		}
+	})
 	client := ec2.NewFromConfig(cfg, func(o *ec2.Options) {
-		o.BaseEndpoint = awssdk.String(os.Getenv("AWS_ENDPOINT"))
+		endpoint, ok := os.LookupEnv("AWS_ENDPOINT")
+		if ok {
+			o.BaseEndpoint = awssdk.String(endpoint)
+		}
 		o.Credentials = stscreds.NewAssumeRoleProvider(stsClient, arn, func(aro *stscreds.AssumeRoleOptions) {
 			if externalId != "" {
 				aro.ExternalID = awssdk.String(externalId)
@@ -146,9 +154,17 @@ func NewResolverClient(region, arn, externalId string) (*route53resolver.Client,
 		return nil, errors.WithStack(err)
 	}
 
-	stsClient := sts.NewFromConfig(cfg)
+	stsClient := sts.NewFromConfig(cfg, func(o *sts.Options) {
+		endpoint, ok := os.LookupEnv("AWS_ENDPOINT")
+		if ok {
+			o.BaseEndpoint = awssdk.String(endpoint)
+		}
+	})
 	client := route53resolver.NewFromConfig(cfg, func(o *route53resolver.Options) {
-		o.BaseEndpoint = awssdk.String(os.Getenv("AWS_ENDPOINT"))
+		endpoint, ok := os.LookupEnv("AWS_ENDPOINT")
+		if ok {
+			o.BaseEndpoint = awssdk.String(endpoint)
+		}
 		o.Credentials = stscreds.NewAssumeRoleProvider(stsClient, arn, func(aro *stscreds.AssumeRoleOptions) {
 			if externalId != "" {
 				aro.ExternalID = awssdk.String(externalId)
@@ -167,9 +183,17 @@ func NewRoute53Client(region, arn, externalId string) (*route53.Client, error) {
 		return nil, errors.WithStack(err)
 	}
 
-	stsClient := sts.NewFromConfig(cfg)
+	stsClient := sts.NewFromConfig(cfg, func(o *sts.Options) {
+		endpoint, ok := os.LookupEnv("AWS_ENDPOINT")
+		if ok {
+			o.BaseEndpoint = awssdk.String(endpoint)
+		}
+	})
 	client := route53.NewFromConfig(cfg, func(o *route53.Options) {
-		o.BaseEndpoint = awssdk.String(os.Getenv("AWS_ENDPOINT"))
+		endpoint, ok := os.LookupEnv("AWS_ENDPOINT")
+		if ok {
+			o.BaseEndpoint = awssdk.String(endpoint)
+		}
 		o.Credentials = stscreds.NewAssumeRoleProvider(stsClient, arn, func(aro *stscreds.AssumeRoleOptions) {
 			if externalId != "" {
 				aro.ExternalID = awssdk.String(externalId)
