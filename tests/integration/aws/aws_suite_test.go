@@ -169,7 +169,7 @@ func createManagedPrefixList(ec2Client *ec2.Client, name string) *ec2types.Manag
 		Expect(err).NotTo(HaveOccurred())
 		Expect(prefixListOutput.PrefixLists).To(HaveLen(1))
 		return prefixListOutput.PrefixLists[0].State
-	}).Should(Equal("create-complete"))
+	}).Should(Equal(ec2types.PrefixListStateCreateComplete))
 
 	return prefixList
 }
