@@ -114,7 +114,7 @@ func main() {
 	flag.StringVar(&managementClusterName, "management-cluster-name", "", "Management cluster CR name.")
 	flag.StringVar(&managementClusterNamespace, "management-cluster-namespace", "", "Management cluster CR namespace.")
 	flag.StringVar(&workloadClusterBaseDomain, "basedomain", "", "Domain for workload cluster, e.g. installation.eu-west-1.aws.domain.tld")
-	flag.DurationVar(&syncPeriod, "sync-period", 10*time.Minute, "The minimum interval at which watched resources are reconciled.")
+	flag.DurationVar(&syncPeriod, "sync-period", 2*time.Minute, "The minimum interval at which watched resources are reconciled.")
 
 	opts := zap.Options{
 		Development: false,
