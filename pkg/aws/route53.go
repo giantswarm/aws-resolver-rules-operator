@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/route53"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
+	route53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/go-logr/logr"
 	gocache "github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
@@ -49,14 +49,14 @@ var (
 )
 
 type Route53 struct {
-	client *route53.Route53
+	client *route53.Client
 
 	upsertCache           *gocache.Cache
 	zoneIdToNSRecordCache *gocache.Cache
 	zoneNameToIdCache     *gocache.Cache
 }
 
-func NewRoute53(client *route53.Route53) *Route53 {
+func NewRoute53(client *route53.Client) *Route53 {
 	return &Route53{
 		client: client,
 
@@ -83,22 +83,22 @@ func (r *Route53) CreateHostedZone(ctx context.Context, logger logr.Logger, dnsZ
 		now := time.Now()
 		createHostedZoneInput := &route53.CreateHostedZoneInput{
 			CallerReference: awssdk.String(fmt.Sprintf("%d", now.UnixNano())),
-			HostedZoneConfig: &route53.HostedZoneConfig{
+			HostedZoneConfig: &route53types.HostedZoneConfig{
 				Comment: awssdk.String("Zone for CAPI cluster"),
 			},
 			Name: awssdk.String(dnsZone.DnsName),
 		}
 
 		if dnsZone.IsPrivate {
-			createHostedZoneInput.HostedZoneConfig.PrivateZone = awssdk.Bool(true)
-			createHostedZoneInput.VPC = &route53.VPC{
+			createHostedZoneInput.HostedZoneConfig.PrivateZone = true
+			createHostedZoneInput.VPC = &route53types.VPC{
 				VPCId:     awssdk.String(dnsZone.VPCId),
-				VPCRegion: awssdk.String(dnsZone.Region),
+				VPCRegion: route53types.VPCRegion(dnsZone.Region),
 			}
 		}
 
 		logger.Info("Creating hosted zone")
-		createdHostedZone, err := r.client.CreateHostedZoneWithContext(ctx, createHostedZoneInput)
+		createdHostedZone, err := r.client.CreateHostedZone(ctx, createHostedZoneInput)
 		if err != nil {
 			return "", errors.WithStack(err)
 		}
@@ -126,9 +126,9 @@ func (r *Route53) tagHostedZone(ctx context.Context, hostedZoneId string, tags m
 		return nil
 	}
 
-	var route53Tags []*route53.Tag
+	var route53Tags []route53types.Tag
 	for tagKey, tagValue := range tags {
-		route53Tags = append(route53Tags, &route53.Tag{
+		route53Tags = append(route53Tags, route53types.Tag{
 			Key:   awssdk.String(tagKey),
 			Value: awssdk.String(tagValue),
 		})
@@ -136,9 +136,9 @@ func (r *Route53) tagHostedZone(ctx context.Context, hostedZoneId string, tags m
 	tagsInput := &route53.ChangeTagsForResourceInput{
 		AddTags:      route53Tags,
 		ResourceId:   awssdk.String(hostedZoneId),
-		ResourceType: awssdk.String("hostedzone"),
+		ResourceType: route53types.TagResourceTypeHostedzone,
 	}
-	_, err := r.client.ChangeTagsForResourceWithContext(ctx, tagsInput)
+	_, err := r.client.ChangeTagsForResource(ctx, tagsInput)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -151,11 +151,11 @@ func (r *Route53) tagHostedZone(ctx context.Context, hostedZoneId string, tags m
 func (r *Route53) associateHostedZoneWithAdditionalVPCs(ctx context.Context, logger logr.Logger, hostedZoneId, region string, vpcsToAssociate []string) {
 	logger.Info("Associating hosted zone with VPCs", "vpcsToAssociate", vpcsToAssociate)
 	for _, vpcIdToAssociate := range vpcsToAssociate {
-		_, err := r.client.AssociateVPCWithHostedZoneWithContext(ctx, &route53.AssociateVPCWithHostedZoneInput{
+		_, err := r.client.AssociateVPCWithHostedZone(ctx, &route53.AssociateVPCWithHostedZoneInput{
 			HostedZoneId: awssdk.String(hostedZoneId),
-			VPC: &route53.VPC{
+			VPC: &route53types.VPC{
 				VPCId:     awssdk.String(vpcIdToAssociate),
-				VPCRegion: awssdk.String(region),
+				VPCRegion: route53types.VPCRegion(region),
 			},
 		})
 		if err != nil {
@@ -175,17 +175,12 @@ func (r *Route53) DeleteHostedZone(ctx context.Context, logger logr.Logger, zone
 		}
 	}
 
-	_, err := r.client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: awssdk.String(zoneId)})
+	_, err := r.client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{Id: awssdk.String(zoneId)})
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case route53.ErrCodeNoSuchHostedZone:
-				return nil
-			default:
-				return errors.WithStack(err)
-			}
+		// TODO: Not sure if this is correct
+		if errors.Is(err, &route53types.NoSuchHostedZone{}) {
+			return nil
 		}
-
 		return errors.WithStack(err)
 	}
 	logger.Info("Hosted zone deleted")
@@ -196,19 +191,19 @@ func (r *Route53) DeleteHostedZone(ctx context.Context, logger logr.Logger, zone
 func (r *Route53) GetHostedZoneNSRecord(ctx context.Context, logger logr.Logger, zoneId string, zoneName string) (*resolver.DNSRecord, error) {
 	logger = logger.WithValues("zoneId", zoneId, "zoneName", zoneName)
 
-	var resourceRecordSet *route53.ResourceRecordSet
+	var resourceRecordSet route53types.ResourceRecordSet
 
 	if cachedValue, ok := r.zoneIdToNSRecordCache.Get(zoneId); ok {
 		logger.Info("Using NS record from cache")
 
-		resourceRecordSet = cachedValue.(*route53.ResourceRecordSet)
+		resourceRecordSet = cachedValue.(route53types.ResourceRecordSet)
 	} else {
 		logger.Info("Requesting NS record")
 
-		listResourceRecordSetsOutput, err := r.client.ListResourceRecordSetsWithContext(ctx, &route53.ListResourceRecordSetsInput{
+		listResourceRecordSetsOutput, err := r.client.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{
 			HostedZoneId:    awssdk.String(zoneId),
-			MaxItems:        awssdk.String("1"),
-			StartRecordType: awssdk.String(route53.RRTypeNs),
+			MaxItems:        awssdk.Int32(1),
+			StartRecordType: route53types.RRTypeNs,
 
 			// `StartRecordType` must be specified together with `StartRecordName`, so we specify the zone domain
 			StartRecordName: awssdk.String(zoneName),
@@ -220,11 +215,11 @@ func (r *Route53) GetHostedZoneNSRecord(ctx context.Context, logger logr.Logger,
 		if len(listResourceRecordSetsOutput.ResourceRecordSets) != 1 {
 			return nil, errors.New("logic error - did not receive exactly one resource record set")
 		}
-		if *listResourceRecordSetsOutput.ResourceRecordSets[0].Type != route53.RRTypeNs {
+		if listResourceRecordSetsOutput.ResourceRecordSets[0].Type != route53types.RRTypeNs {
 			return nil, errors.Errorf(
 				"logic error - did not receive a resource record set of type NS (got name %q and type %q)",
 				*listResourceRecordSetsOutput.ResourceRecordSets[0].Name,
-				*listResourceRecordSetsOutput.ResourceRecordSets[0].Type)
+				listResourceRecordSetsOutput.ResourceRecordSets[0].Type)
 		}
 		if len(listResourceRecordSetsOutput.ResourceRecordSets[0].ResourceRecords) == 0 {
 			return nil, errors.New("did not receive any NS resource record")
@@ -237,7 +232,7 @@ func (r *Route53) GetHostedZoneNSRecord(ctx context.Context, logger logr.Logger,
 
 	record := &resolver.DNSRecord{
 		Name:   *resourceRecordSet.Name,
-		Kind:   resolver.DnsRecordType(*resourceRecordSet.Type),
+		Kind:   resolver.DnsRecordType(resourceRecordSet.Type),
 		Values: []string{},
 	}
 
@@ -261,9 +256,9 @@ func (r *Route53) GetHostedZoneIdByName(ctx context.Context, logger logr.Logger,
 	// comparison - if that exact zone name does not exist, AWS may still return other zones!
 	//
 	// See https://docs.aws.amazon.com/Route53/latest/APIReference/API_ListHostedZonesByName.html.
-	listResponse, err := r.client.ListHostedZonesByNameWithContext(ctx, &route53.ListHostedZonesByNameInput{
+	listResponse, err := r.client.ListHostedZonesByName(ctx, &route53.ListHostedZonesByNameInput{
 		DNSName:  awssdk.String(zoneName),
-		MaxItems: awssdk.String("100"),
+		MaxItems: awssdk.Int32(100),
 	})
 	if err != nil {
 		return "", errors.WithStack(err)
@@ -306,9 +301,9 @@ func (r *Route53) AddDelegationToParentZone(ctx context.Context, logger logr.Log
 		return errors.New("logic error - no NS resource records")
 	}
 
-	var awsResourceRecords []*route53.ResourceRecord
+	var awsResourceRecords []route53types.ResourceRecord
 	for _, value := range resourceRecord.Values {
-		awsResourceRecords = append(awsResourceRecords, &route53.ResourceRecord{
+		awsResourceRecords = append(awsResourceRecords, route53types.ResourceRecord{
 			Value: awssdk.String(value),
 		})
 	}
@@ -322,15 +317,15 @@ func (r *Route53) AddDelegationToParentZone(ctx context.Context, logger logr.Log
 		return nil
 	}
 
-	_, err := r.client.ChangeResourceRecordSetsWithContext(ctx, &route53.ChangeResourceRecordSetsInput{
+	_, err := r.client.ChangeResourceRecordSets(ctx, &route53.ChangeResourceRecordSetsInput{
 		HostedZoneId: awssdk.String(parentZoneId),
-		ChangeBatch: &route53.ChangeBatch{
-			Changes: []*route53.Change{
+		ChangeBatch: &route53types.ChangeBatch{
+			Changes: []route53types.Change{
 				{
-					Action: awssdk.String("UPSERT"),
-					ResourceRecordSet: &route53.ResourceRecordSet{
+					Action: route53types.ChangeActionUpsert,
+					ResourceRecordSet: &route53types.ResourceRecordSet{
 						Name:            awssdk.String(resourceRecord.Name),
-						Type:            awssdk.String("NS"),
+						Type:            route53types.RRTypeNs,
 						TTL:             awssdk.Int64(300),
 						ResourceRecords: awsResourceRecords,
 					},
@@ -372,8 +367,8 @@ func (r *Route53) AddDnsRecordsToHostedZone(ctx context.Context, logger logr.Log
 		return nil
 	}
 
-	_, err := r.client.ChangeResourceRecordSetsWithContext(ctx, &route53.ChangeResourceRecordSetsInput{
-		ChangeBatch: &route53.ChangeBatch{
+	_, err := r.client.ChangeResourceRecordSets(ctx, &route53.ChangeResourceRecordSetsInput{
+		ChangeBatch: &route53types.ChangeBatch{
 			Changes: getAWSSdkChangesFromDnsRecords(logger, dnsRecords),
 		},
 		HostedZoneId: awssdk.String(hostedZoneId),
@@ -392,28 +387,28 @@ func (r *Route53) AddDnsRecordsToHostedZone(ctx context.Context, logger logr.Log
 // DeleteDnsRecordsFromHostedZone will delete all dns records from the zone, except for SOA and NS records.
 func (r *Route53) DeleteDnsRecordsFromHostedZone(ctx context.Context, logger logr.Logger, hostedZoneId string) error {
 	logger.Info("Deleting dns records from hosted zone")
-	listRecordsResponse, err := r.client.ListResourceRecordSetsWithContext(ctx, &route53.ListResourceRecordSetsInput{
+	listRecordsResponse, err := r.client.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{
 		HostedZoneId: awssdk.String(hostedZoneId),
 	})
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	changes := []*route53.Change{}
+	changes := []route53types.Change{}
 	for _, recordSet := range listRecordsResponse.ResourceRecordSets {
-		if *recordSet.Type == route53.RRTypeSoa || *recordSet.Type == route53.RRTypeNs {
+		if recordSet.Type == route53types.RRTypeSoa || recordSet.Type == route53types.RRTypeNs {
 			continue
 		}
 
-		changes = append(changes, &route53.Change{
-			Action:            awssdk.String("DELETE"),
-			ResourceRecordSet: recordSet,
+		changes = append(changes, route53types.Change{
+			Action:            route53types.ChangeActionDelete,
+			ResourceRecordSet: &recordSet,
 		})
 	}
 
 	if len(changes) > 0 {
-		_, err = r.client.ChangeResourceRecordSetsWithContext(ctx, &route53.ChangeResourceRecordSetsInput{
-			ChangeBatch: &route53.ChangeBatch{
+		_, err = r.client.ChangeResourceRecordSets(ctx, &route53.ChangeResourceRecordSetsInput{
+			ChangeBatch: &route53types.ChangeBatch{
 				Changes: changes,
 			},
 			HostedZoneId: awssdk.String(hostedZoneId),
@@ -426,32 +421,32 @@ func (r *Route53) DeleteDnsRecordsFromHostedZone(ctx context.Context, logger log
 	return nil
 }
 
-func getAWSSdkChangesFromDnsRecords(logger logr.Logger, dnsRecords []resolver.DNSRecord) []*route53.Change {
-	var changes []*route53.Change
+func getAWSSdkChangesFromDnsRecords(logger logr.Logger, dnsRecords []resolver.DNSRecord) []route53types.Change {
+	var changes []route53types.Change
 	for _, record := range dnsRecords {
 		switch record.Kind {
 		case resolver.DnsRecordTypeCname, resolver.DnsRecordTypeA:
-			changes = append(changes, &route53.Change{
-				Action: awssdk.String("UPSERT"),
-				ResourceRecordSet: &route53.ResourceRecordSet{
+			changes = append(changes, route53types.Change{
+				Action: route53types.ChangeActionUpsert,
+				ResourceRecordSet: &route53types.ResourceRecordSet{
 					Name: awssdk.String(record.Name),
-					Type: awssdk.String(string(record.Kind)),
+					Type: route53types.RRType(record.Kind),
 					TTL:  awssdk.Int64(300),
-					ResourceRecords: []*route53.ResourceRecord{
+					ResourceRecords: []route53types.ResourceRecord{
 						{
 							Value: awssdk.String(record.Values[0]),
 						},
 					},
 				}})
 		case resolver.DnsRecordTypeAlias:
-			changes = append(changes, &route53.Change{
-				Action: awssdk.String("UPSERT"),
-				ResourceRecordSet: &route53.ResourceRecordSet{
+			changes = append(changes, route53types.Change{
+				Action: route53types.ChangeActionUpsert,
+				ResourceRecordSet: &route53types.ResourceRecordSet{
 					Name: awssdk.String(record.Name),
-					Type: awssdk.String("A"),
-					AliasTarget: &route53.AliasTarget{
+					Type: route53types.RRTypeA,
+					AliasTarget: &route53types.AliasTarget{
 						DNSName:              awssdk.String(record.Values[0]),
-						EvaluateTargetHealth: awssdk.Bool(false),
+						EvaluateTargetHealth: false,
 						HostedZoneId:         awssdk.String(canonicalHostedZones[record.Region]),
 					},
 				},
@@ -465,22 +460,22 @@ func getAWSSdkChangesFromDnsRecords(logger logr.Logger, dnsRecords []resolver.DN
 }
 
 func (r *Route53) DeleteDelegationFromParentZone(ctx context.Context, logger logr.Logger, parentZoneId string, resourceRecord *resolver.DNSRecord) error {
-	var awsResourceRecords []*route53.ResourceRecord
+	var awsResourceRecords []route53types.ResourceRecord
 	for _, value := range resourceRecord.Values {
-		awsResourceRecords = append(awsResourceRecords, &route53.ResourceRecord{
+		awsResourceRecords = append(awsResourceRecords, route53types.ResourceRecord{
 			Value: awssdk.String(value),
 		})
 	}
 
-	_, err := r.client.ChangeResourceRecordSetsWithContext(ctx, &route53.ChangeResourceRecordSetsInput{
+	_, err := r.client.ChangeResourceRecordSets(ctx, &route53.ChangeResourceRecordSetsInput{
 		HostedZoneId: awssdk.String(parentZoneId),
-		ChangeBatch: &route53.ChangeBatch{
-			Changes: []*route53.Change{
+		ChangeBatch: &route53types.ChangeBatch{
+			Changes: []route53types.Change{
 				{
-					Action: awssdk.String("DELETE"),
-					ResourceRecordSet: &route53.ResourceRecordSet{
+					Action: route53types.ChangeActionDelete,
+					ResourceRecordSet: &route53types.ResourceRecordSet{
 						Name:            awssdk.String(resourceRecord.Name),
-						Type:            awssdk.String("NS"),
+						Type:            route53types.RRTypeNs,
 						TTL:             awssdk.Int64(300),
 						ResourceRecords: awsResourceRecords,
 					},
@@ -489,15 +484,9 @@ func (r *Route53) DeleteDelegationFromParentZone(ctx context.Context, logger log
 		},
 	})
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case route53.ErrCodeInvalidChangeBatch:
-				return nil
-			default:
-				return errors.WithStack(err)
-			}
+		if errors.Is(err, &route53types.InvalidChangeBatch{}) {
+			return nil
 		}
-
 		return errors.WithStack(err)
 	}
 

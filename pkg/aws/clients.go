@@ -11,14 +11,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ram"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/route53resolver"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	awsv1 "github.com/aws/aws-sdk-go/aws"
 	stscredsv1 "github.com/aws/aws-sdk-go/aws/credentials/stscreds"
-	"github.com/aws/aws-sdk-go/aws/request"
 	awssession "github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/route53"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/smithy-go/metrics/smithyotelmetrics"
 	"github.com/pkg/errors"
 
@@ -229,28 +228,40 @@ func (c *Clients) NewRouteTableClient(region, rolearn string) (resolver.RouteTab
 	}, nil
 }
 
-func (c *Clients) newRoute53Client(region, arn, externalId string) (*route53.Route53, error) {
-	session, err := c.sessionFromRegion(region)
+func (c *Clients) newRoute53Client(region, roleArn, externalId string) (*route53.Client, error) {
+	conf, err := c.configFromRegion(region)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	route53Client := route53.New(session, &awsv1.Config{Credentials: stscredsv1.NewCredentials(session, arn, configureExternalId(arn, externalId))})
-	route53Client.Handlers.Build.PushFront(request.MakeAddToUserAgentHandler(controllerName, currentCommit))
-	route53Client.Handlers.CompleteAttempt.PushFront(captureRequestMetrics(controllerName))
+	route53Client := route53.NewFromConfig(conf, func(o *route53.Options) {
+		o.Credentials = aws.NewCredentialsCache(
+			stscreds.NewAssumeRoleProvider(sts.NewFromConfig(conf), roleArn, func(aro *stscreds.AssumeRoleOptions) {
+				aro.ExternalID = aws.String(externalId)
+			}),
+		)
+		o.AppID = appID
+		o.MeterProvider = smithyotelmetrics.Adapt(metricProvider)
+	})
 
 	return route53Client, nil
 }
 
-func (c *Clients) newS3Client(region, arn, externalId string) (*s3.S3, error) {
-	session, err := c.sessionFromRegion(region)
+func (c *Clients) newS3Client(region, roleArn, externalId string) (*s3.Client, error) {
+	conf, err := c.configFromRegion(region)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	s3Client := s3.New(session, &awsv1.Config{Credentials: stscredsv1.NewCredentials(session, arn, configureExternalId(arn, externalId))})
-	s3Client.Handlers.Build.PushFront(request.MakeAddToUserAgentHandler(controllerName, currentCommit))
-	s3Client.Handlers.CompleteAttempt.PushFront(captureRequestMetrics(controllerName))
+	s3Client := s3.NewFromConfig(conf, func(o *s3.Options) {
+		o.Credentials = aws.NewCredentialsCache(
+			stscreds.NewAssumeRoleProvider(sts.NewFromConfig(conf), roleArn, func(aro *stscreds.AssumeRoleOptions) {
+				aro.ExternalID = aws.String(externalId)
+			}),
+		)
+		o.AppID = appID
+		o.MeterProvider = smithyotelmetrics.Adapt(metricProvider)
+	})
 
 	return s3Client, nil
 }
