@@ -10,13 +10,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ram"
 	"github.com/aws/aws-sdk-go-v2/service/route53resolver"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	awsv1 "github.com/aws/aws-sdk-go/aws"
 	stscredsv1 "github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/request"
 	awssession "github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ram"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/smithy-go/metrics/smithyotelmetrics"
@@ -147,15 +147,21 @@ func (c *Clients) NewRAMClientWithExternalId(region, arn, externalId string) (re
 	return &RAM{client: client}, nil
 }
 
-func (c *Clients) newRAMClient(region, arn, externalId string) (*ram.RAM, error) {
-	session, err := c.sessionFromRegion(region)
+func (c *Clients) newRAMClient(region, roleArn, externalId string) (*ram.Client, error) {
+	conf, err := c.configFromRegion(region)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	ramClient := ram.New(session, &awsv1.Config{Credentials: stscredsv1.NewCredentials(session, arn, configureExternalId(arn, externalId))})
-	ramClient.Handlers.Build.PushFront(request.MakeAddToUserAgentHandler(controllerName, currentCommit))
-	ramClient.Handlers.CompleteAttempt.PushFront(captureRequestMetrics(controllerName))
+	ramClient := ram.NewFromConfig(conf, func(o *ram.Options) {
+		o.Credentials = aws.NewCredentialsCache(
+			stscreds.NewAssumeRoleProvider(sts.NewFromConfig(conf), roleArn, func(aro *stscreds.AssumeRoleOptions) {
+				aro.ExternalID = aws.String(externalId)
+			}),
+		)
+		o.AppID = appID
+		o.MeterProvider = smithyotelmetrics.Adapt(metricProvider)
+	})
 
 	return ramClient, nil
 }
