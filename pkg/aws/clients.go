@@ -9,13 +9,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/route53resolver"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	awsv1 "github.com/aws/aws-sdk-go/aws"
 	stscredsv1 "github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/request"
 	awssession "github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ram"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -45,6 +45,7 @@ var (
 
 		return ""
 	}()
+	appID = fmt.Sprintf("%s/%s", controllerName, currentCommit)
 )
 
 func NewClients(endpoint string) *Clients {
@@ -56,11 +57,12 @@ func (c *Clients) NewResolverClient(region, roleToAssume string) (resolver.Resol
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
+
 	client := route53resolver.NewFromConfig(conf, func(o *route53resolver.Options) {
 		o.Credentials = aws.NewCredentialsCache(
 			stscreds.NewAssumeRoleProvider(sts.NewFromConfig(conf), roleToAssume),
 		)
-		o.AppID = fmt.Sprintf("%s/%s", controllerName, currentCommit)
+		o.AppID = appID
 		o.MeterProvider = smithyotelmetrics.Adapt(metricProvider)
 	})
 
@@ -83,7 +85,7 @@ func (c *Clients) NewResolverClientWithExternalId(region, roleToAssume, external
 				aro.ExternalID = aws.String(externalId)
 			}),
 		)
-		o.AppID = fmt.Sprintf("%s/%s", controllerName, currentCommit)
+		o.AppID = appID
 		o.MeterProvider = smithyotelmetrics.Adapt(metricProvider)
 	})
 
@@ -108,15 +110,21 @@ func (c *Clients) NewEC2ClientWithExternalId(region, arn, externalId string) (re
 	return &AWSEC2{client: client}, nil
 }
 
-func (c *Clients) newEC2Client(region, arn, externalId string) (*ec2.EC2, error) {
-	session, err := c.sessionFromRegion(region)
+func (c *Clients) newEC2Client(region, roleArn, externalId string) (*ec2.Client, error) {
+	conf, err := c.configFromRegion(region)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	ec2Client := ec2.New(session, &awsv1.Config{Credentials: stscredsv1.NewCredentials(session, arn, configureExternalId(arn, externalId))})
-	ec2Client.Handlers.Build.PushFront(request.MakeAddToUserAgentHandler(controllerName, currentCommit))
-	ec2Client.Handlers.CompleteAttempt.PushFront(captureRequestMetrics(controllerName))
+	ec2Client := ec2.NewFromConfig(conf, func(o *ec2.Options) {
+		o.Credentials = aws.NewCredentialsCache(
+			stscreds.NewAssumeRoleProvider(sts.NewFromConfig(conf), roleArn, func(aro *stscreds.AssumeRoleOptions) {
+				aro.ExternalID = aws.String(externalId)
+			}),
+		)
+		o.AppID = appID
+		o.MeterProvider = smithyotelmetrics.Adapt(metricProvider)
+	})
 
 	return ec2Client, nil
 }
@@ -171,13 +179,13 @@ func (c *Clients) NewS3Client(region, arn string) (resolver.S3Client, error) {
 }
 
 func (c *Clients) NewTransitGatewayClient(region, rolearn string) (resolver.TransitGatewayClient, error) {
-	session, err := c.sessionForRole(rolearn)
+	conf, err := c.configForRole(rolearn)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	ec2Client := ec2.New(session, &awsv1.Config{
-		Region: aws.String(region),
+	ec2Client := ec2.NewFromConfig(conf, func(o *ec2.Options) {
+		o.Region = region
 	})
 
 	return &TransitGateways{
@@ -186,13 +194,13 @@ func (c *Clients) NewTransitGatewayClient(region, rolearn string) (resolver.Tran
 }
 
 func (c *Clients) NewPrefixListClient(region, rolearn string) (resolver.PrefixListClient, error) {
-	session, err := c.sessionForRole(rolearn)
+	conf, err := c.configForRole(rolearn)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	ec2Client := ec2.New(session, &awsv1.Config{
-		Region: aws.String(region),
+	ec2Client := ec2.NewFromConfig(conf, func(o *ec2.Options) {
+		o.Region = region
 	})
 
 	return &PrefixLists{
@@ -201,13 +209,13 @@ func (c *Clients) NewPrefixListClient(region, rolearn string) (resolver.PrefixLi
 }
 
 func (c *Clients) NewRouteTableClient(region, rolearn string) (resolver.RouteTableClient, error) {
-	session, err := c.sessionForRole(rolearn)
+	conf, err := c.configForRole(rolearn)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	ec2Client := ec2.New(session, &awsv1.Config{
-		Region: aws.String(region),
+	ec2Client := ec2.NewFromConfig(conf, func(o *ec2.Options) {
+		o.Region = region
 	})
 
 	return &RouteTableClient{
@@ -282,11 +290,14 @@ func (c *Clients) configForRole(roleArn string) (aws.Config, error) {
 		return emptyConfig, errors.WithStack(err)
 	}
 
-	stsClient := sts.NewFromConfig(defaultConfig, nil)
-	creds := stscreds.NewAssumeRoleProvider(stsClient, roleArn)
+	creds := stscreds.NewAssumeRoleProvider(sts.NewFromConfig(defaultConfig), roleArn)
 
 	conf := defaultConfig.Copy()
 	conf.Credentials = aws.NewCredentialsCache(creds)
+
+	configCache.Store(roleArn, &configCacheEntry{
+		config: conf,
+	})
 	return conf, nil
 }
 

@@ -14,6 +14,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/route53 v1.58.0
 	github.com/aws/aws-sdk-go-v2/service/route53resolver v1.40.2
 	github.com/aws/aws-sdk-go-v2/service/sts v1.38.2
+	github.com/aws/smithy-go v1.23.0
 	github.com/aws/smithy-go/metrics/smithyotelmetrics v1.0.7
 	github.com/blang/semver/v4 v4.0.0
 	github.com/giantswarm/k8smetadata v0.25.0
@@ -51,7 +52,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.6 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.29.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.34.2 // indirect
-	github.com/aws/smithy-go v1.23.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect

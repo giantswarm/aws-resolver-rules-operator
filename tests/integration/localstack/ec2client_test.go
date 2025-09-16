@@ -8,9 +8,12 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 )
 
 var _ = Describe("EC2 client", func() {
+	// TODO: Remove this before merging.
+	format.MaxLength = 0
 
 	var (
 		resolverEndpointsSecurityGroup string
