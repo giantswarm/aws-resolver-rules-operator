@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"log"
 	"net/url"
 	"strconv"
 	"strings"
@@ -9,9 +10,27 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/prometheus/client_golang/prometheus"
+	promprom "github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel/exporters/prometheus"
+	"go.opentelemetry.io/otel/sdk/metric"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
+
+var (
+	metricProvider *metric.MeterProvider
+)
+
+func init() {
+	exporter, err := prometheus.New()
+	if err != nil {
+		log.Fatal(err)
+	}
+	metricProvider = metric.NewMeterProvider(metric.WithReader(exporter))
+
+	// v1 stuff below
+	metrics.Registry.MustRegister(awsRequestCount)
+	metrics.Registry.MustRegister(awsRequestDurationSeconds)
+}
 
 const (
 	metricAWSSubsystem       = "aws"
@@ -26,22 +45,17 @@ const (
 )
 
 var (
-	awsRequestCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+	awsRequestCount = promprom.NewCounterVec(promprom.CounterOpts{
 		Subsystem: metricAWSSubsystem,
 		Name:      metricRequestCountKey,
 		Help:      "Total number of AWS requests",
 	}, []string{metricControllerLabel, metricServiceLabel, metricRegionLabel, metricOperationLabel, metricStatusCodeLabel, metricErrorCodeLabel})
-	awsRequestDurationSeconds = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+	awsRequestDurationSeconds = promprom.NewHistogramVec(promprom.HistogramOpts{
 		Subsystem: metricAWSSubsystem,
 		Name:      metricRequestDurationKey,
 		Help:      "Latency of HTTP requests to AWS",
 	}, []string{metricControllerLabel, metricServiceLabel, metricRegionLabel, metricOperationLabel})
 )
-
-func init() {
-	metrics.Registry.MustRegister(awsRequestCount)
-	metrics.Registry.MustRegister(awsRequestDurationSeconds)
-}
 
 func captureRequestMetrics(controller string) func(r *request.Request) {
 	return func(r *request.Request) {
