@@ -62,7 +62,7 @@ var _ = Describe("RAM client", func() {
 	})
 
 	AfterEach(func() {
-		getResourceShareOutput, err := rawRamClient.GetResourceShares(context.TODO(), &ram.GetResourceSharesInput{
+		getResourceShareOutput, err := rawRamClient.GetResourceShares(ctx, &ram.GetResourceSharesInput{
 			Name:          awssdk.String(name),
 			ResourceOwner: ramtypes.ResourceOwnerSelf,
 		})
@@ -72,13 +72,13 @@ var _ = Describe("RAM client", func() {
 				continue
 			}
 
-			_, err = rawRamClient.DeleteResourceShare(context.TODO(), &ram.DeleteResourceShareInput{
+			_, err = rawRamClient.DeleteResourceShare(ctx, &ram.DeleteResourceShareInput{
 				ResourceShareArn: resourceShare.ResourceShareArn,
 			})
 			Expect(err).NotTo(HaveOccurred())
 		}
 
-		_, err = rawEC2Client.DeleteManagedPrefixList(context.TODO(), &ec2.DeleteManagedPrefixListInput{
+		_, err = rawEC2Client.DeleteManagedPrefixList(ctx, &ec2.DeleteManagedPrefixListInput{
 			PrefixListId: prefixList.PrefixListId,
 		})
 		Expect(err).NotTo(HaveOccurred())

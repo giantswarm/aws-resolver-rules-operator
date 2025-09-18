@@ -56,7 +56,7 @@ var _ = Describe("Transit Gateways", func() {
 	})
 
 	It("creates the transit gateway", func() {
-		output, err := testFixture.EC2Client.DescribeTransitGateways(context.TODO(), &ec2.DescribeTransitGatewaysInput{
+		output, err := testFixture.EC2Client.DescribeTransitGateways(ctx, &ec2.DescribeTransitGatewaysInput{
 			TransitGatewayIds: []string{transitGatewayID},
 		})
 		Expect(err).NotTo(HaveOccurred())
@@ -77,7 +77,7 @@ var _ = Describe("Transit Gateways", func() {
 					},
 				},
 			}
-			describeTGWattachmentOutput, err := testFixture.EC2Client.DescribeTransitGatewayVpcAttachments(context.TODO(), describeTGWattachmentInput)
+			describeTGWattachmentOutput, err := testFixture.EC2Client.DescribeTransitGatewayVpcAttachments(ctx, describeTGWattachmentInput)
 			Expect(err).NotTo(HaveOccurred())
 			return describeTGWattachmentOutput.TransitGatewayVpcAttachments
 		}
@@ -92,7 +92,7 @@ var _ = Describe("Transit Gateways", func() {
 		managementAWSCluster := testFixture.ManagementCluster.AWSCluster
 		prefixListDescription := fmt.Sprintf("CIDR block for cluster %s", managementAWSCluster.Name)
 		Eventually(func(g Gomega) []ec2types.PrefixListEntry {
-			result, err := testFixture.EC2Client.GetManagedPrefixListEntries(context.TODO(), &ec2.GetManagedPrefixListEntriesInput{
+			result, err := testFixture.EC2Client.GetManagedPrefixListEntries(ctx, &ec2.GetManagedPrefixListEntriesInput{
 				PrefixListId: awssdk.String(prefixListID),
 				MaxResults:   awssdk.Int32(100),
 			})
@@ -112,7 +112,7 @@ var _ = Describe("Transit Gateways", func() {
 				subnets = append(subnets, s.ResourceID)
 			}
 
-			routeTablesOutput, err := testFixture.EC2Client.DescribeRouteTables(context.TODO(), &ec2.DescribeRouteTablesInput{
+			routeTablesOutput, err := testFixture.EC2Client.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{
 				Filters: []ec2types.Filter{
 					{Name: awssdk.String("association.subnet-id"), Values: subnets},
 				},

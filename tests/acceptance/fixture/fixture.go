@@ -40,7 +40,9 @@ type Data struct {
 }
 
 func NewFixture(k8sClient client.Client, config Config) *Fixture {
-	cfg, err := awsconfig.LoadDefaultConfig(context.TODO(),
+	ctx := context.Background()
+
+	cfg, err := awsconfig.LoadDefaultConfig(ctx,
 		awsconfig.WithRegion(config.AWSRegion),
 	)
 	Expect(err).NotTo(HaveOccurred())
@@ -157,7 +159,9 @@ func (f *Fixture) Teardown() error {
 }
 
 func (f *Fixture) createNetwork() Network {
-	createVpcOutput, err := f.EC2Client.CreateVpc(context.TODO(), &ec2.CreateVpcInput{
+	ctx := context.Background()
+
+	createVpcOutput, err := f.EC2Client.CreateVpc(ctx, &ec2.CreateVpcInput{
 		CidrBlock: awssdk.String(ClusterVCPCIDR),
 		TagSpecifications: []ec2types.TagSpecification{
 			{
@@ -175,7 +179,7 @@ func (f *Fixture) createNetwork() Network {
 
 	vpcID := *createVpcOutput.Vpc.VpcId
 
-	createSubnetOutput, err := f.EC2Client.CreateSubnet(context.TODO(), &ec2.CreateSubnetInput{
+	createSubnetOutput, err := f.EC2Client.CreateSubnet(ctx, &ec2.CreateSubnetInput{
 		CidrBlock:         awssdk.String(ClusterSubnetCIDR),
 		VpcId:             awssdk.String(vpcID),
 		AvailabilityZone:  awssdk.String(getAvailabilityZone(f.config.AWSRegion)),
@@ -184,14 +188,14 @@ func (f *Fixture) createNetwork() Network {
 	Expect(err).NotTo(HaveOccurred())
 	subnetID := *createSubnetOutput.Subnet.SubnetId
 
-	createRouteTableOutput, err := f.EC2Client.CreateRouteTable(context.TODO(), &ec2.CreateRouteTableInput{
+	createRouteTableOutput, err := f.EC2Client.CreateRouteTable(ctx, &ec2.CreateRouteTableInput{
 		VpcId: awssdk.String(vpcID),
 	})
 	Expect(err).NotTo(HaveOccurred())
 
 	routeTableID := *createRouteTableOutput.RouteTable.RouteTableId
 
-	assocRouteTableOutput, err := f.EC2Client.AssociateRouteTable(context.TODO(), &ec2.AssociateRouteTableInput{
+	assocRouteTableOutput, err := f.EC2Client.AssociateRouteTable(ctx, &ec2.AssociateRouteTableInput{
 		RouteTableId: awssdk.String(routeTableID),
 		SubnetId:     awssdk.String(subnetID),
 	})
