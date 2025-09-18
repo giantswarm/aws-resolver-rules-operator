@@ -15,9 +15,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/route53resolver"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
-	awsv1 "github.com/aws/aws-sdk-go/aws"
-	stscredsv1 "github.com/aws/aws-sdk-go/aws/credentials/stscreds"
-	awssession "github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/smithy-go/metrics/smithyotelmetrics"
 	"github.com/pkg/errors"
 
@@ -266,17 +263,6 @@ func (c *Clients) newS3Client(region, roleArn, externalId string) (*s3.Client, e
 	return s3Client, nil
 }
 
-func configureExternalId(roleArn, externalId string) func(provider *stscredsv1.AssumeRoleProvider) {
-	return func(assumeRoleProvider *stscredsv1.AssumeRoleProvider) {
-		if roleArn != "" {
-			assumeRoleProvider.RoleARN = roleArn
-		}
-		if externalId != "" {
-			assumeRoleProvider.ExternalID = aws.String(externalId)
-		}
-	}
-}
-
 func (c *Clients) config() (aws.Config, error) {
 	if conf, ok := configCache.Load(defaultSessionKey); ok {
 		entry := conf.(*configCacheEntry)
@@ -344,74 +330,4 @@ var configCache sync.Map
 
 type configCacheEntry struct {
 	config aws.Config
-}
-
-func (c *Clients) session() (*awssession.Session, error) {
-	if s, ok := sessionCache.Load(defaultSessionKey); ok {
-		entry := s.(*sessionCacheEntry)
-		return entry.session, nil
-	}
-
-	ns, err := awssession.NewSession(&awsv1.Config{
-		Endpoint: aws.String(c.endpoint),
-	})
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	sessionCache.Store(defaultSessionKey, &sessionCacheEntry{
-		session: ns,
-	})
-	return ns, nil
-}
-
-func (c *Clients) sessionForRole(roleArn string) (*awssession.Session, error) {
-	if s, ok := sessionCache.Load(roleArn); ok {
-		entry := s.(*sessionCacheEntry)
-		return entry.session, nil
-	}
-
-	defaultSession, err := c.session()
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	ns, err := awssession.NewSession(&awsv1.Config{
-		Endpoint:    awsv1.String(c.endpoint),
-		Credentials: stscredsv1.NewCredentials(defaultSession, roleArn),
-	})
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	sessionCache.Store(roleArn, &sessionCacheEntry{
-		session: ns,
-	})
-	return ns, nil
-}
-
-func (c *Clients) sessionFromRegion(region string) (*awssession.Session, error) {
-	if s, ok := sessionCache.Load(region); ok {
-		entry := s.(*sessionCacheEntry)
-		return entry.session, nil
-	}
-
-	ns, err := awssession.NewSession(&awsv1.Config{
-		Region:   aws.String(region),
-		Endpoint: aws.String(c.endpoint),
-	})
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	sessionCache.Store(region, &sessionCacheEntry{
-		session: ns,
-	})
-	return ns, nil
-}
-
-var sessionCache sync.Map
-
-type sessionCacheEntry struct {
-	session *awssession.Session
 }

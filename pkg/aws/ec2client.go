@@ -211,9 +211,7 @@ func (a *AWSEC2) TerminateInstancesByTag(ctx context.Context, logger logr.Logger
 		return nil, errors.WithStack(err)
 	}
 
-	for _, id := range instanceIds {
-		ids = append(ids, id)
-	}
+	ids = append(ids, instanceIds...)
 
 	logger.Info("Successfully requested termination of instances", "count", len(ids), "instances", ids, "tagKey", tagKey, "tagValue", tagValue)
 	return ids, nil

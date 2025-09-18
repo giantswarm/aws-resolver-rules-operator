@@ -3,7 +3,7 @@ package aws
 import (
 	"reflect"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/smithy-go"
 	"github.com/pkg/errors"
 )
 
@@ -17,13 +17,13 @@ const (
 )
 
 func HasErrorCode(err error, code string) bool {
-	var apiError awserr.Error
-	ok := errors.As(err, &apiError)
+	var gae *smithy.GenericAPIError
+	ok := errors.As(err, &gae)
 	if !ok {
 		return false
 	}
 
-	return apiError.Code() == code
+	return gae.Code == code
 }
 
 type TransitGatewayNotReadyError struct{}
