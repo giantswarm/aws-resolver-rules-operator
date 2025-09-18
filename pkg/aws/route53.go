@@ -102,7 +102,7 @@ func (r *Route53) CreateHostedZone(ctx context.Context, logger logr.Logger, dnsZ
 		if err != nil {
 			return "", errors.WithStack(err)
 		}
-		hostedZoneId = *createdHostedZone.HostedZone.Id
+		hostedZoneId = sanitizeZoneId(*createdHostedZone.HostedZone.Id)
 		r.zoneNameToIdCache.SetDefault(dnsZone.DnsName, hostedZoneId)
 	}
 
@@ -177,8 +177,8 @@ func (r *Route53) DeleteHostedZone(ctx context.Context, logger logr.Logger, zone
 
 	_, err := r.client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{Id: awssdk.String(zoneId)})
 	if err != nil {
-		// TODO: Not sure if this is correct
-		if errors.Is(err, &route53types.NoSuchHostedZone{}) {
+		var nshz *route53types.NoSuchHostedZone
+		if errors.As(err, &nshz) {
 			return nil
 		}
 		return errors.WithStack(err)
@@ -273,14 +273,14 @@ func (r *Route53) GetHostedZoneIdByName(ctx context.Context, logger logr.Logger,
 				// We found this zone name already
 				return "", errors.New("found two identical zone names in ListHostedZonesByName response")
 			}
-			foundZoneId = *hostedZone.Id
+			foundZoneId = sanitizeZoneId(*hostedZone.Id)
 		}
 	}
 
 	// If the response was considered fully valid above, cache all returned zones
 	for _, hostedZone := range listResponse.HostedZones {
 		cacheKey := strings.TrimSuffix(*hostedZone.Name, ".")
-		r.zoneNameToIdCache.SetDefault(cacheKey, *hostedZone.Id)
+		r.zoneNameToIdCache.SetDefault(cacheKey, foundZoneId)
 	}
 
 	if foundZoneId == "" {
@@ -491,4 +491,11 @@ func (r *Route53) DeleteDelegationFromParentZone(ctx context.Context, logger log
 	}
 
 	return nil
+}
+
+// sanitizeZoneId cleans up the ID of a Hosted Zone as returned by the AWS API,
+// so that it can be fed back into other API calls. If the ID is already clean,
+// the ID is returned without changes.
+func sanitizeZoneId(zoneId string) string {
+	return strings.TrimPrefix(zoneId, "/hostedzone/")
 }

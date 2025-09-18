@@ -199,7 +199,7 @@ var _ = Describe("Route53 Resolver client", func() {
 		It("returns the id", func() {
 			hostedZoneId, err := route53Client.GetHostedZoneIdByName(ctx, logger, "findid.test.example.com")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(hostedZoneId).To(Equal(*hostedZoneToFind.HostedZone.Id))
+			Expect(hostedZoneId).To(Equal(*trimHostedZonePrefix(hostedZoneToFind.HostedZone.Id)))
 
 			By("looking for a non existing zone, we expect an error")
 			_, err = route53Client.GetHostedZoneIdByName(ctx, logger, "nonexisting.test.example.com.")
