@@ -29,12 +29,12 @@ func (a *AWSEC2) CreateSecurityGroupForResolverEndpoints(ctx context.Context, vp
 		return "", errors.WithStack(err)
 	}
 
-	err = a.authorizeSecurityGroupIngressWithContext(ctx, securityGroupId, "udp", "0.0.0.0/0", DNSPort, tags)
+	err = a.authorizeSecurityGroupIngress(ctx, securityGroupId, "udp", "0.0.0.0/0", DNSPort, tags)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
-	err = a.authorizeSecurityGroupIngressWithContext(ctx, securityGroupId, "tcp", "0.0.0.0/0", DNSPort, tags)
+	err = a.authorizeSecurityGroupIngress(ctx, securityGroupId, "tcp", "0.0.0.0/0", DNSPort, tags)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -121,10 +121,10 @@ func (a *AWSEC2) createSecurityGroup(ctx context.Context, vpcId, groupName strin
 	return *response.GroupId, nil
 }
 
-// authorizeSecurityGroupIngressWithContext adds the specified inbound (ingress) rules to a security group.
+// authorizeSecurityGroupIngress adds the specified inbound (ingress) rules to a security group.
 // It won't return an error if the rule already exists for the security group. Errors can be found here
 // https://docs.aws.amazon.com/AWSEC2/latest/APIReference/errors-overview.html#CommonErrors
-func (a *AWSEC2) authorizeSecurityGroupIngressWithContext(ctx context.Context, securityGroupId, protocol, cidr string, port int32, tags map[string]string) error {
+func (a *AWSEC2) authorizeSecurityGroupIngress(ctx context.Context, securityGroupId, protocol, cidr string, port int32, tags map[string]string) error {
 	_, err := a.client.AuthorizeSecurityGroupIngress(ctx, &ec2.AuthorizeSecurityGroupIngressInput{
 		FromPort:   aws.Int32(port),
 		GroupId:    aws.String(securityGroupId),

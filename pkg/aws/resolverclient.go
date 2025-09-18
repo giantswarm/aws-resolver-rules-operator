@@ -34,12 +34,12 @@ func (a *AWSResolver) CreateResolverRule(ctx context.Context, logger logr.Logger
 	}
 
 	// Otherwise we create it.
-	inboundEndpointId, err := a.createResolverEndpointWithContext(ctx, logger, "INBOUND", getInboundEndpointName(cluster.Name), []string{securityGroupId}, cluster.Subnets, cluster.AdditionalTags)
+	inboundEndpointId, err := a.createResolverEndpoint(ctx, logger, "INBOUND", getInboundEndpointName(cluster.Name), []string{securityGroupId}, cluster.Subnets, cluster.AdditionalTags)
 	if err != nil {
 		return resolver.ResolverRule{}, errors.WithStack(err)
 	}
 
-	outboundEndpointId, err := a.createResolverEndpointWithContext(ctx, logger, "OUTBOUND", getOutboundEndpointName(cluster.Name), []string{securityGroupId}, cluster.Subnets, cluster.AdditionalTags)
+	outboundEndpointId, err := a.createResolverEndpoint(ctx, logger, "OUTBOUND", getOutboundEndpointName(cluster.Name), []string{securityGroupId}, cluster.Subnets, cluster.AdditionalTags)
 	if err != nil {
 		return resolver.ResolverRule{}, errors.WithStack(err)
 	}
@@ -97,10 +97,10 @@ func (a *AWSResolver) createResolverRule(ctx context.Context, logger logr.Logger
 	return resolverRule, nil
 }
 
-// CreateResolverEndpointWithContext creates a Resolver endpoint.
+// createResolverEndpoint creates a Resolver endpoint.
 // It won't return an error if the endpoint already exists. Errors can be found here
 // https://docs.aws.amazon.com/Route53/latest/APIReference/API_route53resolver_CreateResolverEndpoint.html#API_route53resolver_CreateResolverEndpoint_Errors
-func (a *AWSResolver) createResolverEndpointWithContext(ctx context.Context, logger logr.Logger, direction, name string, securityGroupIds, subnetIds []string, tags map[string]string) (string, error) {
+func (a *AWSResolver) createResolverEndpoint(ctx context.Context, logger logr.Logger, direction, name string, securityGroupIds, subnetIds []string, tags map[string]string) (string, error) {
 	resolverEndpoint, err := a.getResolverEndpoint(ctx, name)
 	if err != nil {
 		if !errors.Is(err, &ResolverEndpointNotFoundError{}) {
@@ -254,10 +254,10 @@ func (a *AWSResolver) GetResolverRuleByName(ctx context.Context, resolverRuleNam
 	return resolver.ResolverRule{}, &resolver.ResolverRuleNotFoundError{}
 }
 
-// AssociateResolverRuleWithContext creates an association between a resolver rule and a VPC.
+// AssociateResolverRule creates an association between a resolver rule and a VPC.
 // You cannot associate rules with same domain name with same VPC on AWS, in which case
-// `AssociateResolverRuleWithContext` will log the error and ignore associating the rule with the VPC.
-func (a *AWSResolver) AssociateResolverRuleWithContext(ctx context.Context, logger logr.Logger, associationName, vpcId, resolverRuleId string) error {
+// `AssociateResolverRule` will log the error and ignore associating the rule with the VPC.
+func (a *AWSResolver) AssociateResolverRule(ctx context.Context, logger logr.Logger, associationName, vpcId, resolverRuleId string) error {
 	logger = logger.WithValues("resolverRuleId", resolverRuleId, "vpcId", vpcId, "associationName", associationName)
 
 	logger.Info("Associating Resolver Rule with the VPC")
@@ -287,7 +287,7 @@ func (a *AWSResolver) AssociateResolverRuleWithContext(ctx context.Context, logg
 	return nil
 }
 
-func (a *AWSResolver) DisassociateResolverRuleWithContext(ctx context.Context, logger logr.Logger, vpcID, resolverRuleId string) error {
+func (a *AWSResolver) DisassociateResolverRule(ctx context.Context, logger logr.Logger, vpcID, resolverRuleId string) error {
 	logger = logger.WithValues("resolverRuleId", resolverRuleId, "resolverRuleType", "FORWARD", "vpcId", vpcID)
 
 	logger.Info("Disassociating Resolver Rule from VPC")

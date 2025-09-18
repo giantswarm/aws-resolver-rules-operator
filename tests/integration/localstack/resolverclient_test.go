@@ -245,16 +245,16 @@ var _ = Describe("Route53 Resolver client", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				// Associating once with the VPC should be fine
-				err = resolverClient.AssociateResolverRuleWithContext(ctx, logger, "associationName", VPCId, *createResolverRuleResponse.ResolverRule.Id)
+				err = resolverClient.AssociateResolverRule(ctx, logger, "associationName", VPCId, *createResolverRuleResponse.ResolverRule.Id)
 				Expect(err).NotTo(HaveOccurred())
 				// Associating again should yield no errors
-				err = resolverClient.AssociateResolverRuleWithContext(ctx, logger, "associationName", VPCId, *createResolverRuleResponse.ResolverRule.Id)
+				err = resolverClient.AssociateResolverRule(ctx, logger, "associationName", VPCId, *createResolverRuleResponse.ResolverRule.Id)
 				Expect(err).NotTo(HaveOccurred())
 				// Disassociating should return no errors
-				err = resolverClient.DisassociateResolverRuleWithContext(ctx, logger, VPCId, *createResolverRuleResponse.ResolverRule.Id)
+				err = resolverClient.DisassociateResolverRule(ctx, logger, VPCId, *createResolverRuleResponse.ResolverRule.Id)
 				Expect(err).NotTo(HaveOccurred())
 				// Disassociating again should return no errors
-				err = resolverClient.DisassociateResolverRuleWithContext(ctx, logger, VPCId, *createResolverRuleResponse.ResolverRule.Id)
+				err = resolverClient.DisassociateResolverRule(ctx, logger, VPCId, *createResolverRuleResponse.ResolverRule.Id)
 				Expect(err).NotTo(HaveOccurred())
 				// Deleting the resolver rule should work after disassociating it from the VPC
 				err = resolverClient.DeleteResolverRule(ctx, logger, cluster, *createResolverRuleResponse.ResolverRule.Id)
