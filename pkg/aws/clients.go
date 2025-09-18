@@ -78,7 +78,9 @@ func (c *Clients) NewResolverClientWithExternalId(region, roleToAssume, external
 	client := route53resolver.NewFromConfig(conf, func(o *route53resolver.Options) {
 		o.Credentials = aws.NewCredentialsCache(
 			stscreds.NewAssumeRoleProvider(sts.NewFromConfig(conf), externalRoleToAssume, func(aro *stscreds.AssumeRoleOptions) {
-				aro.ExternalID = aws.String(externalId)
+				if externalId != "" {
+					aro.ExternalID = aws.String(externalId)
+				}
 			}),
 		)
 		o.AppID = appID
@@ -115,7 +117,9 @@ func (c *Clients) newEC2Client(region, roleArn, externalId string) (*ec2.Client,
 	ec2Client := ec2.NewFromConfig(conf, func(o *ec2.Options) {
 		o.Credentials = aws.NewCredentialsCache(
 			stscreds.NewAssumeRoleProvider(sts.NewFromConfig(conf), roleArn, func(aro *stscreds.AssumeRoleOptions) {
-				aro.ExternalID = aws.String(externalId)
+				if externalId != "" {
+					aro.ExternalID = aws.String(externalId)
+				}
 			}),
 		)
 		o.AppID = appID
@@ -152,7 +156,9 @@ func (c *Clients) newRAMClient(region, roleArn, externalId string) (*ram.Client,
 	ramClient := ram.NewFromConfig(conf, func(o *ram.Options) {
 		o.Credentials = aws.NewCredentialsCache(
 			stscreds.NewAssumeRoleProvider(sts.NewFromConfig(conf), roleArn, func(aro *stscreds.AssumeRoleOptions) {
-				aro.ExternalID = aws.String(externalId)
+				if externalId != "" {
+					aro.ExternalID = aws.String(externalId)
+				}
 			}),
 		)
 		o.AppID = appID
@@ -234,7 +240,9 @@ func (c *Clients) newRoute53Client(region, roleArn, externalId string) (*route53
 	route53Client := route53.NewFromConfig(conf, func(o *route53.Options) {
 		o.Credentials = aws.NewCredentialsCache(
 			stscreds.NewAssumeRoleProvider(sts.NewFromConfig(conf), roleArn, func(aro *stscreds.AssumeRoleOptions) {
-				aro.ExternalID = aws.String(externalId)
+				if externalId != "" {
+					aro.ExternalID = aws.String(externalId)
+				}
 			}),
 		)
 		o.AppID = appID
@@ -253,7 +261,9 @@ func (c *Clients) newS3Client(region, roleArn, externalId string) (*s3.Client, e
 	s3Client := s3.NewFromConfig(conf, func(o *s3.Options) {
 		o.Credentials = aws.NewCredentialsCache(
 			stscreds.NewAssumeRoleProvider(sts.NewFromConfig(conf), roleArn, func(aro *stscreds.AssumeRoleOptions) {
-				aro.ExternalID = aws.String(externalId)
+				if externalId != "" {
+					aro.ExternalID = aws.String(externalId)
+				}
 			}),
 		)
 		o.AppID = appID
