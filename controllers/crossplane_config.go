@@ -76,7 +76,7 @@ func (r *CrossplaneClusterConfigReconciler) SetupWithManager(ctx context.Context
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("crossplane-cluster-config").
 		For(&capi.Cluster{}).
-		WithEventFilter(predicates.ResourceNotPaused(logger)).
+		WithEventFilter(predicates.ResourceNotPaused(mgr.GetScheme(), logger)).
 		Complete(r)
 }
 

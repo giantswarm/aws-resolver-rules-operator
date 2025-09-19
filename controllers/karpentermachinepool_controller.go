@@ -685,7 +685,7 @@ func (r *KarpenterMachinePoolReconciler) SetupWithManager(ctx context.Context, m
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("karpentermachinepool").
 		For(&v1alpha1.KarpenterMachinePool{}).
-		WithEventFilter(predicates.ResourceNotPaused(logger)).
+		WithEventFilter(predicates.ResourceNotPaused(mgr.GetScheme(), logger)).
 		Complete(r)
 }
 
