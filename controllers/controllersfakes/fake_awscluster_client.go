@@ -795,26 +795,6 @@ func (fake *FakeAWSClusterClient) UpdateStatusReturnsOnCall(i int, result1 error
 func (fake *FakeAWSClusterClient) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.addFinalizerMutex.RLock()
-	defer fake.addFinalizerMutex.RUnlock()
-	fake.getAWSClusterMutex.RLock()
-	defer fake.getAWSClusterMutex.RUnlock()
-	fake.getClusterMutex.RLock()
-	defer fake.getClusterMutex.RUnlock()
-	fake.getIdentityMutex.RLock()
-	defer fake.getIdentityMutex.RUnlock()
-	fake.getOwnerMutex.RLock()
-	defer fake.getOwnerMutex.RUnlock()
-	fake.markConditionTrueMutex.RLock()
-	defer fake.markConditionTrueMutex.RUnlock()
-	fake.patchClusterMutex.RLock()
-	defer fake.patchClusterMutex.RUnlock()
-	fake.removeFinalizerMutex.RLock()
-	defer fake.removeFinalizerMutex.RUnlock()
-	fake.unpauseMutex.RLock()
-	defer fake.unpauseMutex.RUnlock()
-	fake.updateStatusMutex.RLock()
-	defer fake.updateStatusMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

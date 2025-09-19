@@ -1,6 +1,6 @@
 version: 2.1
 orbs:
-  architect: giantswarm/architect@6.2.1
+  architect: giantswarm/architect@6.6.1
 
 jobs:
   unit-tests:
@@ -74,8 +74,6 @@ workflows:
             only: /^v.*/
 
     - architect/go-build:
-        requires:
-        - hold
         context: architect
         name: go-build
         binary: aws-resolver-rules-operator

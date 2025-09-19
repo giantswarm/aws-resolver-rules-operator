@@ -58,8 +58,8 @@ type ResolverClient interface {
 	GetResolverRuleByName(ctx context.Context, resolverRuleName, resolverRuleType string) (ResolverRule, error)
 	CreateResolverRule(ctx context.Context, logger logr.Logger, cluster Cluster, securityGroupId, domainName, resolverRuleName string) (ResolverRule, error)
 	DeleteResolverRule(ctx context.Context, logger logr.Logger, cluster Cluster, resolverRuleId string) error
-	AssociateResolverRuleWithContext(ctx context.Context, logger logr.Logger, associationName, vpcID, resolverRuleId string) error
-	DisassociateResolverRuleWithContext(ctx context.Context, logger logr.Logger, vpcID, resolverRuleId string) error
+	AssociateResolverRule(ctx context.Context, logger logr.Logger, associationName, vpcID, resolverRuleId string) error
+	DisassociateResolverRule(ctx context.Context, logger logr.Logger, vpcID, resolverRuleId string) error
 	FindResolverRulesByAWSAccountId(ctx context.Context, logger logr.Logger, awsAccountId string) ([]ResolverRule, error)
 	FindResolverRuleIdsAssociatedWithVPCId(ctx context.Context, logger logr.Logger, vpcId string) ([]string, error)
 }

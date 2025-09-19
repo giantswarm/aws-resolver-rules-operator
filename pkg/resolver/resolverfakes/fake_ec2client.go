@@ -261,12 +261,6 @@ func (fake *FakeEC2Client) TerminateInstancesByTagReturnsOnCall(i int, result1 [
 func (fake *FakeEC2Client) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.createSecurityGroupForResolverEndpointsMutex.RLock()
-	defer fake.createSecurityGroupForResolverEndpointsMutex.RUnlock()
-	fake.deleteSecurityGroupForResolverEndpointsMutex.RLock()
-	defer fake.deleteSecurityGroupForResolverEndpointsMutex.RUnlock()
-	fake.terminateInstancesByTagMutex.RLock()
-	defer fake.terminateInstancesByTagMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

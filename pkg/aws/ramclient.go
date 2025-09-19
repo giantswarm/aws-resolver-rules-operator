@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/arn"
-	"github.com/aws/aws-sdk-go/service/ram"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
+	"github.com/aws/aws-sdk-go-v2/service/ram"
+	"github.com/aws/aws-sdk-go-v2/service/ram/types"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -14,10 +15,8 @@ import (
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
 )
 
-const ResourceOwnerSelf = "SELF"
-
 type RAM struct {
-	client *ram.RAM
+	client *ram.Client
 }
 
 func (c *RAM) ApplyResourceShare(ctx context.Context, share resolver.ResourceShare) error {
@@ -50,11 +49,11 @@ func (c *RAM) ApplyResourceShare(ctx context.Context, share resolver.ResourceSha
 	}
 
 	logger.Info("creating resource share")
-	_, err = c.client.CreateResourceShare(&ram.CreateResourceShareInput{
-		AllowExternalPrincipals: awssdk.Bool(true),
-		Name:                    awssdk.String(share.Name),
-		Principals:              awssdk.StringSlice([]string{share.ExternalAccountID}),
-		ResourceArns:            awssdk.StringSlice(share.ResourceArns),
+	_, err = c.client.CreateResourceShare(ctx, &ram.CreateResourceShareInput{
+		AllowExternalPrincipals: aws.Bool(true),
+		Name:                    aws.String(share.Name),
+		Principals:              []string{share.ExternalAccountID},
+		ResourceArns:            share.ResourceArns,
 	})
 	if err != nil {
 		logger.Error(err, "failed to create resource share")
@@ -79,19 +78,19 @@ func (c *RAM) DeleteResourceShare(ctx context.Context, name string) error {
 		return nil
 	}
 
-	_, err = c.client.DeleteResourceShare(&ram.DeleteResourceShareInput{
+	_, err = c.client.DeleteResourceShare(ctx, &ram.DeleteResourceShareInput{
 		ResourceShareArn: resourceShare.ResourceShareArn,
 	})
 	return err
 }
 
-func (c *RAM) getResourceShare(ctx context.Context, name string) (*ram.ResourceShare, error) {
+func (c *RAM) getResourceShare(ctx context.Context, name string) (*types.ResourceShare, error) {
 	logger := c.getLogger(ctx)
 	logger = logger.WithValues("resource-share-name", name)
 
-	resourceShareOutput, err := c.client.GetResourceShares(&ram.GetResourceSharesInput{
-		Name:          awssdk.String(name),
-		ResourceOwner: awssdk.String(ResourceOwnerSelf),
+	resourceShareOutput, err := c.client.GetResourceShares(ctx, &ram.GetResourceSharesInput{
+		Name:          aws.String(name),
+		ResourceOwner: types.ResourceOwnerSelf,
 	})
 	if err != nil {
 		logger.Error(err, "failed to get resource share")
@@ -111,7 +110,7 @@ func (c *RAM) getResourceShare(ctx context.Context, name string) (*ram.ResourceS
 		return nil, err
 	}
 
-	return resourceShares[0], nil
+	return &resourceShares[0], nil
 }
 
 func (c *RAM) getLogger(ctx context.Context) logr.Logger {
@@ -120,8 +119,8 @@ func (c *RAM) getLogger(ctx context.Context) logr.Logger {
 	return logger
 }
 
-func filterDeletedResourceShares(resourceShares []*ram.ResourceShare) []*ram.ResourceShare {
-	filtered := []*ram.ResourceShare{}
+func filterDeletedResourceShares(resourceShares []types.ResourceShare) []types.ResourceShare {
+	filtered := []types.ResourceShare{}
 	for _, share := range resourceShares {
 		if !isResourceShareDeleted(share) {
 			filtered = append(filtered, share)
@@ -131,11 +130,7 @@ func filterDeletedResourceShares(resourceShares []*ram.ResourceShare) []*ram.Res
 	return filtered
 }
 
-func isResourceShareDeleted(resourceShare *ram.ResourceShare) bool {
-	if resourceShare.Status == nil {
-		return false
-	}
-
-	status := *resourceShare.Status
-	return status == ram.ResourceShareStatusDeleted || status == ram.ResourceShareStatusDeleting
+func isResourceShareDeleted(resourceShare types.ResourceShare) bool {
+	status := resourceShare.Status
+	return status == types.ResourceShareStatusDeleted || status == types.ResourceShareStatusDeleting
 }
