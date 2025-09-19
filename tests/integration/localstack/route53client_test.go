@@ -6,8 +6,9 @@ import (
 	"strings"
 	"time"
 
-	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/route53"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
+	route53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -32,7 +33,7 @@ var _ = Describe("Route53 Resolver client", func() {
 			var hostedZoneId string
 
 			AfterEach(func() {
-				_, _ = rawRoute53Client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: awssdk.String(hostedZoneId)})
+				_, _ = rawRoute53Client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{Id: awssdk.String(hostedZoneId)})
 			})
 
 			It("creates a public hosted zone successfully", func() {
@@ -41,24 +42,24 @@ var _ = Describe("Route53 Resolver client", func() {
 
 				var publicListHostedZoneResponse *route53.ListHostedZonesByNameOutput
 				Eventually(func() (int, error) {
-					publicListHostedZoneResponse, err = rawRoute53Client.ListHostedZonesByNameWithContext(ctx, &route53.ListHostedZonesByNameInput{
+					publicListHostedZoneResponse, err = rawRoute53Client.ListHostedZonesByName(ctx, &route53.ListHostedZonesByNameInput{
 						DNSName:  awssdk.String("apublic.test.example.com"),
-						MaxItems: awssdk.String("1"),
+						MaxItems: awssdk.Int32(1),
 					})
 					return len(publicListHostedZoneResponse.HostedZones), err
 				}, "2s", "100ms").Should(Equal(1))
 
-				actualTags, err := rawRoute53Client.ListTagsForResourceWithContext(ctx, &route53.ListTagsForResourceInput{
-					ResourceId:   publicListHostedZoneResponse.HostedZones[0].Id,
-					ResourceType: awssdk.String("hostedzone"),
+				actualTags, err := rawRoute53Client.ListTagsForResource(ctx, &route53.ListTagsForResourceInput{
+					ResourceId:   trimHostedZonePrefix(publicListHostedZoneResponse.HostedZones[0].Id),
+					ResourceType: route53types.TagResourceTypeHostedzone,
 				})
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(actualTags.ResourceTagSet.Tags).To(ContainElement(&route53.Tag{
+				Expect(actualTags.ResourceTagSet.Tags).To(ContainElement(route53types.Tag{
 					Key:   awssdk.String("Name"),
 					Value: awssdk.String("jose"),
 				}))
-				Expect(actualTags.ResourceTagSet.Tags).To(ContainElement(&route53.Tag{
+				Expect(actualTags.ResourceTagSet.Tags).To(ContainElement(route53types.Tag{
 					Key:   awssdk.String("something"),
 					Value: awssdk.String("else"),
 				}))
@@ -67,7 +68,7 @@ var _ = Describe("Route53 Resolver client", func() {
 			When("the hosted zone already exists", func() {
 				BeforeEach(func() {
 					now := time.Now()
-					_, err = rawRoute53Client.CreateHostedZone(&route53.CreateHostedZoneInput{
+					_, err = rawRoute53Client.CreateHostedZone(ctx, &route53.CreateHostedZoneInput{
 						CallerReference: awssdk.String(fmt.Sprintf("1%d", now.UnixNano())),
 						Name:            awssdk.String("already.public.exists.test.example.com"),
 					})
@@ -78,9 +79,9 @@ var _ = Describe("Route53 Resolver client", func() {
 					hostedZoneId, err = route53Client.CreateHostedZone(ctx, logger, resolver.BuildPublicHostedZone("already.public.exists.test.example.com", tags))
 					Expect(err).NotTo(HaveOccurred())
 
-					hostedZoneResponse, err := rawRoute53Client.ListHostedZonesByNameWithContext(ctx, &route53.ListHostedZonesByNameInput{
+					hostedZoneResponse, err := rawRoute53Client.ListHostedZonesByName(ctx, &route53.ListHostedZonesByNameInput{
 						DNSName:  awssdk.String("already.public.exists.test.example.com"),
-						MaxItems: awssdk.String("1"),
+						MaxItems: awssdk.Int32(1),
 					})
 					Expect(err).NotTo(HaveOccurred())
 					Expect(hostedZoneResponse.HostedZones).To(HaveLen(1))
@@ -92,7 +93,7 @@ var _ = Describe("Route53 Resolver client", func() {
 			var hostedZoneId string
 
 			AfterEach(func() {
-				_, _ = rawRoute53Client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: awssdk.String(hostedZoneId)})
+				_, _ = rawRoute53Client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{Id: awssdk.String(hostedZoneId)})
 			})
 
 			It("creates a private hosted zone successfully", func() {
@@ -102,9 +103,9 @@ var _ = Describe("Route53 Resolver client", func() {
 
 				var privateHostedZoneResponse *route53.ListHostedZonesByNameOutput
 				Eventually(func() (string, error) {
-					privateHostedZoneResponse, err = rawRoute53Client.ListHostedZonesByNameWithContext(ctx, &route53.ListHostedZonesByNameInput{
+					privateHostedZoneResponse, err = rawRoute53Client.ListHostedZonesByName(ctx, &route53.ListHostedZonesByNameInput{
 						DNSName:  awssdk.String("aprivate.test.example.com"),
-						MaxItems: awssdk.String("1"),
+						MaxItems: awssdk.Int32(1),
 					})
 					if len(privateHostedZoneResponse.HostedZones) > 0 {
 						return *privateHostedZoneResponse.HostedZones[0].Name, err
@@ -112,26 +113,26 @@ var _ = Describe("Route53 Resolver client", func() {
 					return "no_what_we_are_looking_for", nil
 				}, "3s", "100ms").Should(Equal("aprivate.test.example.com."))
 
-				actualTags, err := rawRoute53Client.ListTagsForResourceWithContext(ctx, &route53.ListTagsForResourceInput{
-					ResourceId:   privateHostedZoneResponse.HostedZones[0].Id,
-					ResourceType: awssdk.String("hostedzone"),
+				actualTags, err := rawRoute53Client.ListTagsForResource(ctx, &route53.ListTagsForResourceInput{
+					ResourceId:   trimHostedZonePrefix(privateHostedZoneResponse.HostedZones[0].Id),
+					ResourceType: route53types.TagResourceTypeHostedzone,
 				})
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(actualTags.ResourceTagSet.Tags).To(ContainElement(&route53.Tag{
+				Expect(actualTags.ResourceTagSet.Tags).To(ContainElement(route53types.Tag{
 					Key:   awssdk.String("Name"),
 					Value: awssdk.String("jose"),
 				}))
 
-				associatedHostedZones, err := rawRoute53Client.ListHostedZonesByVPCWithContext(ctx, &route53.ListHostedZonesByVPCInput{
+				associatedHostedZones, err := rawRoute53Client.ListHostedZonesByVPC(ctx, &route53.ListHostedZonesByVPCInput{
 					VPCId:     awssdk.String(MCVPCId),
-					VPCRegion: awssdk.String(Region),
+					VPCRegion: route53types.VPCRegion(Region),
 				})
 				Expect(err).NotTo(HaveOccurred())
-				Expect(associatedHostedZones.HostedZoneSummaries).To(ContainElement(&route53.HostedZoneSummary{
-					HostedZoneId: awssdk.String(strings.TrimPrefix(*privateHostedZoneResponse.HostedZones[0].Id, "/hostedzone/")),
+				Expect(associatedHostedZones.HostedZoneSummaries).To(ContainElement(route53types.HostedZoneSummary{
+					HostedZoneId: trimHostedZonePrefix(privateHostedZoneResponse.HostedZones[0].Id),
 					Name:         awssdk.String("aprivate.test.example.com."),
-					Owner: &route53.HostedZoneOwner{
+					Owner: &route53types.HostedZoneOwner{
 						OwningAccount: awssdk.String("000000000000"),
 					},
 				}))
@@ -140,16 +141,16 @@ var _ = Describe("Route53 Resolver client", func() {
 			When("the hosted zone already exists", func() {
 				BeforeEach(func() {
 					now := time.Now()
-					_, err = rawRoute53Client.CreateHostedZone(&route53.CreateHostedZoneInput{
+					_, err = rawRoute53Client.CreateHostedZone(ctx, &route53.CreateHostedZoneInput{
 						CallerReference: awssdk.String(fmt.Sprintf("1%d", now.UnixNano())),
-						HostedZoneConfig: &route53.HostedZoneConfig{
+						HostedZoneConfig: &route53types.HostedZoneConfig{
 							Comment:     awssdk.String("Zone for CAPI cluster"),
-							PrivateZone: awssdk.Bool(true),
+							PrivateZone: true,
 						},
 						Name: awssdk.String("already.private.exists.test.example.com"),
-						VPC: &route53.VPC{
+						VPC: &route53types.VPC{
 							VPCId:     awssdk.String(VPCId),
-							VPCRegion: awssdk.String(Region),
+							VPCRegion: route53types.VPCRegion(Region),
 						},
 					})
 					Expect(err).NotTo(HaveOccurred())
@@ -160,9 +161,9 @@ var _ = Describe("Route53 Resolver client", func() {
 					hostedZoneId, err = route53Client.CreateHostedZone(ctx, logger, dnsZone)
 					Expect(err).NotTo(HaveOccurred())
 
-					hostedZoneResponse, err := rawRoute53Client.ListHostedZonesByNameWithContext(ctx, &route53.ListHostedZonesByNameInput{
+					hostedZoneResponse, err := rawRoute53Client.ListHostedZonesByName(ctx, &route53.ListHostedZonesByNameInput{
 						DNSName:  awssdk.String("already.private.exists.test.example.com"),
-						MaxItems: awssdk.String("1"),
+						MaxItems: awssdk.Int32(1),
 					})
 					Expect(err).NotTo(HaveOccurred())
 					Expect(*hostedZoneResponse.HostedZones[0].Name).To(Equal("already.private.exists.test.example.com."))
@@ -175,13 +176,13 @@ var _ = Describe("Route53 Resolver client", func() {
 		var hostedZoneToFind, differentHostedZoneToFind *route53.CreateHostedZoneOutput
 		BeforeEach(func() {
 			now := time.Now()
-			hostedZoneToFind, err = rawRoute53Client.CreateHostedZone(&route53.CreateHostedZoneInput{
+			hostedZoneToFind, err = rawRoute53Client.CreateHostedZone(ctx, &route53.CreateHostedZoneInput{
 				CallerReference: awssdk.String(fmt.Sprintf("1%d", now.UnixNano())),
 				Name:            awssdk.String("findid.test.example.com"),
 			})
 			Expect(err).NotTo(HaveOccurred())
 
-			differentHostedZoneToFind, err = rawRoute53Client.CreateHostedZone(&route53.CreateHostedZoneInput{
+			differentHostedZoneToFind, err = rawRoute53Client.CreateHostedZone(ctx, &route53.CreateHostedZoneInput{
 				CallerReference: awssdk.String(fmt.Sprintf("1%d", now.UnixNano())),
 				Name:            awssdk.String("different.test.example.com"),
 			})
@@ -189,16 +190,16 @@ var _ = Describe("Route53 Resolver client", func() {
 		})
 
 		AfterEach(func() {
-			_, err = rawRoute53Client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: hostedZoneToFind.HostedZone.Id})
+			_, err = rawRoute53Client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{Id: hostedZoneToFind.HostedZone.Id})
 			Expect(err).NotTo(HaveOccurred())
-			_, err = rawRoute53Client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: differentHostedZoneToFind.HostedZone.Id})
+			_, err = rawRoute53Client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{Id: differentHostedZoneToFind.HostedZone.Id})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("returns the id", func() {
 			hostedZoneId, err := route53Client.GetHostedZoneIdByName(ctx, logger, "findid.test.example.com")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(hostedZoneId).To(Equal(*hostedZoneToFind.HostedZone.Id))
+			Expect(hostedZoneId).To(Equal(*trimHostedZonePrefix(hostedZoneToFind.HostedZone.Id)))
 
 			By("looking for a non existing zone, we expect an error")
 			_, err = route53Client.GetHostedZoneIdByName(ctx, logger, "nonexisting.test.example.com.")
@@ -213,13 +214,13 @@ var _ = Describe("Route53 Resolver client", func() {
 
 		BeforeEach(func() {
 			now := time.Now()
-			parentHostedZoneToFind, err = rawRoute53Client.CreateHostedZone(&route53.CreateHostedZoneInput{
+			parentHostedZoneToFind, err = rawRoute53Client.CreateHostedZone(ctx, &route53.CreateHostedZoneInput{
 				CallerReference: awssdk.String(fmt.Sprintf("1%d", now.UnixNano())),
 				Name:            awssdk.String("test.example.com"),
 			})
 			Expect(err).NotTo(HaveOccurred())
 
-			hostedZoneToFind, err = rawRoute53Client.CreateHostedZone(&route53.CreateHostedZoneInput{
+			hostedZoneToFind, err = rawRoute53Client.CreateHostedZone(ctx, &route53.CreateHostedZoneInput{
 				CallerReference: awssdk.String(fmt.Sprintf("1%d", now.UnixNano())),
 				Name:            awssdk.String("different.test.example.com"),
 			})
@@ -227,22 +228,22 @@ var _ = Describe("Route53 Resolver client", func() {
 		})
 
 		AfterEach(func() {
-			_, err = rawRoute53Client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: parentHostedZoneToFind.HostedZone.Id})
+			_, err = rawRoute53Client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{Id: parentHostedZoneToFind.HostedZone.Id})
 			Expect(err).NotTo(HaveOccurred())
-			_, err = rawRoute53Client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: hostedZoneToFind.HostedZone.Id})
+			_, err = rawRoute53Client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{Id: hostedZoneToFind.HostedZone.Id})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("creates the dns records", func() {
-			listRecordSets, err := rawRoute53Client.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
+			listRecordSets, err := rawRoute53Client.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{
 				HostedZoneId: hostedZoneToFind.HostedZone.Id,
-				MaxItems:     awssdk.String("1"), // First entry is always NS record
+				MaxItems:     awssdk.Int32(1), // First entry is always NS record
 			})
 			Expect(err).NotTo(HaveOccurred())
 
 			record := &resolver.DNSRecord{
 				Name:   *listRecordSets.ResourceRecordSets[0].Name,
-				Kind:   resolver.DnsRecordType(*listRecordSets.ResourceRecordSets[0].Type),
+				Kind:   resolver.DnsRecordType(listRecordSets.ResourceRecordSets[0].Type),
 				Values: []string{},
 			}
 
@@ -253,7 +254,7 @@ var _ = Describe("Route53 Resolver client", func() {
 			err = route53Client.AddDelegationToParentZone(ctx, logger, *parentHostedZoneToFind.HostedZone.Id, record)
 			Expect(err).NotTo(HaveOccurred())
 
-			listParentRecordSets, err := rawRoute53Client.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
+			listParentRecordSets, err := rawRoute53Client.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{
 				HostedZoneId: parentHostedZoneToFind.HostedZone.Id,
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -276,7 +277,7 @@ var _ = Describe("Route53 Resolver client", func() {
 			BeforeEach(func() {
 				now := time.Now()
 
-				hostedZoneToFind, err = rawRoute53Client.CreateHostedZone(&route53.CreateHostedZoneInput{
+				hostedZoneToFind, err = rawRoute53Client.CreateHostedZone(ctx, &route53.CreateHostedZoneInput{
 					CallerReference: awssdk.String(fmt.Sprintf("1%d", now.UnixNano())),
 					Name:            awssdk.String("deleting.test.example.com"),
 				})
@@ -285,7 +286,7 @@ var _ = Describe("Route53 Resolver client", func() {
 
 			AfterEach(func() {
 				// We don't check error here because we actually expect an error since we just removed the hosted zone.
-				_, err = rawRoute53Client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: hostedZoneToFind.HostedZone.Id})
+				_, err = rawRoute53Client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{Id: hostedZoneToFind.HostedZone.Id})
 			})
 
 			It("deletes the zone", func() {
@@ -293,9 +294,9 @@ var _ = Describe("Route53 Resolver client", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				Eventually(func() (int, error) {
-					listHostedZoneResponse, err := rawRoute53Client.ListHostedZonesByName(&route53.ListHostedZonesByNameInput{
+					listHostedZoneResponse, err := rawRoute53Client.ListHostedZonesByName(ctx, &route53.ListHostedZonesByNameInput{
 						DNSName:  awssdk.String("deleting.test.example.com"),
-						MaxItems: awssdk.String("1"),
+						MaxItems: awssdk.Int32(1),
 					})
 					return len(listHostedZoneResponse.HostedZones), err
 				}, "3s", "500ms").Should(BeZero())
@@ -316,27 +317,27 @@ var _ = Describe("Route53 Resolver client", func() {
 
 		BeforeEach(func() {
 			now := time.Now()
-			parentHostedZoneToFind, err = rawRoute53Client.CreateHostedZone(&route53.CreateHostedZoneInput{
+			parentHostedZoneToFind, err = rawRoute53Client.CreateHostedZone(ctx, &route53.CreateHostedZoneInput{
 				CallerReference: awssdk.String(fmt.Sprintf("1%d", now.UnixNano())),
 				Name:            awssdk.String("test.example.com"),
 			})
 			Expect(err).NotTo(HaveOccurred())
 
-			hostedZoneToFind, err = rawRoute53Client.CreateHostedZone(&route53.CreateHostedZoneInput{
+			hostedZoneToFind, err = rawRoute53Client.CreateHostedZone(ctx, &route53.CreateHostedZoneInput{
 				CallerReference: awssdk.String(fmt.Sprintf("1%d", now.UnixNano())),
 				Name:            awssdk.String("different.test.example.com"),
 			})
 			Expect(err).NotTo(HaveOccurred())
 
-			listRecordSets, err := rawRoute53Client.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
+			listRecordSets, err := rawRoute53Client.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{
 				HostedZoneId: hostedZoneToFind.HostedZone.Id,
-				MaxItems:     awssdk.String("1"), // First entry is always NS record
+				MaxItems:     awssdk.Int32(1), // First entry is always NS record
 			})
 			Expect(err).NotTo(HaveOccurred())
 
 			record := &resolver.DNSRecord{
 				Name:   *listRecordSets.ResourceRecordSets[0].Name,
-				Kind:   resolver.DnsRecordType(*listRecordSets.ResourceRecordSets[0].Type),
+				Kind:   resolver.DnsRecordType(listRecordSets.ResourceRecordSets[0].Type),
 				Values: []string{},
 			}
 
@@ -350,22 +351,22 @@ var _ = Describe("Route53 Resolver client", func() {
 		})
 
 		AfterEach(func() {
-			_, err = rawRoute53Client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: parentHostedZoneToFind.HostedZone.Id})
+			_, err = rawRoute53Client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{Id: parentHostedZoneToFind.HostedZone.Id})
 			Expect(err).NotTo(HaveOccurred())
-			_, err = rawRoute53Client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: hostedZoneToFind.HostedZone.Id})
+			_, err = rawRoute53Client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{Id: hostedZoneToFind.HostedZone.Id})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("deletes the delegation from the parent zone", func() {
-			listRecordSets, err := rawRoute53Client.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
+			listRecordSets, err := rawRoute53Client.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{
 				HostedZoneId: hostedZoneToFind.HostedZone.Id,
-				MaxItems:     awssdk.String("1"), // First entry is always NS record
+				MaxItems:     awssdk.Int32(1), // First entry is always NS record
 			})
 			Expect(err).NotTo(HaveOccurred())
 
 			record := &resolver.DNSRecord{
 				Name:   *listRecordSets.ResourceRecordSets[0].Name,
-				Kind:   resolver.DnsRecordType(*listRecordSets.ResourceRecordSets[0].Type),
+				Kind:   resolver.DnsRecordType(listRecordSets.ResourceRecordSets[0].Type),
 				Values: []string{},
 			}
 
@@ -375,7 +376,7 @@ var _ = Describe("Route53 Resolver client", func() {
 			err = route53Client.DeleteDelegationFromParentZone(ctx, logger, *parentHostedZoneToFind.HostedZone.Id, record)
 			Expect(err).NotTo(HaveOccurred())
 
-			listParentRecordSets, err := rawRoute53Client.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
+			listParentRecordSets, err := rawRoute53Client.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{
 				HostedZoneId: parentHostedZoneToFind.HostedZone.Id,
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -396,7 +397,7 @@ var _ = Describe("Route53 Resolver client", func() {
 		BeforeEach(func() {
 			now := time.Now()
 
-			hostedZoneToFind, err = rawRoute53Client.CreateHostedZone(&route53.CreateHostedZoneInput{
+			hostedZoneToFind, err = rawRoute53Client.CreateHostedZone(ctx, &route53.CreateHostedZoneInput{
 				CallerReference: awssdk.String(fmt.Sprintf("1%d", now.UnixNano())),
 				Name:            awssdk.String("deleting.test.example.com"),
 			})
@@ -405,7 +406,7 @@ var _ = Describe("Route53 Resolver client", func() {
 
 		AfterEach(func() {
 			// We don't check error here because we actually expect an error since we just removed the hosted zone.
-			_, err = rawRoute53Client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: hostedZoneToFind.HostedZone.Id})
+			_, err = rawRoute53Client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{Id: hostedZoneToFind.HostedZone.Id})
 		})
 
 		It("deletes the zone", func() {
@@ -413,9 +414,9 @@ var _ = Describe("Route53 Resolver client", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() (int, error) {
-				listHostedZoneResponse, err := rawRoute53Client.ListHostedZonesByName(&route53.ListHostedZonesByNameInput{
+				listHostedZoneResponse, err := rawRoute53Client.ListHostedZonesByName(ctx, &route53.ListHostedZonesByNameInput{
 					DNSName:  awssdk.String("deleting.test.example.com"),
-					MaxItems: awssdk.String("1"),
+					MaxItems: awssdk.Int32(1),
 				})
 				return len(listHostedZoneResponse.HostedZones), err
 			}, "3s", "100ms").Should(BeZero())
@@ -428,7 +429,7 @@ var _ = Describe("Route53 Resolver client", func() {
 		BeforeEach(func() {
 			now := time.Now()
 
-			hostedZoneToFind, err = rawRoute53Client.CreateHostedZone(&route53.CreateHostedZoneInput{
+			hostedZoneToFind, err = rawRoute53Client.CreateHostedZone(ctx, &route53.CreateHostedZoneInput{
 				CallerReference: awssdk.String(fmt.Sprintf("1%d", now.UnixNano())),
 				Name:            awssdk.String("dnsrecords.example.com"),
 			})
@@ -436,20 +437,20 @@ var _ = Describe("Route53 Resolver client", func() {
 		})
 
 		AfterEach(func() {
-			foundDnsRecordsResponse, err := rawRoute53Client.ListResourceRecordSetsWithContext(ctx, &route53.ListResourceRecordSetsInput{
+			foundDnsRecordsResponse, err := rawRoute53Client.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{
 				HostedZoneId: hostedZoneToFind.HostedZone.Id,
 			})
 			Expect(err).NotTo(HaveOccurred())
 
 			for _, recordSet := range foundDnsRecordsResponse.ResourceRecordSets {
 				// We don't need to remove NS or SOA records.
-				if *recordSet.Type == "CNAME" || *recordSet.Type == "A" {
-					_, err = rawRoute53Client.ChangeResourceRecordSetsWithContext(ctx, &route53.ChangeResourceRecordSetsInput{
-						ChangeBatch: &route53.ChangeBatch{
-							Changes: []*route53.Change{
+				if recordSet.Type == route53types.RRTypeCname || recordSet.Type == route53types.RRTypeA {
+					_, err = rawRoute53Client.ChangeResourceRecordSets(ctx, &route53.ChangeResourceRecordSetsInput{
+						ChangeBatch: &route53types.ChangeBatch{
+							Changes: []route53types.Change{
 								{
-									Action:            awssdk.String("DELETE"),
-									ResourceRecordSet: recordSet,
+									Action:            route53types.ChangeActionDelete,
+									ResourceRecordSet: &recordSet,
 								},
 							},
 						},
@@ -459,7 +460,7 @@ var _ = Describe("Route53 Resolver client", func() {
 				}
 			}
 
-			_, err = rawRoute53Client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: hostedZoneToFind.HostedZone.Id})
+			_, err = rawRoute53Client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{Id: hostedZoneToFind.HostedZone.Id})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -480,7 +481,7 @@ var _ = Describe("Route53 Resolver client", func() {
 			err = route53Client.AddDnsRecordsToHostedZone(ctx, logger, *hostedZoneToFind.HostedZone.Id, dnsRecordsToCreate)
 			Expect(err).NotTo(HaveOccurred())
 
-			foundDnsRecordsResponse, err := rawRoute53Client.ListResourceRecordSetsWithContext(ctx, &route53.ListResourceRecordSetsInput{
+			foundDnsRecordsResponse, err := rawRoute53Client.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{
 				HostedZoneId: hostedZoneToFind.HostedZone.Id,
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -523,7 +524,7 @@ var _ = Describe("Route53 Resolver client", func() {
 		BeforeEach(func() {
 			now := time.Now()
 
-			hostedZoneToFind, err = rawRoute53Client.CreateHostedZone(&route53.CreateHostedZoneInput{
+			hostedZoneToFind, err = rawRoute53Client.CreateHostedZone(ctx, &route53.CreateHostedZoneInput{
 				CallerReference: awssdk.String(fmt.Sprintf("1%d", now.UnixNano())),
 				Name:            awssdk.String("dnsrecordstodelete.example.com"),
 			})
@@ -547,20 +548,20 @@ var _ = Describe("Route53 Resolver client", func() {
 		})
 
 		AfterEach(func() {
-			foundDnsRecordsResponse, err := rawRoute53Client.ListResourceRecordSetsWithContext(ctx, &route53.ListResourceRecordSetsInput{
+			foundDnsRecordsResponse, err := rawRoute53Client.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{
 				HostedZoneId: hostedZoneToFind.HostedZone.Id,
 			})
 			Expect(err).NotTo(HaveOccurred())
 
 			for _, recordSet := range foundDnsRecordsResponse.ResourceRecordSets {
 				// We don't need to remove NS or SOA records.
-				if *recordSet.Type == "CNAME" || *recordSet.Type == "A" {
-					_, err = rawRoute53Client.ChangeResourceRecordSetsWithContext(ctx, &route53.ChangeResourceRecordSetsInput{
-						ChangeBatch: &route53.ChangeBatch{
-							Changes: []*route53.Change{
+				if recordSet.Type == route53types.RRTypeCname || recordSet.Type == route53types.RRTypeA {
+					_, err = rawRoute53Client.ChangeResourceRecordSets(ctx, &route53.ChangeResourceRecordSetsInput{
+						ChangeBatch: &route53types.ChangeBatch{
+							Changes: []route53types.Change{
 								{
-									Action:            awssdk.String("DELETE"),
-									ResourceRecordSet: recordSet,
+									Action:            route53types.ChangeActionDelete,
+									ResourceRecordSet: &recordSet,
 								},
 							},
 						},
@@ -570,7 +571,7 @@ var _ = Describe("Route53 Resolver client", func() {
 				}
 			}
 
-			_, err = rawRoute53Client.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{Id: hostedZoneToFind.HostedZone.Id})
+			_, err = rawRoute53Client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{Id: hostedZoneToFind.HostedZone.Id})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -578,7 +579,7 @@ var _ = Describe("Route53 Resolver client", func() {
 			err = route53Client.DeleteDnsRecordsFromHostedZone(ctx, logger, *hostedZoneToFind.HostedZone.Id)
 			Expect(err).NotTo(HaveOccurred())
 
-			foundDnsRecordsResponse, err := rawRoute53Client.ListResourceRecordSetsWithContext(ctx, &route53.ListResourceRecordSetsInput{
+			foundDnsRecordsResponse, err := rawRoute53Client.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{
 				HostedZoneId: hostedZoneToFind.HostedZone.Id,
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -587,3 +588,7 @@ var _ = Describe("Route53 Resolver client", func() {
 		})
 	})
 })
+
+func trimHostedZonePrefix(id *string) *string {
+	return awssdk.String(strings.TrimPrefix(*id, "/hostedzone/"))
+}

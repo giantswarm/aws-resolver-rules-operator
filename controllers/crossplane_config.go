@@ -23,7 +23,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws/arn"
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -518,12 +518,12 @@ func (r *CrossplaneClusterConfigReconciler) updateProviderConfig(ctx context.Con
 	return nil
 }
 
-func (r *CrossplaneClusterConfigReconciler) getProviderConfigSpec(accountID, region, providerRole string) map[string]interface{} {
+func (r *CrossplaneClusterConfigReconciler) getProviderConfigSpec(accountID, region, providerRole string) map[string]any {
 	partition := getPartition(region)
-	return map[string]interface{}{
-		"credentials": map[string]interface{}{
+	return map[string]any{
+		"credentials": map[string]any{
 			"source": "WebIdentity",
-			"webIdentity": map[string]interface{}{
+			"webIdentity": map[string]any{
 				"roleARN": fmt.Sprintf("arn:%s:iam::%s:role/%s", partition, accountID, providerRole),
 			},
 		},
@@ -556,8 +556,8 @@ func getConfigMapValues(clusterInfo *ClusterInfo, accountID, baseDomain string) 
 
 func getProviderConfig(name string, namespace string) *unstructured.Unstructured {
 	providerConfig := &unstructured.Unstructured{}
-	providerConfig.Object = map[string]interface{}{
-		"metadata": map[string]interface{}{
+	providerConfig.Object = map[string]any{
+		"metadata": map[string]any{
 			"name":      name,
 			"namespace": namespace,
 		},

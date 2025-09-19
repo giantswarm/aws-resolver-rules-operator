@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/arn"
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/giantswarm/k8smetadata/pkg/annotation"
 	"github.com/pkg/errors"
 	k8stypes "k8s.io/apimachinery/pkg/types"

@@ -4,12 +4,13 @@ import (
 	"context"
 	"time"
 
-	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/ram"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/ram"
+	ramtypes "github.com/aws/aws-sdk-go-v2/service/ram/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	. "github.com/onsi/gomega/gstruct"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/aws-resolver-rules-operator/pkg/aws"
@@ -23,7 +24,7 @@ var _ = Describe("RAM client", func() {
 
 		name       string
 		share      resolver.ResourceShare
-		prefixList *ec2.ManagedPrefixList
+		prefixList *ec2types.ManagedPrefixList
 
 		ramClient resolver.RAMClient
 	)
@@ -33,10 +34,10 @@ var _ = Describe("RAM client", func() {
 		// principal are in a final state like Associated. If we don't
 		// wait for this state the tests will flake
 		Eventually(getResourceAssociationStatus(name, prefixList)).
-			Should(PointTo(Equal(ram.ResourceShareAssociationStatusAssociated)))
+			Should(Equal(ramtypes.ResourceShareAssociationStatusAssociated))
 
 		Eventually(getPrincipalAssociationStatus(name)).
-			Should(PointTo(Equal(ram.ResourceShareAssociationStatusAssociated)))
+			Should(Equal(ramtypes.ResourceShareAssociationStatusAssociated))
 	}
 
 	BeforeEach(func() {
@@ -61,9 +62,9 @@ var _ = Describe("RAM client", func() {
 	})
 
 	AfterEach(func() {
-		getResourceShareOutput, err := rawRamClient.GetResourceShares(&ram.GetResourceSharesInput{
+		getResourceShareOutput, err := rawRamClient.GetResourceShares(ctx, &ram.GetResourceSharesInput{
 			Name:          awssdk.String(name),
-			ResourceOwner: awssdk.String(aws.ResourceOwnerSelf),
+			ResourceOwner: ramtypes.ResourceOwnerSelf,
 		})
 		Expect(err).NotTo(HaveOccurred())
 		for _, resourceShare := range getResourceShareOutput.ResourceShares {
@@ -71,13 +72,15 @@ var _ = Describe("RAM client", func() {
 				continue
 			}
 
-			_, err = rawRamClient.DeleteResourceShare(&ram.DeleteResourceShareInput{
+			_, err = rawRamClient.DeleteResourceShare(ctx, &ram.DeleteResourceShareInput{
 				ResourceShareArn: resourceShare.ResourceShareArn,
 			})
 			Expect(err).NotTo(HaveOccurred())
 		}
 
-		_, err = rawEC2Client.DeleteManagedPrefixList(&ec2.DeleteManagedPrefixListInput{PrefixListId: prefixList.PrefixListId})
+		_, err = rawEC2Client.DeleteManagedPrefixList(ctx, &ec2.DeleteManagedPrefixListInput{
+			PrefixListId: prefixList.PrefixListId,
+		})
 		Expect(err).NotTo(HaveOccurred())
 	})
 
