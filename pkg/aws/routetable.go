@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/smithy-go"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -19,11 +20,11 @@ type RouteTable struct {
 }
 
 type RouteTableClient struct {
-	client *ec2.EC2
+	client *ec2.Client
 }
 
 func (r *RouteTableClient) createRoute(ctx context.Context, routeTableId, prefixListID, transitGatewayID string) error {
-	if _, err := r.client.CreateRouteWithContext(ctx, &ec2.CreateRouteInput{
+	if _, err := r.client.CreateRoute(ctx, &ec2.CreateRouteInput{
 		RouteTableId:            aws.String(routeTableId),
 		DestinationPrefixListId: aws.String(prefixListID),
 		TransitGatewayId:        aws.String(transitGatewayID),
@@ -34,28 +35,26 @@ func (r *RouteTableClient) createRoute(ctx context.Context, routeTableId, prefix
 }
 
 func (r *RouteTableClient) deleteRoute(ctx context.Context, routeTableId, prefixListID string) error {
-	if _, err := r.client.DeleteRouteWithContext(ctx, &ec2.DeleteRouteInput{
+	if _, err := r.client.DeleteRoute(ctx, &ec2.DeleteRouteInput{
 		RouteTableId:            aws.String(routeTableId),
 		DestinationPrefixListId: aws.String(prefixListID),
 	}); err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case "InvalidRoute.NotFound":
+		var gae *smithy.GenericAPIError
+		if errors.As(err, &gae) {
+			if gae.Code == "InvalidRoute.NotFound" {
 				return nil
-			default:
-				return errors.WithStack(err)
 			}
 		}
-		return err
+		return errors.WithStack(err)
 	}
 	return nil
 }
 
-func (r *RouteTableClient) getRouteTables(ctx context.Context, filter resolver.Filter) ([]*ec2.RouteTable, error) {
+func (r *RouteTableClient) getRouteTables(ctx context.Context, filter resolver.Filter) ([]ec2types.RouteTable, error) {
 	filterName := "association.subnet-id"
-	output, err := r.client.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{
-		Filters: []*ec2.Filter{
-			{Name: &filterName, Values: aws.StringSlice(filter)},
+	output, err := r.client.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{
+		Filters: []ec2types.Filter{
+			{Name: &filterName, Values: filter},
 		},
 	})
 	if err != nil {
@@ -110,7 +109,7 @@ func (r *RouteTableClient) RemoveRoutes(ctx context.Context, rule resolver.Route
 	return nil
 }
 
-func routeExists(routes []*ec2.Route, targetRoute resolver.RouteRule) bool {
+func routeExists(routes []ec2types.Route, targetRoute resolver.RouteRule) bool {
 	for _, route := range routes {
 		if route.DestinationPrefixListId != nil && route.TransitGatewayId != nil && *route.DestinationPrefixListId == targetRoute.DestinationPrefixListId && *route.TransitGatewayId == targetRoute.TransitGatewayId {
 			return true

@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/pkg/errors"
 
 	gserrors "github.com/aws-resolver-rules-operator/pkg/errors"
@@ -26,7 +27,7 @@ func clusterTag(name string) string {
 }
 
 type TransitGateways struct {
-	ec2 *ec2.EC2
+	ec2 *ec2.Client
 }
 
 func (t *TransitGateways) Apply(ctx context.Context, name string, tags map[string]string) (string, error) {
@@ -75,7 +76,7 @@ func (t *TransitGateways) Detach(ctx context.Context, attachment resolver.Transi
 		return nil
 	}
 
-	_, err = t.ec2.DeleteTransitGatewayVpcAttachmentWithContext(ctx, &ec2.DeleteTransitGatewayVpcAttachmentInput{
+	_, err = t.ec2.DeleteTransitGatewayVpcAttachment(ctx, &ec2.DeleteTransitGatewayVpcAttachmentInput{
 		TransitGatewayAttachmentId: vpcAttachment.TransitGatewayAttachmentId,
 	})
 	return errors.WithStack(err)
@@ -94,9 +95,9 @@ func (t *TransitGateways) Delete(ctx context.Context, name string) error {
 	return t.delete(ctx, gateway)
 }
 
-func (t *TransitGateways) delete(ctx context.Context, gateway *ec2.TransitGateway) error {
+func (t *TransitGateways) delete(ctx context.Context, gateway *ec2types.TransitGateway) error {
 	id := gateway.TransitGatewayId
-	_, err := t.ec2.DeleteTransitGateway(&ec2.DeleteTransitGatewayInput{
+	_, err := t.ec2.DeleteTransitGateway(ctx, &ec2.DeleteTransitGatewayInput{
 		TransitGatewayId: id,
 	})
 	if HasErrorCode(err, ErrIncorrectState) {
@@ -109,18 +110,18 @@ func (t *TransitGateways) delete(ctx context.Context, gateway *ec2.TransitGatewa
 	return errors.WithStack(err)
 }
 
-func (t *TransitGateways) get(ctx context.Context, name string) (*ec2.TransitGateway, error) {
+func (t *TransitGateways) get(ctx context.Context, name string) (*ec2types.TransitGateway, error) {
 	nameTag := "tag:" + clusterTag(name)
 	input := &ec2.DescribeTransitGatewaysInput{
-		Filters: []*ec2.Filter{
+		Filters: []ec2types.Filter{
 			{
 				Name:   awssdk.String(nameTag),
-				Values: awssdk.StringSlice([]string{clusterTagValue}),
+				Values: []string{clusterTagValue},
 			},
 		},
 	}
 
-	out, err := t.ec2.DescribeTransitGatewaysWithContext(ctx, input)
+	out, err := t.ec2.DescribeTransitGateways(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -138,14 +139,14 @@ func (t *TransitGateways) get(ctx context.Context, name string) (*ec2.TransitGat
 		)
 	}
 
-	return gateways[0], nil
+	return &gateways[0], nil
 }
 
 func (t *TransitGateways) create(ctx context.Context, name string, tags map[string]string) (string, error) {
 	ec2tags := getEc2Tags(tags)
 	// Add cluster tag if not already present
 	if _, ok := tags[clusterTag(name)]; !ok {
-		ec2tags = append(ec2tags, &ec2.Tag{
+		ec2tags = append(ec2tags, ec2types.Tag{
 			Key:   awssdk.String(clusterTag(name)),
 			Value: awssdk.String(clusterTagValue),
 		})
@@ -153,17 +154,17 @@ func (t *TransitGateways) create(ctx context.Context, name string, tags map[stri
 
 	input := &ec2.CreateTransitGatewayInput{
 		Description: awssdk.String(fmt.Sprintf("Transit Gateway for cluster %s", name)),
-		Options: &ec2.TransitGatewayRequestOptions{
-			AutoAcceptSharedAttachments: awssdk.String(ec2.AutoAcceptSharedAttachmentsValueEnable),
+		Options: &ec2types.TransitGatewayRequestOptions{
+			AutoAcceptSharedAttachments: ec2types.AutoAcceptSharedAttachmentsValueEnable,
 		},
-		TagSpecifications: []*ec2.TagSpecification{
+		TagSpecifications: []ec2types.TagSpecification{
 			{
-				ResourceType: awssdk.String(ec2.ResourceTypeTransitGateway),
+				ResourceType: ec2types.ResourceTypeTransitGateway,
 				Tags:         ec2tags,
 			},
 		},
 	}
-	out, err := t.ec2.CreateTransitGatewayWithContext(ctx, input)
+	out, err := t.ec2.CreateTransitGateway(ctx, input)
 	if err != nil {
 		return "", err
 	}
@@ -172,22 +173,22 @@ func (t *TransitGateways) create(ctx context.Context, name string, tags map[stri
 }
 
 func (t *TransitGateways) attach(ctx context.Context, transitGatewayID string, attachment resolver.TransitGatewayAttachment) error {
-	tags := []*ec2.Tag{}
+	tags := []ec2types.Tag{}
 	for key, value := range attachment.Tags {
-		tag := ec2.Tag{
+		tag := ec2types.Tag{
 			Key:   awssdk.String(key),
 			Value: awssdk.String(value),
 		}
-		tags = append(tags, &tag)
+		tags = append(tags, tag)
 	}
 
-	_, err := t.ec2.CreateTransitGatewayVpcAttachmentWithContext(ctx, &ec2.CreateTransitGatewayVpcAttachmentInput{
+	_, err := t.ec2.CreateTransitGatewayVpcAttachment(ctx, &ec2.CreateTransitGatewayVpcAttachmentInput{
 		TransitGatewayId: awssdk.String(transitGatewayID),
 		VpcId:            awssdk.String(attachment.VPCID),
-		SubnetIds:        awssdk.StringSlice(attachment.SubnetIDs),
-		TagSpecifications: []*ec2.TagSpecification{
+		SubnetIds:        attachment.SubnetIDs,
+		TagSpecifications: []ec2types.TagSpecification{
 			{
-				ResourceType: awssdk.String(ec2.ResourceTypeTransitGatewayAttachment),
+				ResourceType: ec2types.ResourceTypeTransitGatewayAttachment,
 				Tags:         tags,
 			},
 		},
@@ -202,20 +203,20 @@ func (t *TransitGateways) attach(ctx context.Context, transitGatewayID string, a
 	return errors.WithStack(err)
 }
 
-func (t *TransitGateways) getAttachment(ctx context.Context, gatewayID, vpcID string) (*ec2.TransitGatewayVpcAttachment, error) {
+func (t *TransitGateways) getAttachment(ctx context.Context, gatewayID, vpcID string) (*ec2types.TransitGatewayVpcAttachment, error) {
 	describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
-		Filters: []*ec2.Filter{
+		Filters: []ec2types.Filter{
 			{
 				Name:   awssdk.String("transit-gateway-id"),
-				Values: awssdk.StringSlice([]string{gatewayID}),
+				Values: []string{gatewayID},
 			},
 			{
 				Name:   awssdk.String("vpc-id"),
-				Values: awssdk.StringSlice([]string{vpcID}),
+				Values: []string{vpcID},
 			},
 		},
 	}
-	attachments, err := t.ec2.DescribeTransitGatewayVpcAttachments(describeTGWattachmentInput)
+	attachments, err := t.ec2.DescribeTransitGatewayVpcAttachments(ctx, describeTGWattachmentInput)
 	if err != nil {
 		return nil, err
 	}
@@ -231,11 +232,11 @@ func (t *TransitGateways) getAttachment(ctx context.Context, gatewayID, vpcID st
 		)
 	}
 
-	return attachments.TransitGatewayVpcAttachments[0], nil
+	return &attachments.TransitGatewayVpcAttachments[0], nil
 }
 
-func filterDeletedTransitGateways(transitGateways []*ec2.TransitGateway) []*ec2.TransitGateway {
-	filtered := []*ec2.TransitGateway{}
+func filterDeletedTransitGateways(transitGateways []ec2types.TransitGateway) []ec2types.TransitGateway {
+	filtered := []ec2types.TransitGateway{}
 	for _, gateway := range transitGateways {
 		if !isTransitGatewayDeleted(gateway) {
 			filtered = append(filtered, gateway)
@@ -245,11 +246,7 @@ func filterDeletedTransitGateways(transitGateways []*ec2.TransitGateway) []*ec2.
 	return filtered
 }
 
-func isTransitGatewayDeleted(transitGateway *ec2.TransitGateway) bool {
-	if transitGateway.State == nil {
-		return false
-	}
-
-	state := *transitGateway.State
-	return state == ec2.TransitGatewayStateDeleted || state == ec2.TransitGatewayStateDeleting
+func isTransitGatewayDeleted(transitGateway ec2types.TransitGateway) bool {
+	state := transitGateway.State
+	return state == ec2types.TransitGatewayStateDeleted || state == ec2types.TransitGatewayStateDeleting
 }

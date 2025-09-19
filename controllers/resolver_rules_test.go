@@ -300,7 +300,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 
 								When("creating ram share resource succeeds", func() {
 									It("associates resolver rule with VPC account", func() {
-										_, _, associationName, vpcId, resolverRuleId := dnsServerResolverClient.AssociateResolverRuleWithContextArgsForCall(0)
+										_, _, associationName, vpcId, resolverRuleId := dnsServerResolverClient.AssociateResolverRuleArgsForCall(0)
 										Expect(associationName).To(Equal(fmt.Sprintf("giantswarm-%s-rr-association", ClusterName)))
 										Expect(vpcId).To(Equal(DnsServerVPCId))
 										Expect(resolverRuleId).To(Equal("resolver-rule-id"))
@@ -308,7 +308,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 
 									When("associating resolver rule with the DNS server VPC fails", func() {
 										BeforeEach(func() {
-											dnsServerResolverClient.AssociateResolverRuleWithContextReturns(errors.New("error associating resolver rule with vpc"))
+											dnsServerResolverClient.AssociateResolverRuleReturns(errors.New("error associating resolver rule with vpc"))
 										})
 
 										It("returns the error", func() {
@@ -341,7 +341,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 								})
 
 								It("it doesn't associate resolver rules and returns error", func() {
-									Expect(resolverClient.AssociateResolverRuleWithContextCallCount()).To(BeZero())
+									Expect(resolverClient.AssociateResolverRuleCallCount()).To(BeZero())
 								})
 
 								It("does not add Condition to AWSCluster to mark that rules got associated", func() {
@@ -361,8 +361,8 @@ var _ = Describe("Resolver rules reconciler", func() {
 								})
 
 								It("does not associate the rules that belong to the WC VPC cidr", func() {
-									Expect(resolverClient.AssociateResolverRuleWithContextCallCount()).To(Equal(4))
-									_, _, associationName, vpcId, resolverRuleId := resolverClient.AssociateResolverRuleWithContextArgsForCall(0)
+									Expect(resolverClient.AssociateResolverRuleCallCount()).To(Equal(4))
+									_, _, associationName, vpcId, resolverRuleId := resolverClient.AssociateResolverRuleArgsForCall(0)
 									Expect(associationName).To(Equal(existingResolverRules[0].Name))
 									Expect(resolverRuleId).To(Equal(existingResolverRules[0].Id))
 									Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
@@ -370,13 +370,13 @@ var _ = Describe("Resolver rules reconciler", func() {
 
 								When("there are errors trying to associate resolver rules", func() {
 									BeforeEach(func() {
-										resolverClient.AssociateResolverRuleWithContextReturnsOnCall(1, errors.New("failed trying to associate resolver rule"))
-										resolverClient.AssociateResolverRuleWithContextReturnsOnCall(2, errors.New("failed trying to associate resolver rule"))
+										resolverClient.AssociateResolverRuleReturnsOnCall(1, errors.New("failed trying to associate resolver rule"))
+										resolverClient.AssociateResolverRuleReturnsOnCall(2, errors.New("failed trying to associate resolver rule"))
 									})
 
 									It("associates resolver rules even when it fails associating some of them ", func() {
-										Expect(resolverClient.AssociateResolverRuleWithContextCallCount()).To(Equal(len(existingResolverRules)))
-										_, _, associationName, vpcId, resolverRuleId := resolverClient.AssociateResolverRuleWithContextArgsForCall(0)
+										Expect(resolverClient.AssociateResolverRuleCallCount()).To(Equal(len(existingResolverRules)))
+										_, _, associationName, vpcId, resolverRuleId := resolverClient.AssociateResolverRuleArgsForCall(0)
 										Expect(associationName).To(Equal(existingResolverRules[0].Name))
 										Expect(resolverRuleId).To(Equal(existingResolverRules[0].Id))
 										Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
@@ -389,8 +389,8 @@ var _ = Describe("Resolver rules reconciler", func() {
 									})
 
 									It("does not associate the rules that are already associated with the workload cluster VPC", func() {
-										Expect(resolverClient.AssociateResolverRuleWithContextCallCount()).To(Equal(2))
-										_, _, associationName, vpcId, resolverRuleId := resolverClient.AssociateResolverRuleWithContextArgsForCall(0)
+										Expect(resolverClient.AssociateResolverRuleCallCount()).To(Equal(2))
+										_, _, associationName, vpcId, resolverRuleId := resolverClient.AssociateResolverRuleArgsForCall(0)
 										Expect(associationName).To(Equal(existingResolverRules[1].Name))
 										Expect(resolverRuleId).To(Equal(existingResolverRules[1].Id))
 										Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
@@ -483,7 +483,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 								})
 
 								It("does not try to delete the resolver rule", func() {
-									Expect(dnsServerResolverClient.DisassociateResolverRuleWithContextCallCount()).To(BeZero())
+									Expect(dnsServerResolverClient.DisassociateResolverRuleCallCount()).To(BeZero())
 									Expect(resolverClient.DeleteResolverRuleCallCount()).To(BeZero())
 									Expect(reconcileErr).NotTo(HaveOccurred())
 								})
@@ -499,14 +499,14 @@ var _ = Describe("Resolver rules reconciler", func() {
 								})
 
 								It("disassociates resolver rule from VPC", func() {
-									_, _, vpcId, resolverRuleId := dnsServerResolverClient.DisassociateResolverRuleWithContextArgsForCall(0)
+									_, _, vpcId, resolverRuleId := dnsServerResolverClient.DisassociateResolverRuleArgsForCall(0)
 									Expect(vpcId).To(Equal(DnsServerVPCId))
 									Expect(resolverRuleId).To(Equal("resolver-rule-id"))
 								})
 
 								When("disassociating resolver rule from VPC fails", func() {
 									BeforeEach(func() {
-										dnsServerResolverClient.DisassociateResolverRuleWithContextReturns(errors.New("failing disassociating resolver rule"))
+										dnsServerResolverClient.DisassociateResolverRuleReturns(errors.New("failing disassociating resolver rule"))
 									})
 
 									It("does not delete the finalizer", func() {
@@ -559,7 +559,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 						When("finding resolver rule associations fails", func() {
 							BeforeEach(func() {
 								resolverClient.FindResolverRuleIdsAssociatedWithVPCIdReturns([]string{}, errors.New("failed trying to get resolver rule associations"))
-								Expect(resolverClient.DisassociateResolverRuleWithContextCallCount()).To(BeZero())
+								Expect(resolverClient.DisassociateResolverRuleCallCount()).To(BeZero())
 							})
 
 							It("does not delete the finalizer", func() {
@@ -572,12 +572,12 @@ var _ = Describe("Resolver rules reconciler", func() {
 							existingResolverRuleAssociations := []string{"a1", "b2"}
 							BeforeEach(func() {
 								resolverClient.FindResolverRuleIdsAssociatedWithVPCIdReturns(existingResolverRuleAssociations, nil)
-								resolverClient.DisassociateResolverRuleWithContextReturnsOnCall(1, errors.New("failed trying to disassociate resolver rule"))
+								resolverClient.DisassociateResolverRuleReturnsOnCall(1, errors.New("failed trying to disassociate resolver rule"))
 							})
 
 							It("disassociates resolver rules from given AWS Account from workload cluster VPC, even if some of them fail", func() {
-								Expect(resolverClient.DisassociateResolverRuleWithContextCallCount()).To(Equal(len(existingResolverRuleAssociations)))
-								_, _, vpcId, resolverRuleId := resolverClient.DisassociateResolverRuleWithContextArgsForCall(0)
+								Expect(resolverClient.DisassociateResolverRuleCallCount()).To(Equal(len(existingResolverRuleAssociations)))
+								_, _, vpcId, resolverRuleId := resolverClient.DisassociateResolverRuleArgsForCall(0)
 								Expect(resolverRuleId).To(Equal(existingResolverRuleAssociations[0]))
 								Expect(vpcId).To(Equal(awsCluster.Spec.NetworkSpec.VPC.ID))
 							})

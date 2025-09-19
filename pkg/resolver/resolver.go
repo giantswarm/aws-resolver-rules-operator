@@ -73,7 +73,7 @@ func (r *Resolver) AssociateResolverRulesInAccountWithClusterVPC(ctx context.Con
 			continue
 		}
 
-		err = resolverClient.AssociateResolverRuleWithContext(ctx, logger, rule.Name, cluster.VPCId, rule.Id)
+		err = resolverClient.AssociateResolverRule(ctx, logger, rule.Name, cluster.VPCId, rule.Id)
 		if err != nil {
 			logger.Error(err, "failed to associate resolver rule to VPC", "resolverRuleId", rule.Id, "resolverRuleArn", rule.Arn, "vpcId", cluster.VPCId)
 			continue
@@ -109,7 +109,7 @@ func (r *Resolver) DisassociateResolverRulesInAccountWithClusterVPC(ctx context.
 
 	for _, resolverRuleId := range resolverRuleAssociations {
 		logger.Info("Disassociating Resolver Rule from VPC", "resolverRuleId", resolverRuleId)
-		err = resolverClient.DisassociateResolverRuleWithContext(ctx, logger, cluster.VPCId, resolverRuleId)
+		err = resolverClient.DisassociateResolverRule(ctx, logger, cluster.VPCId, resolverRuleId)
 		if err != nil {
 			logger.Error(err, "Failed to disassociate Resolver Rule from VPC", "resolverRuleId", resolverRuleId)
 			continue
@@ -151,7 +151,7 @@ func (r *Resolver) DeleteRule(ctx context.Context, logger logr.Logger, cluster C
 	// Only if we found the resolver rule, try to delete it
 	if err == nil {
 		logger.Info("Resolver Rule was found. Let's dissasociate it from workload cluster VPC before removing it")
-		err = dnsServerResolverClient.DisassociateResolverRuleWithContext(ctx, logger, r.dnsServer.VPCId, resolverRule.Id)
+		err = dnsServerResolverClient.DisassociateResolverRule(ctx, logger, r.dnsServer.VPCId, resolverRule.Id)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -224,7 +224,7 @@ func (r *Resolver) associateRule(ctx context.Context, logger logr.Logger, cluste
 		return errors.WithStack(err)
 	}
 
-	err = dnsServerResolverClient.AssociateResolverRuleWithContext(ctx, logger, getAssociationName(cluster.Name), r.dnsServer.VPCId, resolverRule.Id)
+	err = dnsServerResolverClient.AssociateResolverRule(ctx, logger, getAssociationName(cluster.Name), r.dnsServer.VPCId, resolverRule.Id)
 	if err != nil {
 		return errors.WithStack(err)
 	}
