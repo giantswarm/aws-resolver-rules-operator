@@ -1,7 +1,6 @@
 aws:
   accessKeyID: accesskey
   secretAccessKey: secretkey
-  region: region
 
 image:
   registry: gsoci.azurecr.io
