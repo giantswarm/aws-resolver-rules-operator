@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Migrate to AWS SDK for Go v2.
 - Use OpenTelemetry for metrics.
+- Disable `controller-runtime` cache for `ConfigMaps` to decrease memory usage.
 
 ## [0.22.0] - 2025-09-10
 
