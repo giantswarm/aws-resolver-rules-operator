@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use OpenTelemetry for metrics.
 - Disable `controller-runtime` cache for `ConfigMaps` to decrease memory usage.
 
+### Added
+
+- Add a terminationGracePeriod of 30 minutes by default.
+
 ## [0.22.0] - 2025-09-10
 
 ### Changed
