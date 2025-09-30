@@ -580,6 +580,8 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 
 			if karpenterMachinePool.Spec.NodePool.Template.Spec.TerminationGracePeriod != nil {
 				templateSpec["terminationGracePeriod"] = karpenterMachinePool.Spec.NodePool.Template.Spec.TerminationGracePeriod
+			} else {
+				templateSpec["terminationGracePeriod"] = "30m"
 			}
 		}
 
