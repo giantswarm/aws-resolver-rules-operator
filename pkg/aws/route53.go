@@ -280,7 +280,7 @@ func (r *Route53) GetHostedZoneIdByName(ctx context.Context, logger logr.Logger,
 	// If the response was considered fully valid above, cache all returned zones
 	for _, hostedZone := range listResponse.HostedZones {
 		cacheKey := strings.TrimSuffix(*hostedZone.Name, ".")
-		r.zoneNameToIdCache.SetDefault(cacheKey, foundZoneId)
+		r.zoneNameToIdCache.SetDefault(cacheKey, sanitizeZoneId(*hostedZone.Id))
 	}
 
 	if foundZoneId == "" {
