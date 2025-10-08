@@ -12,7 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ram v1.34.6
 	github.com/aws/aws-sdk-go-v2/service/route53 v1.58.4
 	github.com/aws/aws-sdk-go-v2/service/route53resolver v1.40.6
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.88.3
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.88.4
 	github.com/aws/aws-sdk-go-v2/service/sts v1.38.6
 	github.com/aws/smithy-go v1.23.0
 	github.com/aws/smithy-go/metrics/smithyotelmetrics v1.0.7
@@ -52,7 +52,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.9 // indirect
 	github.com/aws/aws-sdk-go-v2/service/eks v1.64.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.8.9 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.9.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.9 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.9 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.29.6 // indirect
