@@ -195,6 +195,59 @@ var _ = Describe("Dns Zone reconciler", func() {
 				})
 			})
 
+			When("a custom delegation identity is specified via annotation", func() {
+				customIdentity := &capa.AWSClusterRoleIdentity{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: ClusterNamespace,
+						Name:      "custom-delegation-identity",
+					},
+					Spec: capa.AWSClusterRoleIdentitySpec{},
+				}
+
+				BeforeEach(func() {
+					awsCluster.Annotations = map[string]string{
+						controllers.DNSDelegationIdentityAnnotation: "custom-delegation-identity",
+					}
+					// First call returns the custom identity for delegation
+					// Second call returns the workload cluster identity
+					clusterClient.GetIdentityReturnsOnCall(0, customIdentity, nil)
+					clusterClient.GetIdentityReturnsOnCall(1, awsClusterRoleIdentity, nil)
+				})
+
+				It("uses the custom identity for DNS delegation", func() {
+					Expect(clusterClient.GetIdentityCallCount()).To(Equal(2))
+					_, identityRef := clusterClient.GetIdentityArgsForCall(0)
+					Expect(identityRef.Name).To(Equal("custom-delegation-identity"))
+				})
+
+				When("the custom identity doesn't exist", func() {
+					expectedError := errors.New("identity not found")
+					BeforeEach(func() {
+						clusterClient.GetIdentityReturnsOnCall(0, nil, expectedError)
+					})
+
+					It("returns an error", func() {
+						Expect(reconcileErr).Should(MatchError(expectedError))
+					})
+				})
+			})
+
+			When("no custom delegation identity is specified", func() {
+				BeforeEach(func() {
+					// First call returns the management cluster identity for delegation
+					// Second call returns the workload cluster identity
+					clusterClient.GetIdentityReturnsOnCall(0, awsClusterRoleIdentity, nil)
+					clusterClient.GetIdentityReturnsOnCall(1, awsClusterRoleIdentity, nil)
+				})
+
+				It("uses the management cluster identity for DNS delegation", func() {
+					Expect(clusterClient.GetIdentityCallCount()).To(Equal(2))
+					_, identityRef := clusterClient.GetIdentityArgsForCall(0)
+					// Should use management cluster's identity reference
+					Expect(identityRef.Name).To(Equal("default"))
+				})
+			})
+
 			When("the cluster has an identity set", func() {
 				BeforeEach(func() {
 					clusterClient.GetIdentityReturns(awsClusterRoleIdentity, nil)

@@ -79,13 +79,14 @@ func (d *Zoner) CreateHostedZone(ctx context.Context, logger logr.Logger, cluste
 		return errors.WithStack(err)
 	}
 
-	mcRoute53Client, err := d.getCachedOrNewRoute53Client(cluster.Region, cluster.MCIAMRoleARN, logger)
+	// Create Route53 client using the DNS delegation identity to manage records in the parent hosted zone
+	dnsDelegationRoute53Client, err := d.getCachedOrNewRoute53Client(cluster.Region, cluster.DnsDelegationRoleARN, logger)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
 	if !cluster.IsDnsModePrivate {
-		parentHostedZoneId, err := mcRoute53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName())
+		parentHostedZoneId, err := dnsDelegationRoute53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName())
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -95,7 +96,7 @@ func (d *Zoner) CreateHostedZone(ctx context.Context, logger logr.Logger, cluste
 			return errors.WithStack(err)
 		}
 
-		err = mcRoute53Client.AddDelegationToParentZone(ctx, logger, parentHostedZoneId, nsRecord)
+		err = dnsDelegationRoute53Client.AddDelegationToParentZone(ctx, logger, parentHostedZoneId, nsRecord)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -123,11 +124,11 @@ func (d *Zoner) DeleteHostedZone(ctx context.Context, logger logr.Logger, cluste
 	logger = logger.WithValues("hostedZoneId", hostedZoneId)
 
 	if !cluster.IsDnsModePrivate {
-		mcRoute53Client, err := d.getCachedOrNewRoute53Client(cluster.Region, cluster.MCIAMRoleARN, logger)
+		dnsDelegationRoute53Client, err := d.getCachedOrNewRoute53Client(cluster.Region, cluster.DnsDelegationRoleARN, logger)
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		parentHostedZoneId, err := mcRoute53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName())
+		parentHostedZoneId, err := dnsDelegationRoute53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName())
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -138,7 +139,7 @@ func (d *Zoner) DeleteHostedZone(ctx context.Context, logger logr.Logger, cluste
 		}
 
 		logger.Info("Deleting delegation from parent hosted zone", "parentHostedZoneId", parentHostedZoneId)
-		err = mcRoute53Client.DeleteDelegationFromParentZone(ctx, logger, parentHostedZoneId, nsRecord)
+		err = dnsDelegationRoute53Client.DeleteDelegationFromParentZone(ctx, logger, parentHostedZoneId, nsRecord)
 		if err != nil {
 			return errors.WithStack(err)
 		}

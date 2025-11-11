@@ -23,6 +23,9 @@ import (
 // - `*`: a CNAME pointing to the `ingress.$basedomain` record
 //
 // When the mode is public, it creates a record set in the parent's hosted zone so that dns delegation works.
+// By default, the management cluster's identity is used for DNS delegation operations.
+// This can be overridden by setting the `aws.giantswarm.io/dns-delegation-identity` annotation on the `AWSCluster` CR
+// with the name of a custom AWSClusterRoleIdentity to use instead.
 //
 // When the mode is private, the hosted zone is associated with a list of VPCs that can be specified using
 // the `aws.giantswarm.io/dns-assign-additional-vpc` annotation on the `AWSCluster` CR.
@@ -57,15 +60,17 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	mcIdentity, err := r.clusterClient.GetIdentity(ctx, mcAWSCluster.Spec.IdentityRef)
-	if err != nil {
-		logger.Error(err, "Cant find management AWSClusterRoleIdentity CR")
-		return ctrl.Result{}, errors.WithStack(err)
-	}
-
 	awsCluster, err := r.clusterClient.GetAWSCluster(ctx, req.NamespacedName)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
+	}
+
+	// Determine which identity to use for DNS delegation
+	delegationIdentityRef := getDelegationIdentity(awsCluster.ObjectMeta, mcAWSCluster)
+	dnsDelegationIdentity, err := r.clusterClient.GetIdentity(ctx, delegationIdentityRef)
+	if err != nil {
+		logger.Error(err, "Cant find delegation AWSClusterRoleIdentity CR", "identityRef", delegationIdentityRef)
+		return ctrl.Result{}, errors.WithStack(err)
 	}
 
 	capiCluster, err := r.clusterClient.GetCluster(ctx, req.NamespacedName)
@@ -88,7 +93,7 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, nil
 	}
 
-	cluster := buildClusterFromAWSCluster(awsCluster, identity, mcIdentity)
+	cluster := buildClusterFromAWSCluster(awsCluster, identity, dnsDelegationIdentity)
 
 	if !capiCluster.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, awsCluster, cluster)
