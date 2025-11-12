@@ -38,14 +38,18 @@ type DnsReconciler struct {
 	managementClusterName string
 	// managementClusterNamespace is the namespace of the CR of the management cluster
 	managementClusterNamespace string
+	// defaultBaseDomain is the default base domain used to construct hosted zone names
+	// when the aws.giantswarm.io/dns-zone annotation is not specified
+	defaultBaseDomain string
 }
 
-func NewDnsReconciler(clusterClient ClusterClient, dns resolver.Zoner, managementClusterName string, managementClusterNamespace string) *DnsReconciler {
+func NewDnsReconciler(clusterClient ClusterClient, dns resolver.Zoner, managementClusterName string, managementClusterNamespace string, defaultBaseDomain string) *DnsReconciler {
 	return &DnsReconciler{
 		clusterClient:              clusterClient,
 		dnsZone:                    dns,
 		managementClusterName:      managementClusterName,
 		managementClusterNamespace: managementClusterNamespace,
+		defaultBaseDomain:          defaultBaseDomain,
 	}
 }
 
@@ -93,7 +97,8 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, nil
 	}
 
-	cluster := buildClusterFromAWSCluster(awsCluster, identity, dnsDelegationIdentity)
+	hostedZoneName := getHostedZoneName(awsCluster.ObjectMeta, r.defaultBaseDomain)
+	cluster := buildClusterFromAWSCluster(awsCluster, identity, dnsDelegationIdentity, hostedZoneName)
 
 	if !capiCluster.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, awsCluster, cluster)

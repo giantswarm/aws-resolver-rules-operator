@@ -64,7 +64,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 		dns, err := resolver.NewDnsZone(fakeAWSClients, WorkloadClusterBaseDomain)
 		Expect(err).NotTo(HaveOccurred())
 
-		reconciler = controllers.NewDnsReconciler(clusterClient, dns, ClusterName, ClusterNamespace)
+		reconciler = controllers.NewDnsReconciler(clusterClient, dns, ClusterName, ClusterNamespace, WorkloadClusterBaseDomain)
 
 		awsClusterRoleIdentity = &capa.AWSClusterRoleIdentity{
 			ObjectMeta: metav1.ObjectMeta{
@@ -413,6 +413,48 @@ var _ = Describe("Dns Zone reconciler", func() {
 									"Kind": Equal("ALIAS"),
 									"Name": Equal(fmt.Sprintf("api.%s.%s", ClusterName, WorkloadClusterBaseDomain)),
 								})))
+							})
+						})
+
+						When("the AWSCluster has a custom dns-zone annotation", func() {
+							const CustomHostedZone = "custom-workload.production.gigantic.io"
+
+							BeforeEach(func() {
+								awsCluster.Annotations = map[string]string{
+									controllers.DNSZoneAnnotation: CustomHostedZone,
+								}
+								awsCluster.Spec.ControlPlaneEndpoint.Host = ControlPlaneEndpointHost
+								route53Client.CreateHostedZoneReturns("hosted-zone-id", nil)
+								route53Client.GetHostedZoneIdByNameReturns("parent-hosted-zone-id", nil)
+							})
+
+							It("should create hosted zone with custom name", func() {
+								Expect(route53Client.CreateHostedZoneCallCount()).To(Equal(1))
+								_, _, zone := route53Client.CreateHostedZoneArgsForCall(0)
+								Expect(zone.DnsName).To(Equal(CustomHostedZone))
+							})
+
+							It("should create DNS records with custom hosted zone", func() {
+								Expect(route53Client.AddDnsRecordsToHostedZoneCallCount()).To(Equal(1))
+								_, _, _, records := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+
+								Expect(records).To(ConsistOf(
+									gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+										"Name":   Equal(fmt.Sprintf("*.%s", CustomHostedZone)),
+										"Values": Equal([]string{fmt.Sprintf("ingress.%s", CustomHostedZone)}),
+									}),
+									gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+										"Name":   Equal(fmt.Sprintf("api.%s", CustomHostedZone)),
+										"Values": Equal([]string{ControlPlaneEndpointHost}),
+									}),
+								))
+							})
+
+							It("should delegate to parent zone correctly", func() {
+								// Should get parent zone "production.gigantic.io" from "custom-workload.production.gigantic.io"
+								Expect(route53Client.GetHostedZoneIdByNameCallCount()).To(BeNumerically(">=", 1))
+								_, _, parentZoneName := route53Client.GetHostedZoneIdByNameArgsForCall(0)
+								Expect(parentZoneName).To(Equal("production.gigantic.io"))
 							})
 						})
 

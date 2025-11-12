@@ -66,7 +66,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 		dns, err := resolver.NewDnsZone(fakeAWSClients, WorkloadClusterBaseDomain)
 		Expect(err).NotTo(HaveOccurred())
 
-		reconciler = controllers.NewEKSDnsReconciler(clusterClient, dns, ClusterName, ClusterNamespace)
+		reconciler = controllers.NewEKSDnsReconciler(clusterClient, dns, ClusterName, ClusterNamespace, WorkloadClusterBaseDomain)
 
 		awsClusterRoleIdentity = &capa.AWSClusterRoleIdentity{
 			ObjectMeta: metav1.ObjectMeta{

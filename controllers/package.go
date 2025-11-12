@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
@@ -24,12 +25,16 @@ const (
 	// DNSDelegationIdentityAnnotation specifies a custom AWSClusterRoleIdentity reference
 	// to use for DNS delegation operations instead of the management cluster's identity
 	DNSDelegationIdentityAnnotation = "aws.giantswarm.io/dns-delegation-identity"
+	// DNSZoneAnnotation specifies the exact hosted zone name to create for this cluster.
+	// If not specified, defaults to {clusterName}.{baseDomain}
+	DNSZoneAnnotation = "aws.giantswarm.io/dns-zone"
 )
 
-func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity, dnsDelegationIdentity *capa.AWSClusterRoleIdentity) resolver.Cluster {
+func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity, dnsDelegationIdentity *capa.AWSClusterRoleIdentity, hostedZoneName string) resolver.Cluster {
 	cluster := resolver.Cluster{
 		AdditionalTags:       awsCluster.Spec.AdditionalTags,
 		Name:                 awsCluster.Name,
+		HostedZoneName:       hostedZoneName,
 		ControlPlaneEndpoint: awsCluster.Spec.ControlPlaneEndpoint.Host,
 		Region:               awsCluster.Spec.Region,
 		IsDnsModePrivate:     awsCluster.Annotations[gsannotations.AWSDNSMode] == gsannotations.DNSModePrivate,
@@ -52,10 +57,11 @@ func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSC
 	return cluster
 }
 
-func buildClusterFromAWSManagedControlPlane(awsManagedControlPlane *eks.AWSManagedControlPlane, identity *capa.AWSClusterRoleIdentity, dnsDelegationIdentity *capa.AWSClusterRoleIdentity) resolver.Cluster {
+func buildClusterFromAWSManagedControlPlane(awsManagedControlPlane *eks.AWSManagedControlPlane, identity *capa.AWSClusterRoleIdentity, dnsDelegationIdentity *capa.AWSClusterRoleIdentity, hostedZoneName string) resolver.Cluster {
 	cluster := resolver.Cluster{
 		AdditionalTags:       awsManagedControlPlane.Spec.AdditionalTags,
 		Name:                 awsManagedControlPlane.Name,
+		HostedZoneName:       hostedZoneName,
 		ControlPlaneEndpoint: awsManagedControlPlane.Spec.ControlPlaneEndpoint.Host,
 		Region:               awsManagedControlPlane.Spec.Region,
 		IsDnsModePrivate:     awsManagedControlPlane.Annotations[gsannotations.AWSDNSMode] == gsannotations.DNSModePrivate,
@@ -96,6 +102,23 @@ func getDelegationIdentity(workloadCluster controllerruntime.ObjectMeta, managem
 		Name: customIdentityName,
 		Kind: capa.ClusterRoleIdentityKind,
 	}
+}
+
+// getHostedZoneName returns the hosted zone name to create for this cluster.
+// It checks for a custom hosted zone name specified via annotation.
+// If the annotation is present and non-empty, it returns that value.
+// Otherwise, it returns {clusterName}.{baseDomain} following the default pattern.
+func getHostedZoneName(objectMeta controllerruntime.ObjectMeta, baseDomain string) string {
+	if objectMeta.Annotations == nil {
+		return fmt.Sprintf("%s.%s", objectMeta.Name, baseDomain)
+	}
+
+	customHostedZone, ok := objectMeta.Annotations[DNSZoneAnnotation]
+	if !ok || customHostedZone == "" {
+		return fmt.Sprintf("%s.%s", objectMeta.Name, baseDomain)
+	}
+
+	return customHostedZone
 }
 
 // getSubnetIds will fetch the subnet ids for the subnets in the spec that contain certain tag.

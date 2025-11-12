@@ -191,8 +191,8 @@ func (r *Resolver) createRule(ctx context.Context, logger logr.Logger, cluster C
 		return ResolverRule{}, errors.WithStack(err)
 	}
 
-	logger.Info("Creating resolver rule", "domainName", getResolverRuleDomainName(cluster.Name, r.workloadClusterBaseDomain))
-	resolverRule, err := resolverClient.CreateResolverRule(ctx, logger, cluster, securityGroupId, getResolverRuleDomainName(cluster.Name, r.workloadClusterBaseDomain), getResolverRuleName(cluster.Name))
+	logger.Info("Creating resolver rule", "domainName", cluster.HostedZoneName)
+	resolverRule, err := resolverClient.CreateResolverRule(ctx, logger, cluster, securityGroupId, cluster.HostedZoneName, getResolverRuleName(cluster.Name))
 	if err != nil {
 		return ResolverRule{}, errors.WithStack(err)
 	}
@@ -246,8 +246,4 @@ func getResourceShareName(clusterName, resolverRuleID string) string {
 
 func getAssociationName(clusterName string) string {
 	return fmt.Sprintf("giantswarm-%s-rr-association", clusterName)
-}
-
-func getResolverRuleDomainName(clusterName, baseDomain string) string {
-	return fmt.Sprintf("%s.%s", clusterName, baseDomain)
 }

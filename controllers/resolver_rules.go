@@ -65,12 +65,16 @@ type AWSClusterClient interface {
 type ResolverRulesReconciler struct {
 	awsClusterClient AWSClusterClient
 	resolver         resolver.Resolver
+	// defaultBaseDomain is the default base domain used to construct hosted zone names
+	// when the aws.giantswarm.io/dns-zone annotation is not specified
+	defaultBaseDomain string
 }
 
-func NewResolverRulesReconciler(awsClusterClient AWSClusterClient, resolver resolver.Resolver) *ResolverRulesReconciler {
+func NewResolverRulesReconciler(awsClusterClient AWSClusterClient, resolver resolver.Resolver, defaultBaseDomain string) *ResolverRulesReconciler {
 	return &ResolverRulesReconciler{
-		awsClusterClient: awsClusterClient,
-		resolver:         resolver,
+		awsClusterClient:  awsClusterClient,
+		resolver:          resolver,
+		defaultBaseDomain: defaultBaseDomain,
 	}
 }
 
@@ -122,7 +126,8 @@ func (r *ResolverRulesReconciler) reconcileNormal(ctx context.Context, awsCluste
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	cluster := buildClusterFromAWSCluster(awsCluster, identity, nil)
+	hostedZoneName := getHostedZoneName(awsCluster.ObjectMeta, r.defaultBaseDomain)
+	cluster := buildClusterFromAWSCluster(awsCluster, identity, nil, hostedZoneName)
 
 	awsAccountOwnerOfRulesToAssociate, ok := awsCluster.Annotations[gsannotations.ResolverRulesOwnerAWSAccountId]
 	if !ok {
@@ -157,7 +162,8 @@ func (r *ResolverRulesReconciler) reconcileDelete(ctx context.Context, awsCluste
 
 	logger := log.FromContext(ctx)
 
-	cluster := buildClusterFromAWSCluster(awsCluster, identity, nil)
+	hostedZoneName := getHostedZoneName(awsCluster.ObjectMeta, r.defaultBaseDomain)
+	cluster := buildClusterFromAWSCluster(awsCluster, identity, nil, hostedZoneName)
 
 	err := r.resolver.DeleteRule(ctx, logger, cluster)
 	if err != nil {

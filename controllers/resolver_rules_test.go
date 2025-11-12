@@ -64,7 +64,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 		resolver, err := resolver.NewResolver(fakeAWSClients, dnsServer, WorkloadClusterBaseDomain)
 		Expect(err).NotTo(HaveOccurred())
 
-		reconciler = controllers.NewResolverRulesReconciler(awsClusterClient, resolver)
+		reconciler = controllers.NewResolverRulesReconciler(awsClusterClient, resolver, WorkloadClusterBaseDomain)
 		awsClusterRoleIdentity = &capa.AWSClusterRoleIdentity{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "bar",
@@ -262,6 +262,20 @@ var _ = Describe("Resolver rules reconciler", func() {
 								Expect(cluster.Name).To(Equal("foo"))
 								Expect(cluster.Subnets).To(HaveLen(1))
 								Expect(cluster.Subnets).To(ContainElement("subnet-1"))
+							})
+
+							When("the AWSCluster has a custom dns-zone annotation", func() {
+								const CustomHostedZone = "custom.resolver.domain.io"
+
+								BeforeEach(func() {
+									awsCluster.Annotations[controllers.DNSZoneAnnotation] = CustomHostedZone
+								})
+
+								It("should create resolver rule with custom domain name", func() {
+									_, _, cluster, _, domainName, _ := resolverClient.CreateResolverRuleArgsForCall(0)
+									Expect(domainName).To(Equal(CustomHostedZone))
+									Expect(cluster.HostedZoneName).To(Equal(CustomHostedZone))
+								})
 							})
 
 							When("creating resolver rule fails", func() {

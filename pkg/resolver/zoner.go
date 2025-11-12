@@ -86,7 +86,7 @@ func (d *Zoner) CreateHostedZone(ctx context.Context, logger logr.Logger, cluste
 	}
 
 	if !cluster.IsDnsModePrivate {
-		parentHostedZoneId, err := dnsDelegationRoute53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName())
+		parentHostedZoneId, err := dnsDelegationRoute53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName(cluster))
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -128,7 +128,7 @@ func (d *Zoner) DeleteHostedZone(ctx context.Context, logger logr.Logger, cluste
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		parentHostedZoneId, err := dnsDelegationRoute53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName())
+		parentHostedZoneId, err := dnsDelegationRoute53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName(cluster))
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -174,11 +174,19 @@ func (d *Zoner) createDnsRecords(ctx context.Context, logger logr.Logger, cluste
 }
 
 func (d *Zoner) getHostedZoneName(cluster Cluster) string {
-	return fmt.Sprintf("%s.%s", cluster.Name, d.workloadClusterBaseDomain)
+	return cluster.HostedZoneName
 }
 
-func (d *Zoner) getParentHostedZoneName() string {
-	return d.workloadClusterBaseDomain
+func (d *Zoner) getParentHostedZoneName(cluster Cluster) string {
+	// Extract parent zone by removing first label
+	// e.g., "cluster1.gaws.gigantic.io" -> "gaws.gigantic.io"
+	parts := strings.SplitN(cluster.HostedZoneName, ".", 2)
+	if len(parts) < 2 {
+		// If no dot found (edge case), fall back to the default base domain
+		// This ensures we always have a parent zone for delegation
+		return d.workloadClusterBaseDomain
+	}
+	return parts[1]
 }
 
 func (d *Zoner) getTagsForHostedZone(cluster Cluster) map[string]string {

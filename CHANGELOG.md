@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Allow users to choose the AWS identity `AWSClusterRoleIdentity` to use when managing the DNS delegation between the cluster hosted zone and the base domain.
+- Allow users to choose the hosted zone name that will be created for the workload cluster.
 
 ## [0.23.1] - 2025-10-02
 
