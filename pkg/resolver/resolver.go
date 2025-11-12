@@ -13,15 +13,12 @@ type Resolver struct {
 	awsClients AWSClients
 	// dnsServer contains details about the DNS server that needs to resolve the domain.
 	dnsServer DNSServer
-	// workloadClusterBaseDomain is the root hosted zone used to create the workload cluster hosted zone, i.e. gaws.gigantic.io
-	workloadClusterBaseDomain string
 }
 
-func NewResolver(awsClients AWSClients, dnsServer DNSServer, workloadClusterBaseDomain string) (Resolver, error) {
+func NewResolver(awsClients AWSClients, dnsServer DNSServer) (Resolver, error) {
 	return Resolver{
-		awsClients:                awsClients,
-		dnsServer:                 dnsServer,
-		workloadClusterBaseDomain: workloadClusterBaseDomain,
+		awsClients: awsClients,
+		dnsServer:  dnsServer,
 	}, nil
 }
 

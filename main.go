@@ -235,13 +235,13 @@ func wireResolverRulesReconciler(cfg reconcilerConfig, mgr manager.Manager) {
 		os.Exit(1)
 	}
 
-	awsResolver, err := resolver.NewResolver(cfg.awsClients, dnsserver, cfg.workloadClusterBaseDomain)
+	awsResolver, err := resolver.NewResolver(cfg.awsClients, dnsserver)
 	if err != nil {
 		setupLog.Error(err, "unable to create Resolver")
 		os.Exit(1)
 	}
 
-	dns, err := resolver.NewDnsZone(cfg.awsClients, cfg.workloadClusterBaseDomain)
+	dns, err := resolver.NewDnsZone(cfg.awsClients)
 	if err != nil {
 		setupLog.Error(err, "unable to create Resolver")
 		os.Exit(1)

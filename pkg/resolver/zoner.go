@@ -18,16 +18,12 @@ type Zoner struct {
 	// Some client objects such as `Route53` contain a cache, so we should reuse the client object
 	// (note that we have separate logic to reuse AWS SDK sessions, see `sessionCache`)
 	awsClientCache *gocache.Cache
-
-	// workloadClusterBaseDomain is the root hosted zone used to create the workload cluster hosted zone, i.e. gaws.gigantic.io
-	workloadClusterBaseDomain string
 }
 
-func NewDnsZone(awsClients AWSClients, workloadClusterBaseDomain string) (Zoner, error) {
+func NewDnsZone(awsClients AWSClients) (Zoner, error) {
 	return Zoner{
-		awsClients:                awsClients,
-		awsClientCache:            gocache.New(15*time.Minute, 60*time.Second),
-		workloadClusterBaseDomain: workloadClusterBaseDomain,
+		awsClients:     awsClients,
+		awsClientCache: gocache.New(15*time.Minute, 60*time.Second),
 	}, nil
 }
 
@@ -86,7 +82,12 @@ func (d *Zoner) CreateHostedZone(ctx context.Context, logger logr.Logger, cluste
 	}
 
 	if !cluster.IsDnsModePrivate {
-		parentHostedZoneId, err := dnsDelegationRoute53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName(cluster))
+		parentHostedZoneName, err := d.getParentHostedZoneName(cluster)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		parentHostedZoneId, err := dnsDelegationRoute53Client.GetHostedZoneIdByName(ctx, logger, parentHostedZoneName)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -128,7 +129,12 @@ func (d *Zoner) DeleteHostedZone(ctx context.Context, logger logr.Logger, cluste
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		parentHostedZoneId, err := dnsDelegationRoute53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName(cluster))
+		parentHostedZoneName, err := d.getParentHostedZoneName(cluster)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		parentHostedZoneId, err := dnsDelegationRoute53Client.GetHostedZoneIdByName(ctx, logger, parentHostedZoneName)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -177,16 +183,14 @@ func (d *Zoner) getHostedZoneName(cluster Cluster) string {
 	return cluster.HostedZoneName
 }
 
-func (d *Zoner) getParentHostedZoneName(cluster Cluster) string {
+func (d *Zoner) getParentHostedZoneName(cluster Cluster) (string, error) {
 	// Extract parent zone by removing first label
 	// e.g., "cluster1.gaws.gigantic.io" -> "gaws.gigantic.io"
 	parts := strings.SplitN(cluster.HostedZoneName, ".", 2)
 	if len(parts) < 2 {
-		// If no dot found (edge case), fall back to the default base domain
-		// This ensures we always have a parent zone for delegation
-		return d.workloadClusterBaseDomain
+		return "", errors.Errorf("cannot extract parent hosted zone name from %q: no dot found in hosted zone name", cluster.HostedZoneName)
 	}
-	return parts[1]
+	return parts[1], nil
 }
 
 func (d *Zoner) getTagsForHostedZone(cluster Cluster) map[string]string {

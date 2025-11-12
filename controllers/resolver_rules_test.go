@@ -61,7 +61,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 		dnsServer, err := resolver.NewDNSServer(DnsServerAWSAccountId, "1234567890", "eu-central-1", "external-iam-role-to-assume", DnsServerVPCId)
 		Expect(err).NotTo(HaveOccurred())
 
-		resolver, err := resolver.NewResolver(fakeAWSClients, dnsServer, WorkloadClusterBaseDomain)
+		resolver, err := resolver.NewResolver(fakeAWSClients, dnsServer)
 		Expect(err).NotTo(HaveOccurred())
 
 		reconciler = controllers.NewResolverRulesReconciler(awsClusterClient, resolver, WorkloadClusterBaseDomain)

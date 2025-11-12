@@ -63,7 +63,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 			Route53Client:          route53Client,
 		}
 
-		dns, err := resolver.NewDnsZone(fakeAWSClients, WorkloadClusterBaseDomain)
+		dns, err := resolver.NewDnsZone(fakeAWSClients)
 		Expect(err).NotTo(HaveOccurred())
 
 		reconciler = controllers.NewEKSDnsReconciler(clusterClient, dns, ClusterName, ClusterNamespace, WorkloadClusterBaseDomain)
