@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
@@ -10,6 +11,7 @@ import (
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
@@ -20,12 +22,19 @@ import (
 
 const (
 	DnsFinalizer = "capa-operator.finalizers.giantswarm.io/dns-controller"
+	// DNSDelegationIdentityAnnotation specifies a custom AWSClusterRoleIdentity reference
+	// to use for DNS delegation operations instead of the management cluster's identity
+	DNSDelegationIdentityAnnotation = "aws.giantswarm.io/dns-delegation-identity"
+	// DNSZoneAnnotation specifies the exact hosted zone name to create for this cluster.
+	// If not specified, defaults to {clusterName}.{baseDomain}
+	DNSZoneAnnotation = "aws.giantswarm.io/dns-zone"
 )
 
-func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity, mcIdentity *capa.AWSClusterRoleIdentity) resolver.Cluster {
+func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity, dnsDelegationIdentity *capa.AWSClusterRoleIdentity, hostedZoneName string) resolver.Cluster {
 	cluster := resolver.Cluster{
 		AdditionalTags:       awsCluster.Spec.AdditionalTags,
 		Name:                 awsCluster.Name,
+		HostedZoneName:       hostedZoneName,
 		ControlPlaneEndpoint: awsCluster.Spec.ControlPlaneEndpoint.Host,
 		Region:               awsCluster.Spec.Region,
 		IsDnsModePrivate:     awsCluster.Annotations[gsannotations.AWSDNSMode] == gsannotations.DNSModePrivate,
@@ -41,17 +50,18 @@ func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSC
 	if ok {
 		cluster.VPCsToAssociateToHostedZone = strings.Split(additionalVpcsAnnotation, ",")
 	}
-	if mcIdentity != nil {
-		cluster.MCIAMRoleARN = mcIdentity.Spec.RoleArn
+	if dnsDelegationIdentity != nil {
+		cluster.DnsDelegationRoleARN = dnsDelegationIdentity.Spec.RoleArn
 	}
 
 	return cluster
 }
 
-func buildClusterFromAWSManagedControlPlane(awsManagedControlPlane *eks.AWSManagedControlPlane, identity *capa.AWSClusterRoleIdentity, mcIdentity *capa.AWSClusterRoleIdentity) resolver.Cluster {
+func buildClusterFromAWSManagedControlPlane(awsManagedControlPlane *eks.AWSManagedControlPlane, identity *capa.AWSClusterRoleIdentity, dnsDelegationIdentity *capa.AWSClusterRoleIdentity, hostedZoneName string) resolver.Cluster {
 	cluster := resolver.Cluster{
 		AdditionalTags:       awsManagedControlPlane.Spec.AdditionalTags,
 		Name:                 awsManagedControlPlane.Name,
+		HostedZoneName:       hostedZoneName,
 		ControlPlaneEndpoint: awsManagedControlPlane.Spec.ControlPlaneEndpoint.Host,
 		Region:               awsManagedControlPlane.Spec.Region,
 		IsDnsModePrivate:     awsManagedControlPlane.Annotations[gsannotations.AWSDNSMode] == gsannotations.DNSModePrivate,
@@ -67,11 +77,48 @@ func buildClusterFromAWSManagedControlPlane(awsManagedControlPlane *eks.AWSManag
 	if ok {
 		cluster.VPCsToAssociateToHostedZone = strings.Split(additionalVpcsAnnotation, ",")
 	}
-	if mcIdentity != nil {
-		cluster.MCIAMRoleARN = mcIdentity.Spec.RoleArn
+	if dnsDelegationIdentity != nil {
+		cluster.DnsDelegationRoleARN = dnsDelegationIdentity.Spec.RoleArn
 	}
 
 	return cluster
+}
+
+// getDelegationIdentity returns the identity to use for DNS delegation operations.
+// It checks for a custom identity specified via annotation on the workload cluster.
+// If the annotation is present, it returns that identity reference.
+// If the annotation is not present or empty, it returns the management cluster's identity reference.
+func getDelegationIdentity(workloadCluster controllerruntime.ObjectMeta, managementCluster *capa.AWSCluster) *capa.AWSIdentityReference {
+	if workloadCluster.Annotations == nil {
+		return managementCluster.Spec.IdentityRef
+	}
+
+	customIdentityName, ok := workloadCluster.Annotations[DNSDelegationIdentityAnnotation]
+	if !ok || customIdentityName == "" {
+		return managementCluster.Spec.IdentityRef
+	}
+
+	return &capa.AWSIdentityReference{
+		Name: customIdentityName,
+		Kind: capa.ClusterRoleIdentityKind,
+	}
+}
+
+// getHostedZoneName returns the hosted zone name to create for this cluster.
+// It checks for a custom hosted zone name specified via annotation.
+// If the annotation is present and non-empty, it returns that value.
+// Otherwise, it returns {clusterName}.{baseDomain} following the default pattern.
+func getHostedZoneName(objectMeta controllerruntime.ObjectMeta, baseDomain string) string {
+	if objectMeta.Annotations == nil {
+		return fmt.Sprintf("%s.%s", objectMeta.Name, baseDomain)
+	}
+
+	customHostedZone, ok := objectMeta.Annotations[DNSZoneAnnotation]
+	if !ok || customHostedZone == "" {
+		return fmt.Sprintf("%s.%s", objectMeta.Name, baseDomain)
+	}
+
+	return customHostedZone
 }
 
 // getSubnetIds will fetch the subnet ids for the subnets in the spec that contain certain tag.

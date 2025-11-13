@@ -18,16 +18,12 @@ type Zoner struct {
 	// Some client objects such as `Route53` contain a cache, so we should reuse the client object
 	// (note that we have separate logic to reuse AWS SDK sessions, see `sessionCache`)
 	awsClientCache *gocache.Cache
-
-	// workloadClusterBaseDomain is the root hosted zone used to create the workload cluster hosted zone, i.e. gaws.gigantic.io
-	workloadClusterBaseDomain string
 }
 
-func NewDnsZone(awsClients AWSClients, workloadClusterBaseDomain string) (Zoner, error) {
+func NewDnsZone(awsClients AWSClients) (Zoner, error) {
 	return Zoner{
-		awsClients:                awsClients,
-		awsClientCache:            gocache.New(15*time.Minute, 60*time.Second),
-		workloadClusterBaseDomain: workloadClusterBaseDomain,
+		awsClients:     awsClients,
+		awsClientCache: gocache.New(15*time.Minute, 60*time.Second),
 	}, nil
 }
 
@@ -79,13 +75,19 @@ func (d *Zoner) CreateHostedZone(ctx context.Context, logger logr.Logger, cluste
 		return errors.WithStack(err)
 	}
 
-	mcRoute53Client, err := d.getCachedOrNewRoute53Client(cluster.Region, cluster.MCIAMRoleARN, logger)
+	// Create Route53 client using the DNS delegation identity to manage records in the parent hosted zone
+	dnsDelegationRoute53Client, err := d.getCachedOrNewRoute53Client(cluster.Region, cluster.DnsDelegationRoleARN, logger)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
 	if !cluster.IsDnsModePrivate {
-		parentHostedZoneId, err := mcRoute53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName())
+		parentHostedZoneName, err := d.getParentHostedZoneName(cluster)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		parentHostedZoneId, err := dnsDelegationRoute53Client.GetHostedZoneIdByName(ctx, logger, parentHostedZoneName)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -95,7 +97,7 @@ func (d *Zoner) CreateHostedZone(ctx context.Context, logger logr.Logger, cluste
 			return errors.WithStack(err)
 		}
 
-		err = mcRoute53Client.AddDelegationToParentZone(ctx, logger, parentHostedZoneId, nsRecord)
+		err = dnsDelegationRoute53Client.AddDelegationToParentZone(ctx, logger, parentHostedZoneId, nsRecord)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -123,11 +125,16 @@ func (d *Zoner) DeleteHostedZone(ctx context.Context, logger logr.Logger, cluste
 	logger = logger.WithValues("hostedZoneId", hostedZoneId)
 
 	if !cluster.IsDnsModePrivate {
-		mcRoute53Client, err := d.getCachedOrNewRoute53Client(cluster.Region, cluster.MCIAMRoleARN, logger)
+		dnsDelegationRoute53Client, err := d.getCachedOrNewRoute53Client(cluster.Region, cluster.DnsDelegationRoleARN, logger)
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		parentHostedZoneId, err := mcRoute53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName())
+		parentHostedZoneName, err := d.getParentHostedZoneName(cluster)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		parentHostedZoneId, err := dnsDelegationRoute53Client.GetHostedZoneIdByName(ctx, logger, parentHostedZoneName)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -138,7 +145,7 @@ func (d *Zoner) DeleteHostedZone(ctx context.Context, logger logr.Logger, cluste
 		}
 
 		logger.Info("Deleting delegation from parent hosted zone", "parentHostedZoneId", parentHostedZoneId)
-		err = mcRoute53Client.DeleteDelegationFromParentZone(ctx, logger, parentHostedZoneId, nsRecord)
+		err = dnsDelegationRoute53Client.DeleteDelegationFromParentZone(ctx, logger, parentHostedZoneId, nsRecord)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -173,11 +180,17 @@ func (d *Zoner) createDnsRecords(ctx context.Context, logger logr.Logger, cluste
 }
 
 func (d *Zoner) getHostedZoneName(cluster Cluster) string {
-	return fmt.Sprintf("%s.%s", cluster.Name, d.workloadClusterBaseDomain)
+	return cluster.HostedZoneName
 }
 
-func (d *Zoner) getParentHostedZoneName() string {
-	return d.workloadClusterBaseDomain
+func (d *Zoner) getParentHostedZoneName(cluster Cluster) (string, error) {
+	// Extract parent zone by removing first label
+	// e.g., "cluster1.gaws.gigantic.io" -> "gaws.gigantic.io"
+	parts := strings.SplitN(cluster.HostedZoneName, ".", 2)
+	if len(parts) < 2 {
+		return "", errors.Errorf("cannot extract parent hosted zone name from %q: no dot found in hosted zone name", cluster.HostedZoneName)
+	}
+	return parts[1], nil
 }
 
 func (d *Zoner) getTagsForHostedZone(cluster Cluster) map[string]string {

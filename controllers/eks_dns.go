@@ -23,14 +23,18 @@ type EKSDnsReconciler struct {
 	managementClusterName string
 	// managementClusterNamespace is the namespace of the CR of the management cluster
 	managementClusterNamespace string
+	// defaultBaseDomain is the default base domain used to construct hosted zone names
+	// when the aws.giantswarm.io/dns-zone annotation is not specified
+	defaultBaseDomain string
 }
 
-func NewEKSDnsReconciler(clusterClient ClusterClient, dns resolver.Zoner, managementClusterName string, managementClusterNamespace string) *EKSDnsReconciler {
+func NewEKSDnsReconciler(clusterClient ClusterClient, dns resolver.Zoner, managementClusterName string, managementClusterNamespace string, defaultBaseDomain string) *EKSDnsReconciler {
 	return &EKSDnsReconciler{
 		clusterClient:              clusterClient,
 		dnsZone:                    dns,
 		managementClusterName:      managementClusterName,
 		managementClusterNamespace: managementClusterNamespace,
+		defaultBaseDomain:          defaultBaseDomain,
 	}
 }
 
@@ -45,15 +49,17 @@ func (r *EKSDnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	mcIdentity, err := r.clusterClient.GetIdentity(ctx, mcAWSCluster.Spec.IdentityRef)
-	if err != nil {
-		logger.Error(err, "Cant find management AWSClusterRoleIdentity CR")
-		return ctrl.Result{}, errors.WithStack(err)
-	}
-
 	awsManagedControlPlane, err := r.clusterClient.GetAWSManagedControlPlane(ctx, req.NamespacedName)
 	if err != nil {
 		return ctrl.Result{}, errors.WithStack(client.IgnoreNotFound(err))
+	}
+
+	// Determine which identity to use for DNS delegation
+	delegationIdentityRef := getDelegationIdentity(awsManagedControlPlane.ObjectMeta, mcAWSCluster)
+	dnsDelegationIdentity, err := r.clusterClient.GetIdentity(ctx, delegationIdentityRef)
+	if err != nil {
+		logger.Error(err, "Cant find delegation AWSClusterRoleIdentity CR", "identityRef", delegationIdentityRef)
+		return ctrl.Result{}, errors.WithStack(err)
 	}
 
 	capiCluster, err := r.clusterClient.GetCluster(ctx, req.NamespacedName)
@@ -76,7 +82,8 @@ func (r *EKSDnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
-	cluster := buildClusterFromAWSManagedControlPlane(awsManagedControlPlane, identity, mcIdentity)
+	hostedZoneName := getHostedZoneName(awsManagedControlPlane.ObjectMeta, r.defaultBaseDomain)
+	cluster := buildClusterFromAWSManagedControlPlane(awsManagedControlPlane, identity, dnsDelegationIdentity, hostedZoneName)
 
 	if !capiCluster.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, awsManagedControlPlane, cluster)

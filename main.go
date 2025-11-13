@@ -235,19 +235,19 @@ func wireResolverRulesReconciler(cfg reconcilerConfig, mgr manager.Manager) {
 		os.Exit(1)
 	}
 
-	awsResolver, err := resolver.NewResolver(cfg.awsClients, dnsserver, cfg.workloadClusterBaseDomain)
+	awsResolver, err := resolver.NewResolver(cfg.awsClients, dnsserver)
 	if err != nil {
 		setupLog.Error(err, "unable to create Resolver")
 		os.Exit(1)
 	}
 
-	dns, err := resolver.NewDnsZone(cfg.awsClients, cfg.workloadClusterBaseDomain)
+	dns, err := resolver.NewDnsZone(cfg.awsClients)
 	if err != nil {
 		setupLog.Error(err, "unable to create Resolver")
 		os.Exit(1)
 	}
 
-	if err = (controllers.NewResolverRulesReconciler(cfg.awsClusterClient, awsResolver)).SetupWithManager(mgr); err != nil {
+	if err = controllers.NewResolverRulesReconciler(cfg.awsClusterClient, awsResolver, cfg.workloadClusterBaseDomain).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller")
 		os.Exit(1)
 	}
@@ -257,13 +257,13 @@ func wireResolverRulesReconciler(cfg reconcilerConfig, mgr manager.Manager) {
 		os.Exit(1)
 	}
 
-	if err = (controllers.NewDnsReconciler(cfg.clusterClient, dns, cfg.managementClusterName, cfg.managementClusterNamespace)).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller")
+	if err = controllers.NewDnsReconciler(cfg.clusterClient, dns, cfg.managementClusterName, cfg.managementClusterNamespace, cfg.workloadClusterBaseDomain).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "DnsReconciler")
 		os.Exit(1)
 	}
 
-	if err = (controllers.NewEKSDnsReconciler(cfg.clusterClient, dns, cfg.managementClusterName, cfg.managementClusterNamespace)).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller")
+	if err = controllers.NewEKSDnsReconciler(cfg.clusterClient, dns, cfg.managementClusterName, cfg.managementClusterNamespace, cfg.workloadClusterBaseDomain).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "EKSDnsReconciler")
 		os.Exit(1)
 	}
 }

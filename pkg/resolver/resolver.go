@@ -13,15 +13,12 @@ type Resolver struct {
 	awsClients AWSClients
 	// dnsServer contains details about the DNS server that needs to resolve the domain.
 	dnsServer DNSServer
-	// workloadClusterBaseDomain is the root hosted zone used to create the workload cluster hosted zone, i.e. gaws.gigantic.io
-	workloadClusterBaseDomain string
 }
 
-func NewResolver(awsClients AWSClients, dnsServer DNSServer, workloadClusterBaseDomain string) (Resolver, error) {
+func NewResolver(awsClients AWSClients, dnsServer DNSServer) (Resolver, error) {
 	return Resolver{
-		awsClients:                awsClients,
-		dnsServer:                 dnsServer,
-		workloadClusterBaseDomain: workloadClusterBaseDomain,
+		awsClients: awsClients,
+		dnsServer:  dnsServer,
 	}, nil
 }
 
@@ -191,8 +188,8 @@ func (r *Resolver) createRule(ctx context.Context, logger logr.Logger, cluster C
 		return ResolverRule{}, errors.WithStack(err)
 	}
 
-	logger.Info("Creating resolver rule", "domainName", getResolverRuleDomainName(cluster.Name, r.workloadClusterBaseDomain))
-	resolverRule, err := resolverClient.CreateResolverRule(ctx, logger, cluster, securityGroupId, getResolverRuleDomainName(cluster.Name, r.workloadClusterBaseDomain), getResolverRuleName(cluster.Name))
+	logger.Info("Creating resolver rule", "domainName", cluster.HostedZoneName)
+	resolverRule, err := resolverClient.CreateResolverRule(ctx, logger, cluster, securityGroupId, cluster.HostedZoneName, getResolverRuleName(cluster.Name))
 	if err != nil {
 		return ResolverRule{}, errors.WithStack(err)
 	}
@@ -246,8 +243,4 @@ func getResourceShareName(clusterName, resolverRuleID string) string {
 
 func getAssociationName(clusterName string) string {
 	return fmt.Sprintf("giantswarm-%s-rr-association", clusterName)
-}
-
-func getResolverRuleDomainName(clusterName, baseDomain string) string {
-	return fmt.Sprintf("%s.%s", clusterName, baseDomain)
 }
