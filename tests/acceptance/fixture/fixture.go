@@ -133,7 +133,7 @@ func (f *Fixture) Teardown() error {
 	prefixListID := getARNID(prefixListAnnotation)
 
 	err = DeletePrefixList(f.EC2Client, prefixListID)
-	Expect(err).To(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidPrefixListId.NotFound"))))
+	Expect(err).To(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidPrefixListID.NotFound"))))
 
 	err = DetachTransitGateway(f.EC2Client, gatewayID, f.Network.VpcID)
 	Expect(err).To(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidTransitGatewayID.NotFound"))))
