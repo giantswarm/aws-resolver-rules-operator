@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.39.6
 	github.com/aws/aws-sdk-go-v2/config v1.31.20
 	github.com/aws/aws-sdk-go-v2/credentials v1.18.24
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.267.0
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.269.0
 	github.com/aws/aws-sdk-go-v2/service/ram v1.34.13
 	github.com/aws/aws-sdk-go-v2/service/route53 v1.59.5
 	github.com/aws/aws-sdk-go-v2/service/route53resolver v1.40.12
