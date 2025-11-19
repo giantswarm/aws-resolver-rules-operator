@@ -29,7 +29,7 @@ require (
 	github.com/samber/lo v1.52.0
 	go.opentelemetry.io/otel/exporters/prometheus v0.60.0
 	go.opentelemetry.io/otel/sdk/metric v1.38.0
-	go.uber.org/zap v1.27.0
+	go.uber.org/zap v1.27.1
 	golang.org/x/tools v0.39.0
 	k8s.io/api v0.32.3
 	k8s.io/apimachinery v0.32.3
