@@ -17,4 +17,3 @@ spec:
     - port: metrics
       interval: {{ .Values.monitoring.interval | default "60s" }}
 {{- end }}
-
