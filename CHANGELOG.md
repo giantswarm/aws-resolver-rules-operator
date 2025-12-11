@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add Podmonitor for metrics scraping
+
 ### Fixed
 
 -  After acceptance tests have finished, we don't want to fail when we get a "not found" error while cleaning up AWS resources. The matcher we use to match the error when deleting a prefix list had a typo and it was fixed.
