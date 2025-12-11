@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"slices"
 	"strings"
 
@@ -516,14 +517,42 @@ func (r *CrossplaneClusterConfigReconciler) updateProviderConfig(ctx context.Con
 
 func (r *CrossplaneClusterConfigReconciler) getProviderConfigSpec(clusterInfo *ClusterInfo) map[string]any {
 	partition := getPartition(clusterInfo.Region)
-	providerRole := fmt.Sprintf("giantswarm-%s-capa-controller", r.ManagementClusterName)
-	return map[string]any{
-		"credentials": map[string]any{
-			"source": "WebIdentity",
-			"webIdentity": map[string]any{
+
+	// We're migrating Crossplane from authenticating with IRSA – a chicken-egg situation
+	// because we use Crossplane to create the IRSA OIDC setup – to static credentials,
+	// and also to have its own IAM role instead of reusing the CAPA role.
+	// Use static credentials only if defined as non-empty. We should later make them required.
+	awsAccessKeyID := os.Getenv("CROSSPLANE_AWS_ACCESS_KEY_ID")
+	awsSecretAccessKey := os.Getenv("CROSSPLANE_AWS_SECRET_ACCESS_KEY")
+
+	if awsAccessKeyID != "" && awsSecretAccessKey != "" {
+		providerRole := fmt.Sprintf("giantswarm-%s-crossplane", r.ManagementClusterName)
+
+		return map[string]any{
+			"assumeRoleChain": []map[string]any{{
 				"roleARN": fmt.Sprintf("arn:%s:iam::%s:role/%s", partition, clusterInfo.RoleArn.AccountID, providerRole),
+			}},
+			"credentials": map[string]any{
+				"secretRef": map[string]any{
+					"key":       "credentials",
+					"name":      "crossplane-aws-credentials",
+					"namespace": "giantswarm",
+				},
+				"source": "Secret",
 			},
-		},
+		}
+	} else {
+		providerRole := fmt.Sprintf("giantswarm-%s-capa-controller", r.ManagementClusterName)
+
+		// IRSA
+		return map[string]any{
+			"credentials": map[string]any{
+				"source": "WebIdentity",
+				"webIdentity": map[string]any{
+					"roleARN": fmt.Sprintf("arn:%s:iam::%s:role/%s", partition, clusterInfo.RoleArn.AccountID, providerRole),
+				},
+			},
+		}
 	}
 }
 
