@@ -58,6 +58,10 @@ spec:
             {{- if .Values.disableResolverControllers }}
             - --disable-resolver-controllers
             {{- end }}
+          ports:
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
           securityContext:
             {{- with .Values.securityContext }}
               {{- . | toYaml | nindent 12 }}
