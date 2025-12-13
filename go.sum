@@ -50,8 +50,8 @@ github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.16 h1:NSbvS17MlI2lu
 github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.16/go.mod h1:SwT8Tmqd4sA6G1qaGdzWCJN99bUmPGHfRwwq3G5Qb+A=
 github.com/aws/aws-sdk-go-v2/service/ram v1.34.18 h1:KzbQzFBEsdAdJcYDqm7aGYcZEpC3AQZmmoV1biAZceU=
 github.com/aws/aws-sdk-go-v2/service/ram v1.34.18/go.mod h1:eqmXZjuKAjyMalpTlvdTmOH8LdJw5m9pbnKI/m6GUPs=
-github.com/aws/aws-sdk-go-v2/service/route53 v1.61.2 h1:AYkXtY/AH76SbJPNO9ZYOBK8201QGt2NxH4yjdrRt3g=
-github.com/aws/aws-sdk-go-v2/service/route53 v1.61.2/go.mod h1:6EZUGGNLPLh5Unt30uEoA+KQcByERfXIkax9qrc80nA=
+github.com/aws/aws-sdk-go-v2/service/route53 v1.62.0 h1:80pDB3Tpmb2RCSZORrK9/3iQxsd+w6vSzVqpT1FGiwE=
+github.com/aws/aws-sdk-go-v2/service/route53 v1.62.0/go.mod h1:6EZUGGNLPLh5Unt30uEoA+KQcByERfXIkax9qrc80nA=
 github.com/aws/aws-sdk-go-v2/service/route53resolver v1.41.5 h1:JJipBAyXEcBqwCwgz3nLxGRHC+IlS8EcQd8edjnsp0w=
 github.com/aws/aws-sdk-go-v2/service/route53resolver v1.41.5/go.mod h1:WrQgdN56bX2k38ghuLVRNAaWx4VppLihB6NPiUa31Os=
 github.com/aws/aws-sdk-go-v2/service/s3 v1.93.2 h1:U3ygWUhCpiSPYSHOrRhb3gOl9T5Y3kB8k5Vjs//57bE=
