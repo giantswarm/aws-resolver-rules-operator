@@ -61,7 +61,7 @@ spec:
           {{- if or (((.Values.crossplane).aws).staticCredentials).accessKeyID (((.Values.crossplane).aws).staticCredentials).secretAccessKey }}
           envFrom:
             - secretRef:
-                name: crossplane-aws-credentials
+                name: {{ include "resource.default.name" . }}-crossplane-aws-credentials
           {{- end }}
           securityContext:
             {{- with .Values.securityContext }}
