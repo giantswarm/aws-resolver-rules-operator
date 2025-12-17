@@ -59,9 +59,9 @@ spec:
             - --disable-resolver-controllers
             {{- end }}
           {{- if or (((.Values.crossplane).aws).staticCredentials).accessKeyID (((.Values.crossplane).aws).staticCredentials).secretAccessKey }}
-          envFrom:
-            - secretRef:
-                name: {{ include "resource.default.name" . }}-crossplane-aws-credentials
+          env:
+            - name: USE_CROSSPLANE_STATIC_AWS_CREDENTIALS
+              value: "true"
           {{- end }}
           securityContext:
             {{- with .Values.securityContext }}

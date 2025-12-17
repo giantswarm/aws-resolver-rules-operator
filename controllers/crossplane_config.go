@@ -522,10 +522,9 @@ func (r *CrossplaneClusterConfigReconciler) getProviderConfigSpec(clusterInfo *C
 	// because we use Crossplane to create the IRSA OIDC setup – to static credentials,
 	// and also to have its own IAM role instead of reusing the CAPA role.
 	// Use static credentials only if defined as non-empty. We should later make them required.
-	awsAccessKeyID := os.Getenv("CROSSPLANE_AWS_ACCESS_KEY_ID")
-	awsSecretAccessKey := os.Getenv("CROSSPLANE_AWS_SECRET_ACCESS_KEY")
+	useStaticAWSCredentials := os.Getenv("USE_CROSSPLANE_STATIC_AWS_CREDENTIALS") == "true"
 
-	if awsAccessKeyID != "" && awsSecretAccessKey != "" {
+	if useStaticAWSCredentials {
 		providerRole := fmt.Sprintf("giantswarm-%s-crossplane", r.ManagementClusterName)
 
 		return map[string]any{
@@ -536,15 +535,16 @@ func (r *CrossplaneClusterConfigReconciler) getProviderConfigSpec(clusterInfo *C
 				"secretRef": map[string]any{
 					"key":       "credentials",
 					"name":      "crossplane-aws-credentials",
-					"namespace": "giantswarm",
+					"namespace": "crossplane",
 				},
 				"source": "Secret",
 			},
 		}
 	} else {
+		// IRSA
+
 		providerRole := fmt.Sprintf("giantswarm-%s-capa-controller", r.ManagementClusterName)
 
-		// IRSA
 		return map[string]any{
 			"credentials": map[string]any{
 				"source": "WebIdentity",
