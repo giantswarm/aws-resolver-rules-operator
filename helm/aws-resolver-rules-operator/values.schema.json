@@ -24,6 +24,7 @@
                     "properties": {
                         "staticCredentials": {
                             "type": "object",
+                            "required": ["accessKeyID", "secretAccessKey"],
                             "properties": {
                                 "accessKeyID": {
                                     "type": "string"
