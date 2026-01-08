@@ -58,6 +58,10 @@ spec:
             {{- if .Values.disableResolverControllers }}
             - --disable-resolver-controllers
             {{- end }}
+          ports:
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
           {{- if or (((.Values.crossplane).aws).staticCredentials).accessKeyID (((.Values.crossplane).aws).staticCredentials).secretAccessKey }}
           env:
             - name: USE_CROSSPLANE_STATIC_AWS_CREDENTIALS

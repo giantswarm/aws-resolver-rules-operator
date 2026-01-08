@@ -57,6 +57,10 @@ securityContext:
     drop:
       - ALL
 
+monitoring:
+  enabled: true
+  interval: 60s
+
 global:
   podSecurityStandards:
     enforced: false
