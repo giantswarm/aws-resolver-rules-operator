@@ -16,6 +16,28 @@
                 }
             }
         },
+        "crossplane": {
+            "type": "object",
+            "properties": {
+                "aws": {
+                    "type": "object",
+                    "properties": {
+                        "staticCredentials": {
+                            "type": "object",
+                            "required": ["accessKeyID", "secretAccessKey"],
+                            "properties": {
+                                "accessKeyID": {
+                                    "type": "string"
+                                },
+                                "secretAccessKey": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "image": {
             "type": "object",
             "properties": {
