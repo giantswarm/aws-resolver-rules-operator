@@ -122,10 +122,6 @@
         "monitoring": {
             "type": "object",
             "properties": {
-                "enabled": {
-                    "type": "boolean",
-                    "default": true
-                },
                 "interval": {
                     "type": "string",
                     "default": "60s"
