@@ -38,11 +38,6 @@ spec:
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ default .Chart.Version .Values.image.tag }}"
-          env:
-            - name: MANAGEMENT_CLUSTER_REGION
-              value: {{ .Values.managementClusterRegion }}
-            - name: AWS_SHARED_CREDENTIALS_FILE
-              value: /home/.aws/credentials
           command:
             - /manager
           args:
@@ -58,11 +53,13 @@ spec:
             {{- if .Values.disableResolverControllers }}
             - --disable-resolver-controllers
             {{- end }}
-          {{- if or (((.Values.crossplane).aws).staticCredentials).accessKeyID (((.Values.crossplane).aws).staticCredentials).secretAccessKey }}
           env:
+            - name: AWS_SHARED_CREDENTIALS_FILE
+              value: /home/.aws/credentials
+            - name: MANAGEMENT_CLUSTER_REGION
+              value: {{ .Values.managementClusterRegion }}
             - name: USE_CROSSPLANE_STATIC_AWS_CREDENTIALS
-              value: "true"
-          {{- end }}
+              value: {{ if or (((.Values.crossplane).aws).staticCredentials).accessKeyID (((.Values.crossplane).aws).staticCredentials).secretAccessKey }}"true"{{ else }}"false"{{ end }}
           securityContext:
             {{- with .Values.securityContext }}
               {{- . | toYaml | nindent 12 }}
