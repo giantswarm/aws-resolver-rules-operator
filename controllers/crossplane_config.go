@@ -268,7 +268,7 @@ func (r *CrossplaneClusterConfigReconciler) reconcileNormal(ctx context.Context,
 
 	}
 
-	err = r.reconcileProviderConfig(ctx, clusterInfo, clusterInfo.RoleArn.AccountID, getProviderRole(r.ManagementClusterName))
+	err = r.reconcileProviderConfig(ctx, clusterInfo)
 	if err != nil {
 		logger.Error(err, "failed to reconcile provider config")
 		return ctrl.Result{}, errors.WithStack(err)
@@ -276,10 +276,6 @@ func (r *CrossplaneClusterConfigReconciler) reconcileNormal(ctx context.Context,
 	}
 
 	return ctrl.Result{}, nil
-}
-
-func getProviderRole(managementClusterName string) string {
-	return fmt.Sprintf("giantswarm-%s-capa-controller", managementClusterName)
 }
 
 type crossplaneConfigValues struct {
@@ -328,7 +324,7 @@ func (r *CrossplaneClusterConfigReconciler) reconcileConfigMap(ctx context.Conte
 	return r.updateConfigMap(ctx, clusterInfo, config, accountID, baseDomain)
 }
 
-func (r *CrossplaneClusterConfigReconciler) reconcileProviderConfig(ctx context.Context, clusterInfo *ClusterInfo, accountID, providerRole string) error {
+func (r *CrossplaneClusterConfigReconciler) reconcileProviderConfig(ctx context.Context, clusterInfo *ClusterInfo) error {
 	logger := log.FromContext(ctx)
 
 	providerConfig := getProviderConfig(clusterInfo.Name, clusterInfo.Namespace)
@@ -342,14 +338,14 @@ func (r *CrossplaneClusterConfigReconciler) reconcileProviderConfig(ctx context.
 		return nil
 	}
 	if k8serrors.IsNotFound(err) {
-		return r.createProviderConfig(ctx, providerConfig, accountID, clusterInfo.Region, providerRole)
+		return r.createProviderConfig(ctx, providerConfig, clusterInfo)
 	}
 	if err != nil {
 		logger.Error(err, "Failed to get provider config")
 		return errors.WithStack(err)
 	}
 
-	return r.updateProviderConfig(ctx, providerConfig, accountID, clusterInfo.Region, providerRole)
+	return r.updateProviderConfig(ctx, providerConfig, clusterInfo)
 }
 
 func (r *CrossplaneClusterConfigReconciler) reconcileDelete(ctx context.Context, cluster *capi.Cluster) (ctrl.Result, error) {
@@ -486,10 +482,10 @@ func (r *CrossplaneClusterConfigReconciler) updateConfigMap(ctx context.Context,
 	return nil
 }
 
-func (r *CrossplaneClusterConfigReconciler) createProviderConfig(ctx context.Context, providerConfig *unstructured.Unstructured, accountID, region, providerRole string) error {
+func (r *CrossplaneClusterConfigReconciler) createProviderConfig(ctx context.Context, providerConfig *unstructured.Unstructured, clusterInfo *ClusterInfo) error {
 	logger := log.FromContext(ctx)
 
-	providerConfig.Object["spec"] = r.getProviderConfigSpec(accountID, region, providerRole)
+	providerConfig.Object["spec"] = r.getProviderConfigSpec(clusterInfo)
 
 	err := r.Client.Create(ctx, providerConfig)
 	if k8serrors.IsAlreadyExists(err) {
@@ -504,11 +500,11 @@ func (r *CrossplaneClusterConfigReconciler) createProviderConfig(ctx context.Con
 	return nil
 }
 
-func (r *CrossplaneClusterConfigReconciler) updateProviderConfig(ctx context.Context, providerConfig *unstructured.Unstructured, accountID, region, providerRole string) error {
+func (r *CrossplaneClusterConfigReconciler) updateProviderConfig(ctx context.Context, providerConfig *unstructured.Unstructured, clusterInfo *ClusterInfo) error {
 	logger := log.FromContext(ctx)
 
 	patchedConfig := providerConfig.DeepCopy()
-	patchedConfig.Object["spec"] = r.getProviderConfigSpec(accountID, region, providerRole)
+	patchedConfig.Object["spec"] = r.getProviderConfigSpec(clusterInfo)
 	err := r.Client.Patch(ctx, patchedConfig, client.MergeFrom(providerConfig))
 	if err != nil {
 		logger.Error(err, "Failed to patch provider config")
@@ -518,13 +514,14 @@ func (r *CrossplaneClusterConfigReconciler) updateProviderConfig(ctx context.Con
 	return nil
 }
 
-func (r *CrossplaneClusterConfigReconciler) getProviderConfigSpec(accountID, region, providerRole string) map[string]any {
-	partition := getPartition(region)
+func (r *CrossplaneClusterConfigReconciler) getProviderConfigSpec(clusterInfo *ClusterInfo) map[string]any {
+	partition := getPartition(clusterInfo.Region)
+	providerRole := fmt.Sprintf("giantswarm-%s-capa-controller", r.ManagementClusterName)
 	return map[string]any{
 		"credentials": map[string]any{
 			"source": "WebIdentity",
 			"webIdentity": map[string]any{
-				"roleARN": fmt.Sprintf("arn:%s:iam::%s:role/%s", partition, accountID, providerRole),
+				"roleARN": fmt.Sprintf("arn:%s:iam::%s:role/%s", partition, clusterInfo.RoleArn.AccountID, providerRole),
 			},
 		},
 	}
