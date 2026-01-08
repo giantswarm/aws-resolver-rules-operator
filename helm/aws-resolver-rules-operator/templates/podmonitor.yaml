@@ -1,3 +1,4 @@
+{{- if .Values.monitoring.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
@@ -15,3 +16,4 @@ spec:
   podMetricsEndpoints:
     - port: metrics
       interval: {{ .Values.monitoring.interval | default "60s" }}
+{{- end }}
