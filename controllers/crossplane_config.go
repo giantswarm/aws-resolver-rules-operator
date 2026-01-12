@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"slices"
 	"strings"
 
@@ -268,7 +269,7 @@ func (r *CrossplaneClusterConfigReconciler) reconcileNormal(ctx context.Context,
 
 	}
 
-	err = r.reconcileProviderConfig(ctx, clusterInfo, clusterInfo.RoleArn.AccountID, getProviderRole(r.ManagementClusterName))
+	err = r.reconcileProviderConfig(ctx, clusterInfo)
 	if err != nil {
 		logger.Error(err, "failed to reconcile provider config")
 		return ctrl.Result{}, errors.WithStack(err)
@@ -276,10 +277,6 @@ func (r *CrossplaneClusterConfigReconciler) reconcileNormal(ctx context.Context,
 	}
 
 	return ctrl.Result{}, nil
-}
-
-func getProviderRole(managementClusterName string) string {
-	return fmt.Sprintf("giantswarm-%s-capa-controller", managementClusterName)
 }
 
 type crossplaneConfigValues struct {
@@ -328,7 +325,7 @@ func (r *CrossplaneClusterConfigReconciler) reconcileConfigMap(ctx context.Conte
 	return r.updateConfigMap(ctx, clusterInfo, config, accountID, baseDomain)
 }
 
-func (r *CrossplaneClusterConfigReconciler) reconcileProviderConfig(ctx context.Context, clusterInfo *ClusterInfo, accountID, providerRole string) error {
+func (r *CrossplaneClusterConfigReconciler) reconcileProviderConfig(ctx context.Context, clusterInfo *ClusterInfo) error {
 	logger := log.FromContext(ctx)
 
 	providerConfig := getProviderConfig(clusterInfo.Name, clusterInfo.Namespace)
@@ -342,14 +339,14 @@ func (r *CrossplaneClusterConfigReconciler) reconcileProviderConfig(ctx context.
 		return nil
 	}
 	if k8serrors.IsNotFound(err) {
-		return r.createProviderConfig(ctx, providerConfig, accountID, clusterInfo.Region, providerRole)
+		return r.createProviderConfig(ctx, providerConfig, clusterInfo)
 	}
 	if err != nil {
 		logger.Error(err, "Failed to get provider config")
 		return errors.WithStack(err)
 	}
 
-	return r.updateProviderConfig(ctx, providerConfig, accountID, clusterInfo.Region, providerRole)
+	return r.updateProviderConfig(ctx, providerConfig, clusterInfo)
 }
 
 func (r *CrossplaneClusterConfigReconciler) reconcileDelete(ctx context.Context, cluster *capi.Cluster) (ctrl.Result, error) {
@@ -486,10 +483,10 @@ func (r *CrossplaneClusterConfigReconciler) updateConfigMap(ctx context.Context,
 	return nil
 }
 
-func (r *CrossplaneClusterConfigReconciler) createProviderConfig(ctx context.Context, providerConfig *unstructured.Unstructured, accountID, region, providerRole string) error {
+func (r *CrossplaneClusterConfigReconciler) createProviderConfig(ctx context.Context, providerConfig *unstructured.Unstructured, clusterInfo *ClusterInfo) error {
 	logger := log.FromContext(ctx)
 
-	providerConfig.Object["spec"] = r.getProviderConfigSpec(accountID, region, providerRole)
+	providerConfig.Object["spec"] = r.getProviderConfigSpec(clusterInfo)
 
 	err := r.Client.Create(ctx, providerConfig)
 	if k8serrors.IsAlreadyExists(err) {
@@ -504,11 +501,11 @@ func (r *CrossplaneClusterConfigReconciler) createProviderConfig(ctx context.Con
 	return nil
 }
 
-func (r *CrossplaneClusterConfigReconciler) updateProviderConfig(ctx context.Context, providerConfig *unstructured.Unstructured, accountID, region, providerRole string) error {
+func (r *CrossplaneClusterConfigReconciler) updateProviderConfig(ctx context.Context, providerConfig *unstructured.Unstructured, clusterInfo *ClusterInfo) error {
 	logger := log.FromContext(ctx)
 
 	patchedConfig := providerConfig.DeepCopy()
-	patchedConfig.Object["spec"] = r.getProviderConfigSpec(accountID, region, providerRole)
+	patchedConfig.Object["spec"] = r.getProviderConfigSpec(clusterInfo)
 	err := r.Client.Patch(ctx, patchedConfig, client.MergeFrom(providerConfig))
 	if err != nil {
 		logger.Error(err, "Failed to patch provider config")
@@ -518,15 +515,44 @@ func (r *CrossplaneClusterConfigReconciler) updateProviderConfig(ctx context.Con
 	return nil
 }
 
-func (r *CrossplaneClusterConfigReconciler) getProviderConfigSpec(accountID, region, providerRole string) map[string]any {
-	partition := getPartition(region)
-	return map[string]any{
-		"credentials": map[string]any{
-			"source": "WebIdentity",
-			"webIdentity": map[string]any{
-				"roleARN": fmt.Sprintf("arn:%s:iam::%s:role/%s", partition, accountID, providerRole),
+func (r *CrossplaneClusterConfigReconciler) getProviderConfigSpec(clusterInfo *ClusterInfo) map[string]any {
+	partition := getPartition(clusterInfo.Region)
+
+	// We're migrating Crossplane from authenticating with IRSA – a chicken-egg situation
+	// because we use Crossplane to create the IRSA OIDC setup – to static credentials,
+	// and also to have its own IAM role instead of reusing the CAPA role.
+	// Use static credentials only if defined as non-empty. We should later make them required.
+	useStaticAWSCredentials := os.Getenv("USE_CROSSPLANE_STATIC_AWS_CREDENTIALS") == "true"
+
+	if useStaticAWSCredentials {
+		providerRole := fmt.Sprintf("giantswarm-%s-crossplane", r.ManagementClusterName)
+
+		return map[string]any{
+			"assumeRoleChain": []map[string]any{{
+				"roleARN": fmt.Sprintf("arn:%s:iam::%s:role/%s", partition, clusterInfo.RoleArn.AccountID, providerRole),
+			}},
+			"credentials": map[string]any{
+				"secretRef": map[string]any{
+					"key":       "credentials",
+					"name":      "crossplane-aws-credentials",
+					"namespace": "crossplane",
+				},
+				"source": "Secret",
 			},
-		},
+		}
+	} else {
+		// IRSA
+
+		providerRole := fmt.Sprintf("giantswarm-%s-capa-controller", r.ManagementClusterName)
+
+		return map[string]any{
+			"credentials": map[string]any{
+				"source": "WebIdentity",
+				"webIdentity": map[string]any{
+					"roleARN": fmt.Sprintf("arn:%s:iam::%s:role/%s", partition, clusterInfo.RoleArn.AccountID, providerRole),
+				},
+			},
+		}
 	}
 }
 
