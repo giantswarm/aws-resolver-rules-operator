@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add Podmonitor for metrics scraping
 - Support using static credentials for Crossplane instead of relying on IRSA to authenticate to AWS. IRSA created a chicken-egg problem since we use Crossplane to create IRSA resources.
 
 ### Fixed
