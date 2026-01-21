@@ -65,6 +65,7 @@ spec:
               value: {{ .Values.managementClusterRegion }}
             - name: USE_CROSSPLANE_STATIC_AWS_CREDENTIALS
               value: {{ if or (((.Values.crossplane).aws).staticCredentials).accessKeyID (((.Values.crossplane).aws).staticCredentials).secretAccessKey }}"true"{{ else }}"false"{{ end }}
+          {{- end }}
           securityContext:
             {{- with .Values.securityContext }}
               {{- . | toYaml | nindent 12 }}
