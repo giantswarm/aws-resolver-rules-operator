@@ -88,6 +88,7 @@ deploy: ensure-deploy-envs ## Deploy controller to the K8s cluster specified in 
 		--namespace giantswarm \
 		--set image.tag=$(IMAGE_TAG) \
 		--set disableResolverControllers=true \
+		--set monitoring.enabled=false \
 		--set managementClusterName=$(MANAGEMENT_CLUSTER_NAME) \
 		--set managementClusterNamespace=$(MANAGEMENT_CLUSTER_NAMESPACE) \
 		--set aws.accessKeyID=$(AWS_ACCESS_KEY_ID) \

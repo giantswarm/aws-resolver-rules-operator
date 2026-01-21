@@ -57,7 +57,6 @@ spec:
             - name: metrics
               containerPort: 8080
               protocol: TCP
-          {{- if or (((.Values.crossplane).aws).staticCredentials).accessKeyID (((.Values.crossplane).aws).staticCredentials).secretAccessKey }}
           env:
             - name: AWS_SHARED_CREDENTIALS_FILE
               value: /home/.aws/credentials
