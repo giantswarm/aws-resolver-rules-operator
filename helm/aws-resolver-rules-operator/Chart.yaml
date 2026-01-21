@@ -4,5 +4,6 @@ description: Operator for reconciling the Route53 hosted zone and basic records 
 home: https://github.com/giantswarm/aws-resolver-rules-operator
 icon: https://s.giantswarm.io/app-icons/aws/2/dark.svg
 version: "0.24.1"
+appVersion: "0.24.1"
 annotations:
   application.giantswarm.io/team: "phoenix"

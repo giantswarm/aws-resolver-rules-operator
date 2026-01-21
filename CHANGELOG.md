@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add Podmonitor for metrics scraping.
 - Add kubelet `systemReserved` and `kubeReserved` configuration to `EC2NodeClass` to fix Karpenter miscalculating available node resources.
 
+### Changed
+
+- Use `Chart.AppVersion` instead of `Chart.Version` when adding labels to kubernetes resources.
+
 ## [0.24.1] - 2026-01-12
 
 ### Fixed
