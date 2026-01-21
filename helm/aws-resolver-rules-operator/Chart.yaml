@@ -6,4 +6,4 @@ icon: https://s.giantswarm.io/app-icons/aws/2/dark.svg
 version: "0.25.0"
 appVersion: "0.25.0"
 annotations:
-  application.giantswarm.io/team: "phoenix"
+  io.giantswarm.application.team: "phoenix"
