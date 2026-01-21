@@ -57,7 +57,6 @@ spec:
             - name: metrics
               containerPort: 8080
               protocol: TCP
-          {{- if or (((.Values.crossplane).aws).staticCredentials).accessKeyID (((.Values.crossplane).aws).staticCredentials).secretAccessKey }}
           env:
             - name: AWS_SHARED_CREDENTIALS_FILE
               value: /home/.aws/credentials
@@ -65,7 +64,6 @@ spec:
               value: {{ .Values.managementClusterRegion }}
             - name: USE_CROSSPLANE_STATIC_AWS_CREDENTIALS
               value: {{ if or (((.Values.crossplane).aws).staticCredentials).accessKeyID (((.Values.crossplane).aws).staticCredentials).secretAccessKey }}"true"{{ else }}"false"{{ end }}
-          {{- end }}
           securityContext:
             {{- with .Values.securityContext }}
               {{- . | toYaml | nindent 12 }}
