@@ -9,13 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add Podmonitor for metrics scraping
+- Add Podmonitor for metrics scraping.
+- Add kubelet `systemReserved` and `kubeReserved` configuration to `EC2NodeClass` to fix Karpenter miscalculating available node resources.
 
 ## [0.24.1] - 2026-01-12
 
 ### Fixed
 
-- Fix environment variables for AWS access in case of using static Crossplane credentials
+- Fix environment variables for AWS access in case of using static Crossplane credentials.
 
 ## [0.24.0] - 2026-01-08
 
