@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Use `Chart.AppVersion` instead of `Chart.Version` when adding labels to kubernetes resources.
+- Change team annotation in the `Chart.yaml` file.
+
 ## [0.25.0] - 2026-01-21
 
 ### Added
