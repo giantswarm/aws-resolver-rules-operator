@@ -1033,6 +1033,9 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 									nodeClaim1.Object = map[string]interface{}{
 										"metadata": map[string]interface{}{
 											"name": fmt.Sprintf("%s-z9y8x", KarpenterMachinePoolName),
+											"labels": map[string]interface{}{
+												"karpenter.sh/nodepool": KarpenterMachinePoolName,
+											},
 										},
 										"spec": map[string]interface{}{
 											"nodeClassRef": map[string]interface{}{
@@ -1065,6 +1068,9 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 									nodeClaim2.Object = map[string]interface{}{
 										"metadata": map[string]interface{}{
 											"name": fmt.Sprintf("%s-m0n1o", KarpenterMachinePoolName),
+											"labels": map[string]interface{}{
+												"karpenter.sh/nodepool": KarpenterMachinePoolName,
+											},
 										},
 										"spec": map[string]interface{}{
 											"nodeClassRef": map[string]interface{}{
@@ -1106,6 +1112,175 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 									// Check karpenter machine pool spec and status
 									Expect(updatedKarpenterMachinePool.Status.Replicas).To(Equal(int32(2)))
 									Expect(updatedKarpenterMachinePool.Spec.ProviderIDList).To(ContainElements("aws:///us-west-2a/i-1234567890abcdef0", "aws:///us-west-2a/i-09876543219fedcba"))
+								})
+
+								When("there are also NodeClaims belonging to a different NodePool", func() {
+									BeforeEach(func() {
+										// Create NodeClaims belonging to a different NodePool
+										// These should NOT be counted by the KarpenterMachinePool being reconciled
+										otherNodePoolName := "other-nodepool"
+
+										otherNodeClaim1 := &unstructured.Unstructured{}
+										otherNodeClaim1.Object = map[string]interface{}{
+											"metadata": map[string]interface{}{
+												"name": fmt.Sprintf("%s-a1b2c", otherNodePoolName),
+												"labels": map[string]interface{}{
+													"karpenter.sh/nodepool": otherNodePoolName,
+												},
+											},
+											"spec": map[string]interface{}{
+												"nodeClassRef": map[string]interface{}{
+													"group": "karpenter.k8s.aws",
+													"kind":  "EC2NodeClass",
+													"name":  otherNodePoolName,
+												},
+												"requirements": []interface{}{
+													map[string]interface{}{
+														"key":      "kubernetes.io/arch",
+														"operator": "In",
+														"values":   []string{"amd64"},
+													},
+												},
+											},
+										}
+										otherNodeClaim1.SetGroupVersionKind(schema.GroupVersionKind{
+											Group:   "karpenter.sh",
+											Kind:    "NodeClaim",
+											Version: "v1",
+										})
+										err := k8sClient.Create(ctx, otherNodeClaim1)
+										Expect(err).NotTo(HaveOccurred())
+										err = unstructured.SetNestedField(otherNodeClaim1.Object, map[string]interface{}{"providerID": "aws:///us-west-2b/i-other111111111111"}, "status")
+										Expect(err).NotTo(HaveOccurred())
+										err = k8sClient.Status().Update(ctx, otherNodeClaim1)
+										Expect(err).NotTo(HaveOccurred())
+
+										otherNodeClaim2 := &unstructured.Unstructured{}
+										otherNodeClaim2.Object = map[string]interface{}{
+											"metadata": map[string]interface{}{
+												"name": fmt.Sprintf("%s-d3e4f", otherNodePoolName),
+												"labels": map[string]interface{}{
+													"karpenter.sh/nodepool": otherNodePoolName,
+												},
+											},
+											"spec": map[string]interface{}{
+												"nodeClassRef": map[string]interface{}{
+													"group": "karpenter.k8s.aws",
+													"kind":  "EC2NodeClass",
+													"name":  otherNodePoolName,
+												},
+												"requirements": []interface{}{
+													map[string]interface{}{
+														"key":      "kubernetes.io/arch",
+														"operator": "In",
+														"values":   []string{"amd64"},
+													},
+												},
+											},
+										}
+										otherNodeClaim2.SetGroupVersionKind(schema.GroupVersionKind{
+											Group:   "karpenter.sh",
+											Kind:    "NodeClaim",
+											Version: "v1",
+										})
+										err = k8sClient.Create(ctx, otherNodeClaim2)
+										Expect(err).NotTo(HaveOccurred())
+										err = unstructured.SetNestedField(otherNodeClaim2.Object, map[string]interface{}{"providerID": "aws:///us-west-2b/i-other222222222222"}, "status")
+										Expect(err).NotTo(HaveOccurred())
+										err = k8sClient.Status().Update(ctx, otherNodeClaim2)
+										Expect(err).NotTo(HaveOccurred())
+
+										otherNodeClaim3 := &unstructured.Unstructured{}
+										otherNodeClaim3.Object = map[string]interface{}{
+											"metadata": map[string]interface{}{
+												"name": fmt.Sprintf("%s-g5h6i", otherNodePoolName),
+												"labels": map[string]interface{}{
+													"karpenter.sh/nodepool": otherNodePoolName,
+												},
+											},
+											"spec": map[string]interface{}{
+												"nodeClassRef": map[string]interface{}{
+													"group": "karpenter.k8s.aws",
+													"kind":  "EC2NodeClass",
+													"name":  otherNodePoolName,
+												},
+												"requirements": []interface{}{
+													map[string]interface{}{
+														"key":      "kubernetes.io/arch",
+														"operator": "In",
+														"values":   []string{"amd64"},
+													},
+												},
+											},
+										}
+										otherNodeClaim3.SetGroupVersionKind(schema.GroupVersionKind{
+											Group:   "karpenter.sh",
+											Kind:    "NodeClaim",
+											Version: "v1",
+										})
+										err = k8sClient.Create(ctx, otherNodeClaim3)
+										Expect(err).NotTo(HaveOccurred())
+										err = unstructured.SetNestedField(otherNodeClaim3.Object, map[string]interface{}{"providerID": "aws:///us-west-2b/i-other333333333333"}, "status")
+										Expect(err).NotTo(HaveOccurred())
+										err = k8sClient.Status().Update(ctx, otherNodeClaim3)
+										Expect(err).NotTo(HaveOccurred())
+
+										otherNodeClaim4 := &unstructured.Unstructured{}
+										otherNodeClaim4.Object = map[string]interface{}{
+											"metadata": map[string]interface{}{
+												"name": fmt.Sprintf("%s-j7k8l", otherNodePoolName),
+												"labels": map[string]interface{}{
+													"karpenter.sh/nodepool": otherNodePoolName,
+												},
+											},
+											"spec": map[string]interface{}{
+												"nodeClassRef": map[string]interface{}{
+													"group": "karpenter.k8s.aws",
+													"kind":  "EC2NodeClass",
+													"name":  otherNodePoolName,
+												},
+												"requirements": []interface{}{
+													map[string]interface{}{
+														"key":      "kubernetes.io/arch",
+														"operator": "In",
+														"values":   []string{"amd64"},
+													},
+												},
+											},
+										}
+										otherNodeClaim4.SetGroupVersionKind(schema.GroupVersionKind{
+											Group:   "karpenter.sh",
+											Kind:    "NodeClaim",
+											Version: "v1",
+										})
+										err = k8sClient.Create(ctx, otherNodeClaim4)
+										Expect(err).NotTo(HaveOccurred())
+										err = unstructured.SetNestedField(otherNodeClaim4.Object, map[string]interface{}{"providerID": "aws:///us-west-2b/i-other444444444444"}, "status")
+										Expect(err).NotTo(HaveOccurred())
+										err = k8sClient.Status().Update(ctx, otherNodeClaim4)
+										Expect(err).NotTo(HaveOccurred())
+									})
+
+									It("only counts NodeClaims belonging to its own NodePool", func() {
+										Expect(reconcileErr).NotTo(HaveOccurred())
+										updatedKarpenterMachinePool := &karpenterinfra.KarpenterMachinePool{}
+										err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: KarpenterMachinePoolName}, updatedKarpenterMachinePool)
+										Expect(err).NotTo(HaveOccurred())
+
+										// Should only count 2 NodeClaims (belonging to KarpenterMachinePoolName),
+										// NOT 6 (2 + 4 from other-nodepool)
+										Expect(updatedKarpenterMachinePool.Status.Replicas).To(Equal(int32(2)))
+										Expect(updatedKarpenterMachinePool.Spec.ProviderIDList).To(HaveLen(2))
+										Expect(updatedKarpenterMachinePool.Spec.ProviderIDList).To(ContainElements(
+											"aws:///us-west-2a/i-1234567890abcdef0",
+											"aws:///us-west-2a/i-09876543219fedcba",
+										))
+										// Verify it does NOT contain the other NodePool's instances
+										Expect(updatedKarpenterMachinePool.Spec.ProviderIDList).NotTo(ContainElement("aws:///us-west-2b/i-other111111111111"))
+										Expect(updatedKarpenterMachinePool.Spec.ProviderIDList).NotTo(ContainElement("aws:///us-west-2b/i-other222222222222"))
+										Expect(updatedKarpenterMachinePool.Spec.ProviderIDList).NotTo(ContainElement("aws:///us-west-2b/i-other333333333333"))
+										Expect(updatedKarpenterMachinePool.Spec.ProviderIDList).NotTo(ContainElement("aws:///us-west-2b/i-other444444444444"))
+									})
 								})
 							})
 							When("the S3 API returns an error", func() {

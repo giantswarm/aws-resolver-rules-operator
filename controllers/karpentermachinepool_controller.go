@@ -235,7 +235,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 // saveKarpenterInstancesToStatus updates the KarpenterMachinePool and parent MachinePool with current node information
 // from the workload cluster, including replica counts and provider ID lists.
 func (r *KarpenterMachinePoolReconciler) saveKarpenterInstancesToStatus(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, machinePool *capiexp.MachinePool) error {
-	providerIDList, numberOfNodeClaims, err := r.computeProviderIDListFromNodeClaimsInWorkloadCluster(ctx, logger, cluster)
+	providerIDList, numberOfNodeClaims, err := r.computeProviderIDListFromNodeClaimsInWorkloadCluster(ctx, logger, cluster, karpenterMachinePool.Name)
 	if err != nil {
 		return err
 	}
@@ -343,9 +343,10 @@ func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, lo
 	return reconcile.Result{}, nil
 }
 
-// getWorkloadClusterNodeClaims retrieves all NodeClaim resources from the workload cluster.
+// getWorkloadClusterNodeClaims retrieves NodeClaim resources from the workload cluster
+// that belong to the specified NodePool.
 // NodeClaims represent actual compute resources provisioned by Karpenter.
-func (r *KarpenterMachinePoolReconciler) getWorkloadClusterNodeClaims(ctx context.Context, cluster *capi.Cluster) (*unstructured.UnstructuredList, error) {
+func (r *KarpenterMachinePoolReconciler) getWorkloadClusterNodeClaims(ctx context.Context, cluster *capi.Cluster, nodePoolName string) (*unstructured.UnstructuredList, error) {
 	nodeClaimList := &unstructured.UnstructuredList{}
 	workloadClusterClient, err := r.clusterClientGetter(ctx, "", r.client, client.ObjectKeyFromObject(cluster))
 	if err != nil {
@@ -359,17 +360,17 @@ func (r *KarpenterMachinePoolReconciler) getWorkloadClusterNodeClaims(ctx contex
 	}
 	nodeClaimList.SetGroupVersionKind(nodeClaimGVR.GroupVersion().WithKind("NodeClaimList"))
 
-	err = workloadClusterClient.List(ctx, nodeClaimList)
+	err = workloadClusterClient.List(ctx, nodeClaimList, client.MatchingLabels{"karpenter.sh/nodepool": nodePoolName})
 	return nodeClaimList, err
 }
 
 // computeProviderIDListFromNodeClaimsInWorkloadCluster extracts provider IDs from NodeClaims
-// and returns both the list of provider IDs and the total count of node claims.
+// belonging to the specified NodePool and returns both the list of provider IDs and the total count.
 // Provider IDs are AWS-specific identifiers like "aws:///us-west-2a/i-1234567890abcdef0"
-func (r *KarpenterMachinePoolReconciler) computeProviderIDListFromNodeClaimsInWorkloadCluster(ctx context.Context, logger logr.Logger, cluster *capi.Cluster) ([]string, int32, error) {
+func (r *KarpenterMachinePoolReconciler) computeProviderIDListFromNodeClaimsInWorkloadCluster(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, nodePoolName string) ([]string, int32, error) {
 	var providerIDList []string
 
-	nodeClaimList, err := r.getWorkloadClusterNodeClaims(ctx, cluster)
+	nodeClaimList, err := r.getWorkloadClusterNodeClaims(ctx, cluster, nodePoolName)
 	if err != nil {
 		return providerIDList, 0, err
 	}
