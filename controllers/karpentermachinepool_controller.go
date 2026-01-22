@@ -480,17 +480,10 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 			"subnetSelectorTerms":        karpenterMachinePool.Spec.EC2NodeClass.SubnetSelectorTerms,
 			"userData":                   userData,
 			"tags":                       mergeMaps(awsCluster.Spec.AdditionalTags, karpenterMachinePool.Spec.EC2NodeClass.Tags),
-			"kubelet": map[string]interface{}{
-				"systemReserved": map[string]string{
-					"cpu":    "250m",
-					"memory": "384Mi",
-				},
-				"kubeReserved": map[string]string{
-					"cpu":               "350m",
-					"memory":            "1280Mi",
-					"ephemeral-storage": "1024Mi",
-				},
-			},
+		}
+
+		if karpenterMachinePool.Spec.EC2NodeClass.Kubelet != nil {
+			spec["kubelet"] = karpenterMachinePool.Spec.EC2NodeClass.Kubelet
 		}
 
 		ec2NodeClass.Object["spec"] = spec

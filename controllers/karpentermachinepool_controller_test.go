@@ -601,6 +601,16 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 							Tags: map[string]string{
 								"one-tag": "only-for-karpenter",
 							},
+							Kubelet: &karpenterinfra.KubeletConfiguration{
+								SystemReserved: map[string]string{
+									"cpu":    "100m",
+									"memory": "256Mi",
+								},
+								KubeReserved: map[string]string{
+									"cpu":    "200m",
+									"memory": "512Mi",
+								},
+							},
 						},
 						NodePool: &karpenterinfra.NodePoolSpec{
 							Template: karpenterinfra.NodeClaimTemplate{
@@ -973,13 +983,12 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "kubelet").To(
 									gstruct.MatchAllKeys(gstruct.Keys{
 										"systemReserved": gstruct.MatchAllKeys(gstruct.Keys{
-											"cpu":    Equal("250m"),
-											"memory": Equal("384Mi"),
+											"cpu":    Equal("100m"),
+											"memory": Equal("256Mi"),
 										}),
 										"kubeReserved": gstruct.MatchAllKeys(gstruct.Keys{
-											"cpu":               Equal("350m"),
-											"memory":            Equal("1280Mi"),
-											"ephemeral-storage": Equal("1024Mi"),
+											"cpu":    Equal("200m"),
+											"memory": Equal("512Mi"),
 										}),
 									}),
 								)
