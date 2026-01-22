@@ -969,6 +969,20 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 										}),
 									),
 								)
+
+								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "kubelet").To(
+									gstruct.MatchAllKeys(gstruct.Keys{
+										"systemReserved": gstruct.MatchAllKeys(gstruct.Keys{
+											"cpu":    Equal("250m"),
+											"memory": Equal("384Mi"),
+										}),
+										"kubeReserved": gstruct.MatchAllKeys(gstruct.Keys{
+											"cpu":               Equal("350m"),
+											"memory":            Equal("1280Mi"),
+											"ephemeral-storage": Equal("1024Mi"),
+										}),
+									}),
+								)
 							})
 							It("creates karpenter NodePool object in workload cluster", func() {
 								nodepoolList := &unstructured.UnstructuredList{}
