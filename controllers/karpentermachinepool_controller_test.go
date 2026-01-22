@@ -1047,9 +1047,6 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 									nodeClaim1.Object = map[string]interface{}{
 										"metadata": map[string]interface{}{
 											"name": fmt.Sprintf("%s-z9y8x", KarpenterMachinePoolName),
-											"labels": map[string]interface{}{
-												"karpenter.sh/nodepool": KarpenterMachinePoolName,
-											},
 										},
 										"spec": map[string]interface{}{
 											"nodeClassRef": map[string]interface{}{
@@ -1071,6 +1068,9 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 										Kind:    "NodeClaim",
 										Version: "v1",
 									})
+									nodeClaim1.SetLabels(map[string]string{
+										"karpenter.sh/nodepool": KarpenterMachinePoolName,
+									})
 									err := k8sClient.Create(ctx, nodeClaim1)
 									Expect(err).NotTo(HaveOccurred())
 									err = unstructured.SetNestedField(nodeClaim1.Object, map[string]interface{}{"providerID": "aws:///us-west-2a/i-1234567890abcdef0"}, "status")
@@ -1082,9 +1082,6 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 									nodeClaim2.Object = map[string]interface{}{
 										"metadata": map[string]interface{}{
 											"name": fmt.Sprintf("%s-m0n1o", KarpenterMachinePoolName),
-											"labels": map[string]interface{}{
-												"karpenter.sh/nodepool": KarpenterMachinePoolName,
-											},
 										},
 										"spec": map[string]interface{}{
 											"nodeClassRef": map[string]interface{}{
@@ -1105,6 +1102,9 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 										Group:   "karpenter.sh",
 										Kind:    "NodeClaim",
 										Version: "v1",
+									})
+									nodeClaim2.SetLabels(map[string]string{
+										"karpenter.sh/nodepool": KarpenterMachinePoolName,
 									})
 									err = k8sClient.Create(ctx, nodeClaim2)
 									Expect(err).NotTo(HaveOccurred())
@@ -1138,9 +1138,6 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 										otherNodeClaim1.Object = map[string]interface{}{
 											"metadata": map[string]interface{}{
 												"name": fmt.Sprintf("%s-a1b2c", otherNodePoolName),
-												"labels": map[string]interface{}{
-													"karpenter.sh/nodepool": otherNodePoolName,
-												},
 											},
 											"spec": map[string]interface{}{
 												"nodeClassRef": map[string]interface{}{
@@ -1162,6 +1159,9 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 											Kind:    "NodeClaim",
 											Version: "v1",
 										})
+										otherNodeClaim1.SetLabels(map[string]string{
+											"karpenter.sh/nodepool": otherNodePoolName,
+										})
 										err := k8sClient.Create(ctx, otherNodeClaim1)
 										Expect(err).NotTo(HaveOccurred())
 										err = unstructured.SetNestedField(otherNodeClaim1.Object, map[string]interface{}{"providerID": "aws:///us-west-2b/i-other111111111111"}, "status")
@@ -1173,9 +1173,6 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 										otherNodeClaim2.Object = map[string]interface{}{
 											"metadata": map[string]interface{}{
 												"name": fmt.Sprintf("%s-d3e4f", otherNodePoolName),
-												"labels": map[string]interface{}{
-													"karpenter.sh/nodepool": otherNodePoolName,
-												},
 											},
 											"spec": map[string]interface{}{
 												"nodeClassRef": map[string]interface{}{
@@ -1197,6 +1194,9 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 											Kind:    "NodeClaim",
 											Version: "v1",
 										})
+										otherNodeClaim2.SetLabels(map[string]string{
+											"karpenter.sh/nodepool": otherNodePoolName,
+										})
 										err = k8sClient.Create(ctx, otherNodeClaim2)
 										Expect(err).NotTo(HaveOccurred())
 										err = unstructured.SetNestedField(otherNodeClaim2.Object, map[string]interface{}{"providerID": "aws:///us-west-2b/i-other222222222222"}, "status")
@@ -1208,9 +1208,6 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 										otherNodeClaim3.Object = map[string]interface{}{
 											"metadata": map[string]interface{}{
 												"name": fmt.Sprintf("%s-g5h6i", otherNodePoolName),
-												"labels": map[string]interface{}{
-													"karpenter.sh/nodepool": otherNodePoolName,
-												},
 											},
 											"spec": map[string]interface{}{
 												"nodeClassRef": map[string]interface{}{
@@ -1232,6 +1229,9 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 											Kind:    "NodeClaim",
 											Version: "v1",
 										})
+										otherNodeClaim3.SetLabels(map[string]string{
+											"karpenter.sh/nodepool": otherNodePoolName,
+										})
 										err = k8sClient.Create(ctx, otherNodeClaim3)
 										Expect(err).NotTo(HaveOccurred())
 										err = unstructured.SetNestedField(otherNodeClaim3.Object, map[string]interface{}{"providerID": "aws:///us-west-2b/i-other333333333333"}, "status")
@@ -1243,9 +1243,6 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 										otherNodeClaim4.Object = map[string]interface{}{
 											"metadata": map[string]interface{}{
 												"name": fmt.Sprintf("%s-j7k8l", otherNodePoolName),
-												"labels": map[string]interface{}{
-													"karpenter.sh/nodepool": otherNodePoolName,
-												},
 											},
 											"spec": map[string]interface{}{
 												"nodeClassRef": map[string]interface{}{
@@ -1266,6 +1263,9 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 											Group:   "karpenter.sh",
 											Kind:    "NodeClaim",
 											Version: "v1",
+										})
+										otherNodeClaim4.SetLabels(map[string]string{
+											"karpenter.sh/nodepool": otherNodePoolName,
 										})
 										err = k8sClient.Create(ctx, otherNodeClaim4)
 										Expect(err).NotTo(HaveOccurred())
