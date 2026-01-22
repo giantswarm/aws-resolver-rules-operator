@@ -38,6 +38,7 @@ Fakes in `*fakes/` dirs (Counterfeiter). Integration uses LocalStack.
 - **Structured logging**: `log := log.FromContext(ctx); log.Info("msg", "key", val)`
 - **Owner references**: Enable automatic garbage collection (`SetControllerReference`)
 - **Finalizers**: Clean up external resources (buckets, VMs, DNS entries)
+- **Tests**: When changing logic in go files, make sure to update existing tests accordingly, or add new ones that cover the new logic.
 
 ## Deployment
 
