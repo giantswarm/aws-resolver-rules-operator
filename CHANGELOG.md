@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Use configurable kubelet `systemReserved` and `kubeReserved` settings from `KarpenterMachinePool.Spec.EC2NodeClass.Kubelet` instead of hardcoded values.
+
 ## [0.25.1] - 2026-01-21
 
 ### Changed
