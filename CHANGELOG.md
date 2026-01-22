@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix KarpenterMachinePool controller counting NodeClaims from all NodePools instead of filtering by `karpenter.sh/nodepool` label. This caused all MachinePools to show the same replica count.
+
 ## [0.25.1] - 2026-01-21
 
 ### Changed
