@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Support for custom DNS hosted zone via annotations:
+  - `aws.giantswarm.io/dns-hosted-zone-name`: Override the hosted zone name for the cluster.
+  - `aws.giantswarm.io/dns-delegation-role-arn`: Specify a custom IAM role for DNS delegation to the parent zone.
+
 ## [0.25.2] - 2026-01-22
 
 ### Fixed

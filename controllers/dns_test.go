@@ -413,6 +413,72 @@ var _ = Describe("Dns Zone reconciler", func() {
 						})
 					})
 
+					When("a custom hosted zone name is specified via annotation", func() {
+						const customHostedZoneName = "my-cluster.custom.domain.com"
+
+						BeforeEach(func() {
+							awsCluster.Annotations = map[string]string{
+								controllers.AWSDNSHostedZoneName: customHostedZoneName,
+							}
+							route53Client.GetHostedZoneIdByNameReturns("custom-parent-hosted-zone-id", nil)
+							route53Client.CreateHostedZoneReturns("hosted-zone-id", nil)
+						})
+
+						It("creates hosted zone with custom name", func() {
+							Expect(route53Client.CreateHostedZoneCallCount()).To(Equal(1))
+							_, _, dnsZone := route53Client.CreateHostedZoneArgsForCall(0)
+							Expect(dnsZone.DnsName).To(Equal(customHostedZoneName))
+							Expect(reconcileErr).NotTo(HaveOccurred())
+						})
+
+						It("derives parent zone from custom hosted zone name", func() {
+							Expect(route53Client.GetHostedZoneIdByNameCallCount()).To(Equal(1))
+							_, _, parentZoneName := route53Client.GetHostedZoneIdByNameArgsForCall(0)
+							Expect(parentZoneName).To(Equal("custom.domain.com"))
+						})
+
+						It("creates DNS records using custom zone name", func() {
+							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+							Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
+								Kind:   resolver.DnsRecordTypeCname,
+								Name:   fmt.Sprintf("*.%s", customHostedZoneName),
+								Values: []string{fmt.Sprintf("ingress.%s", customHostedZoneName)},
+							}))
+						})
+					})
+
+					When("a custom delegation role ARN is specified via annotation", func() {
+						const customDelegationRoleARN = "arn:aws:iam::123456789012:role/CustomDelegationRole"
+
+						BeforeEach(func() {
+							awsCluster.Annotations = map[string]string{
+								controllers.AWSDNSDelegationRoleARN: customDelegationRoleARN,
+							}
+							route53Client.GetHostedZoneIdByNameReturns("parent-hosted-zone-id", nil)
+							route53Client.CreateHostedZoneReturns("hosted-zone-id", nil)
+						})
+
+						It("uses custom role ARN for delegation operations", func() {
+							Expect(route53Client.AddDelegationToParentZoneCallCount()).To(Equal(1))
+							Expect(reconcileErr).NotTo(HaveOccurred())
+						})
+					})
+
+					When("a custom hosted zone name without valid parent is specified", func() {
+						BeforeEach(func() {
+							awsCluster.Annotations = map[string]string{
+								controllers.AWSDNSHostedZoneName: "invalid",
+							}
+							route53Client.CreateHostedZoneReturns("hosted-zone-id", nil)
+						})
+
+						It("skips delegation but creates the hosted zone", func() {
+							Expect(route53Client.CreateHostedZoneCallCount()).To(Equal(1))
+							Expect(route53Client.AddDelegationToParentZoneCallCount()).To(Equal(0))
+							Expect(reconcileErr).NotTo(HaveOccurred())
+						})
+					})
+
 					When("the cluster uses private dns mode", func() {
 						BeforeEach(func() {
 							awsCluster.Annotations = map[string]string{

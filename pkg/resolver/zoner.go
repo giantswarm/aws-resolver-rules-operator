@@ -79,25 +79,31 @@ func (d *Zoner) CreateHostedZone(ctx context.Context, logger logr.Logger, cluste
 		return errors.WithStack(err)
 	}
 
-	mcRoute53Client, err := d.getCachedOrNewRoute53Client(cluster.Region, cluster.MCIAMRoleARN, logger)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
 	if !cluster.IsDnsModePrivate {
-		parentHostedZoneId, err := mcRoute53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName())
-		if err != nil {
-			return errors.WithStack(err)
-		}
+		parentHostedZoneName := d.getParentHostedZoneName(cluster)
+		if parentHostedZoneName == "" {
+			logger.Info("Skipping DNS delegation - no valid parent zone derivable from custom hosted zone name")
+		} else {
+			delegationRoleARN := d.getDelegationRoleARN(cluster)
+			delegationRoute53Client, err := d.getCachedOrNewRoute53Client(cluster.Region, delegationRoleARN, logger)
+			if err != nil {
+				return errors.WithStack(err)
+			}
 
-		nsRecord, err := route53Client.GetHostedZoneNSRecord(ctx, logger, hostedZoneId, dnsZoneToCreate.DnsName)
-		if err != nil {
-			return errors.WithStack(err)
-		}
+			parentHostedZoneId, err := delegationRoute53Client.GetHostedZoneIdByName(ctx, logger, parentHostedZoneName)
+			if err != nil {
+				return errors.WithStack(err)
+			}
 
-		err = mcRoute53Client.AddDelegationToParentZone(ctx, logger, parentHostedZoneId, nsRecord)
-		if err != nil {
-			return errors.WithStack(err)
+			nsRecord, err := route53Client.GetHostedZoneNSRecord(ctx, logger, hostedZoneId, dnsZoneToCreate.DnsName)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
+			err = delegationRoute53Client.AddDelegationToParentZone(ctx, logger, parentHostedZoneId, nsRecord)
+			if err != nil {
+				return errors.WithStack(err)
+			}
 		}
 	}
 
@@ -123,24 +129,31 @@ func (d *Zoner) DeleteHostedZone(ctx context.Context, logger logr.Logger, cluste
 	logger = logger.WithValues("hostedZoneId", hostedZoneId)
 
 	if !cluster.IsDnsModePrivate {
-		mcRoute53Client, err := d.getCachedOrNewRoute53Client(cluster.Region, cluster.MCIAMRoleARN, logger)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-		parentHostedZoneId, err := mcRoute53Client.GetHostedZoneIdByName(ctx, logger, d.getParentHostedZoneName())
-		if err != nil {
-			return errors.WithStack(err)
-		}
+		parentHostedZoneName := d.getParentHostedZoneName(cluster)
+		if parentHostedZoneName == "" {
+			logger.Info("Skipping DNS delegation deletion - no valid parent zone derivable from custom hosted zone name")
+		} else {
+			delegationRoleARN := d.getDelegationRoleARN(cluster)
+			delegationRoute53Client, err := d.getCachedOrNewRoute53Client(cluster.Region, delegationRoleARN, logger)
+			if err != nil {
+				return errors.WithStack(err)
+			}
 
-		nsRecord, err := route53Client.GetHostedZoneNSRecord(ctx, logger, hostedZoneId, hostedZoneName)
-		if err != nil {
-			return errors.WithStack(err)
-		}
+			parentHostedZoneId, err := delegationRoute53Client.GetHostedZoneIdByName(ctx, logger, parentHostedZoneName)
+			if err != nil {
+				return errors.WithStack(err)
+			}
 
-		logger.Info("Deleting delegation from parent hosted zone", "parentHostedZoneId", parentHostedZoneId)
-		err = mcRoute53Client.DeleteDelegationFromParentZone(ctx, logger, parentHostedZoneId, nsRecord)
-		if err != nil {
-			return errors.WithStack(err)
+			nsRecord, err := route53Client.GetHostedZoneNSRecord(ctx, logger, hostedZoneId, hostedZoneName)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
+			logger.Info("Deleting delegation from parent hosted zone", "parentHostedZoneId", parentHostedZoneId)
+			err = delegationRoute53Client.DeleteDelegationFromParentZone(ctx, logger, parentHostedZoneId, nsRecord)
+			if err != nil {
+				return errors.WithStack(err)
+			}
 		}
 	}
 
@@ -173,11 +186,29 @@ func (d *Zoner) createDnsRecords(ctx context.Context, logger logr.Logger, cluste
 }
 
 func (d *Zoner) getHostedZoneName(cluster Cluster) string {
+	if cluster.CustomHostedZoneName != "" {
+		return cluster.CustomHostedZoneName
+	}
 	return fmt.Sprintf("%s.%s", cluster.Name, d.workloadClusterBaseDomain)
 }
 
-func (d *Zoner) getParentHostedZoneName() string {
+func (d *Zoner) getParentHostedZoneName(cluster Cluster) string {
+	if cluster.CustomHostedZoneName != "" {
+		// Custom zone: derive parent (e.g., "foo.bar.com" → "bar.com")
+		parts := strings.SplitN(cluster.CustomHostedZoneName, ".", 2)
+		if len(parts) == 2 && strings.Contains(parts[1], ".") {
+			return parts[1]
+		}
+		return "" // No valid parent → skip delegation
+	}
 	return d.workloadClusterBaseDomain
+}
+
+func (d *Zoner) getDelegationRoleARN(cluster Cluster) string {
+	if cluster.DelegationIAMRoleARN != "" {
+		return cluster.DelegationIAMRoleARN
+	}
+	return cluster.MCIAMRoleARN
 }
 
 func (d *Zoner) getTagsForHostedZone(cluster Cluster) map[string]string {
