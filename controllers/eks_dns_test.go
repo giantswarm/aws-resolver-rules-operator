@@ -540,7 +540,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 						})
 					})
 
-					When("a custom hosted zone name without valid parent is specified", func() {
+					When("a custom hosted zone name without valid parent is specified (single label)", func() {
 						BeforeEach(func() {
 							awsManagedControlPlane.Annotations = map[string]string{
 								controllers.DNSHostedZoneNameAnnotation: "invalid",
@@ -552,6 +552,41 @@ var _ = Describe("Dns Zone reconciler", func() {
 							Expect(route53Client.CreateHostedZoneCallCount()).To(Equal(1))
 							Expect(route53Client.AddDelegationToParentZoneCallCount()).To(Equal(0))
 							Expect(reconcileErr).NotTo(HaveOccurred())
+						})
+					})
+
+					When("a custom hosted zone name with only two labels is specified", func() {
+						BeforeEach(func() {
+							awsManagedControlPlane.Annotations = map[string]string{
+								controllers.DNSHostedZoneNameAnnotation: "foo.com",
+							}
+							route53Client.CreateHostedZoneReturns("hosted-zone-id", nil)
+						})
+
+						It("skips delegation because parent would be TLD only", func() {
+							Expect(route53Client.CreateHostedZoneCallCount()).To(Equal(1))
+							_, _, dnsZone := route53Client.CreateHostedZoneArgsForCall(0)
+							Expect(dnsZone.DnsName).To(Equal("foo.com"))
+							Expect(route53Client.AddDelegationToParentZoneCallCount()).To(Equal(0))
+							Expect(reconcileErr).NotTo(HaveOccurred())
+						})
+					})
+
+					When("a deeply nested custom hosted zone name is specified", func() {
+						const customHostedZoneName = "deep.nested.sub.domain.com"
+
+						BeforeEach(func() {
+							awsManagedControlPlane.Annotations = map[string]string{
+								controllers.DNSHostedZoneNameAnnotation: customHostedZoneName,
+							}
+							route53Client.GetHostedZoneIdByNameReturns("parent-hosted-zone-id", nil)
+							route53Client.CreateHostedZoneReturns("hosted-zone-id", nil)
+						})
+
+						It("derives the correct parent zone", func() {
+							Expect(route53Client.GetHostedZoneIdByNameCallCount()).To(Equal(1))
+							_, _, parentZoneName := route53Client.GetHostedZoneIdByNameArgsForCall(0)
+							Expect(parentZoneName).To(Equal("nested.sub.domain.com"))
 						})
 					})
 
