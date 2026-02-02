@@ -418,7 +418,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 
 						BeforeEach(func() {
 							awsCluster.Annotations = map[string]string{
-								controllers.AWSDNSHostedZoneName: customHostedZoneName,
+								controllers.DNSHostedZoneNameAnnotation: customHostedZoneName,
 							}
 							route53Client.GetHostedZoneIdByNameReturns("custom-parent-hosted-zone-id", nil)
 							route53Client.CreateHostedZoneReturns("hosted-zone-id", nil)
@@ -452,7 +452,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 
 						BeforeEach(func() {
 							awsCluster.Annotations = map[string]string{
-								controllers.AWSDNSDelegationRoleARN: customDelegationRoleARN,
+								controllers.AWSDNSDelegationRoleARNAnnotation: customDelegationRoleARN,
 							}
 							route53Client.GetHostedZoneIdByNameReturns("parent-hosted-zone-id", nil)
 							route53Client.CreateHostedZoneReturns("hosted-zone-id", nil)
@@ -467,7 +467,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 					When("a custom hosted zone name without valid parent is specified", func() {
 						BeforeEach(func() {
 							awsCluster.Annotations = map[string]string{
-								controllers.AWSDNSHostedZoneName: "invalid",
+								controllers.DNSHostedZoneNameAnnotation: "invalid",
 							}
 							route53Client.CreateHostedZoneReturns("hosted-zone-id", nil)
 						})

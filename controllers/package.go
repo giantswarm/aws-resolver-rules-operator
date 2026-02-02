@@ -21,13 +21,13 @@ import (
 const (
 	DnsFinalizer = "capa-operator.finalizers.giantswarm.io/dns-controller"
 
-	// AWSDNSHostedZoneName is the annotation key for specifying a custom DNS hosted zone name.
+	// DNSHostedZoneNameAnnotation is the annotation key for specifying a custom DNS hosted zone name.
 	// The value should be the full hosted zone name (e.g., "my-cluster.other.domain.com").
-	AWSDNSHostedZoneName = "aws.giantswarm.io/dns-hosted-zone-name"
+	DNSHostedZoneNameAnnotation = "giantswarm.io/dns-hosted-zone-name"
 
-	// AWSDNSDelegationRoleARN is the annotation key for specifying a custom IAM role ARN
+	// AWSDNSDelegationRoleARNAnnotation is the annotation key for specifying a custom IAM role ARN
 	// for DNS delegation to the parent zone.
-	AWSDNSDelegationRoleARN = "aws.giantswarm.io/dns-delegation-role-arn"
+	AWSDNSDelegationRoleARNAnnotation = "aws.giantswarm.io/dns-delegation-role-arn"
 )
 
 func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity, mcIdentity *capa.AWSClusterRoleIdentity) resolver.Cluster {
@@ -53,8 +53,8 @@ func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSC
 		cluster.MCIAMRoleARN = mcIdentity.Spec.RoleArn
 	}
 
-	cluster.CustomHostedZoneName = awsCluster.Annotations[AWSDNSHostedZoneName]
-	cluster.DelegationIAMRoleARN = awsCluster.Annotations[AWSDNSDelegationRoleARN]
+	cluster.CustomHostedZoneName = awsCluster.Annotations[DNSHostedZoneNameAnnotation]
+	cluster.DelegationIAMRoleARN = awsCluster.Annotations[AWSDNSDelegationRoleARNAnnotation]
 
 	return cluster
 }
@@ -82,8 +82,8 @@ func buildClusterFromAWSManagedControlPlane(awsManagedControlPlane *eks.AWSManag
 		cluster.MCIAMRoleARN = mcIdentity.Spec.RoleArn
 	}
 
-	cluster.CustomHostedZoneName = awsManagedControlPlane.Annotations[AWSDNSHostedZoneName]
-	cluster.DelegationIAMRoleARN = awsManagedControlPlane.Annotations[AWSDNSDelegationRoleARN]
+	cluster.CustomHostedZoneName = awsManagedControlPlane.Annotations[DNSHostedZoneNameAnnotation]
+	cluster.DelegationIAMRoleARN = awsManagedControlPlane.Annotations[AWSDNSDelegationRoleARNAnnotation]
 
 	return cluster
 }
