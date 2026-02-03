@@ -523,20 +523,56 @@ var _ = Describe("Dns Zone reconciler", func() {
 						})
 					})
 
-					When("a custom delegation role ARN is specified via annotation", func() {
-						const customDelegationRoleARN = "arn:aws:iam::123456789012:role/CustomDelegationRole"
+					When("a custom delegation identity is specified via annotation", func() {
+						var delegationIdentity *capa.AWSClusterRoleIdentity
 
 						BeforeEach(func() {
-							awsManagedControlPlane.Annotations = map[string]string{
-								controllers.AWSDNSDelegationRoleARNAnnotation: customDelegationRoleARN,
+							delegationIdentity = &capa.AWSClusterRoleIdentity{
+								ObjectMeta: metav1.ObjectMeta{
+									Name: "delegation-identity",
+								},
+								Spec: capa.AWSClusterRoleIdentitySpec{
+									AWSRoleSpec: capa.AWSRoleSpec{
+										RoleArn: "arn:aws:iam::123456789012:role/CustomDelegationRole",
+									},
+								},
 							}
+							awsManagedControlPlane.Annotations = map[string]string{
+								controllers.AWSDNSDelegationIdentityAnnotation: "delegation-identity",
+							}
+							// GetIdentity is called 3 times: MC identity (0), cluster identity (1), delegation identity (2)
+							clusterClient.GetIdentityReturnsOnCall(2, delegationIdentity, nil)
 							route53Client.GetHostedZoneIdByNameReturns("parent-hosted-zone-id", nil)
 							route53Client.CreateHostedZoneReturns("hosted-zone-id", nil)
+						})
+
+						It("fetches the delegation identity", func() {
+							Expect(clusterClient.GetIdentityCallCount()).To(Equal(3))
+							_, identityRef := clusterClient.GetIdentityArgsForCall(2)
+							Expect(identityRef.Name).To(Equal("delegation-identity"))
 						})
 
 						It("uses custom role ARN for delegation operations", func() {
 							Expect(route53Client.AddDelegationToParentZoneCallCount()).To(Equal(1))
 							Expect(reconcileErr).NotTo(HaveOccurred())
+						})
+					})
+
+					When("a custom delegation identity is specified but does not exist", func() {
+						expectedError := errors.New("AWSClusterRoleIdentity not found")
+
+						BeforeEach(func() {
+							awsManagedControlPlane.Annotations = map[string]string{
+								controllers.AWSDNSDelegationIdentityAnnotation: "non-existent-identity",
+							}
+							// GetIdentity is called 3 times: MC identity (0), cluster identity (1), delegation identity (2)
+							clusterClient.GetIdentityReturnsOnCall(2, nil, expectedError)
+						})
+
+						It("returns an error", func() {
+							Expect(clusterClient.GetIdentityCallCount()).To(Equal(3))
+							Expect(reconcileErr).To(HaveOccurred())
+							Expect(reconcileErr).Should(MatchError(expectedError))
 						})
 					})
 
