@@ -20,9 +20,22 @@ import (
 
 const (
 	DnsFinalizer = "capa-operator.finalizers.giantswarm.io/dns-controller"
+
+	// DNSHostedZoneNameAnnotation is the annotation key for specifying a custom DNS hosted zone name.
+	// The value should be the full hosted zone name (e.g., "my-cluster.other.domain.com").
+	DNSHostedZoneNameAnnotation = "giantswarm.io/dns-hosted-zone-name"
+
+	// DNSBaseDomainAnnotation is the annotation key for specifying the parent DNS hosted zone
+	// where the NS delegation records should be created. This overrides the default base domain
+	// configured at the operator level.
+	DNSBaseDomainAnnotation = "giantswarm.io/base-domain"
+
+	// AWSDNSDelegationIdentityAnnotation is the annotation key for specifying the name of an
+	// AWSClusterRoleIdentity to use for DNS delegation to the parent zone.
+	AWSDNSDelegationIdentityAnnotation = "aws.giantswarm.io/dns-delegation-identity"
 )
 
-func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity, mcIdentity *capa.AWSClusterRoleIdentity) resolver.Cluster {
+func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSClusterRoleIdentity, mcIdentity *capa.AWSClusterRoleIdentity, delegationIdentity *capa.AWSClusterRoleIdentity) resolver.Cluster {
 	cluster := resolver.Cluster{
 		AdditionalTags:       awsCluster.Spec.AdditionalTags,
 		Name:                 awsCluster.Name,
@@ -45,10 +58,16 @@ func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSC
 		cluster.MCIAMRoleARN = mcIdentity.Spec.RoleArn
 	}
 
+	cluster.CustomHostedZoneName = awsCluster.Annotations[DNSHostedZoneNameAnnotation]
+	cluster.BaseDomain = awsCluster.Annotations[DNSBaseDomainAnnotation]
+	if delegationIdentity != nil {
+		cluster.DelegationIAMRoleARN = delegationIdentity.Spec.RoleArn
+	}
+
 	return cluster
 }
 
-func buildClusterFromAWSManagedControlPlane(awsManagedControlPlane *eks.AWSManagedControlPlane, identity *capa.AWSClusterRoleIdentity, mcIdentity *capa.AWSClusterRoleIdentity) resolver.Cluster {
+func buildClusterFromAWSManagedControlPlane(awsManagedControlPlane *eks.AWSManagedControlPlane, identity *capa.AWSClusterRoleIdentity, mcIdentity *capa.AWSClusterRoleIdentity, delegationIdentity *capa.AWSClusterRoleIdentity) resolver.Cluster {
 	cluster := resolver.Cluster{
 		AdditionalTags:       awsManagedControlPlane.Spec.AdditionalTags,
 		Name:                 awsManagedControlPlane.Name,
@@ -69,6 +88,12 @@ func buildClusterFromAWSManagedControlPlane(awsManagedControlPlane *eks.AWSManag
 	}
 	if mcIdentity != nil {
 		cluster.MCIAMRoleARN = mcIdentity.Spec.RoleArn
+	}
+
+	cluster.CustomHostedZoneName = awsManagedControlPlane.Annotations[DNSHostedZoneNameAnnotation]
+	cluster.BaseDomain = awsManagedControlPlane.Annotations[DNSBaseDomainAnnotation]
+	if delegationIdentity != nil {
+		cluster.DelegationIAMRoleARN = delegationIdentity.Spec.RoleArn
 	}
 
 	return cluster

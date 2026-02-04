@@ -122,7 +122,7 @@ func (r *ResolverRulesReconciler) reconcileNormal(ctx context.Context, awsCluste
 		return ctrl.Result{}, errors.WithStack(err)
 	}
 
-	cluster := buildClusterFromAWSCluster(awsCluster, identity, nil)
+	cluster := buildClusterFromAWSCluster(awsCluster, identity, nil, nil)
 
 	awsAccountOwnerOfRulesToAssociate, ok := awsCluster.Annotations[gsannotations.ResolverRulesOwnerAWSAccountId]
 	if !ok {
@@ -157,7 +157,7 @@ func (r *ResolverRulesReconciler) reconcileDelete(ctx context.Context, awsCluste
 
 	logger := log.FromContext(ctx)
 
-	cluster := buildClusterFromAWSCluster(awsCluster, identity, nil)
+	cluster := buildClusterFromAWSCluster(awsCluster, identity, nil, nil)
 
 	err := r.resolver.DeleteRule(ctx, logger, cluster)
 	if err != nil {

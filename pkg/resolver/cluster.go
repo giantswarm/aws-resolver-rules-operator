@@ -14,4 +14,7 @@ type Cluster struct {
 	IAMRoleARN                  string
 	MCIAMRoleARN                string
 	Subnets                     []string
+	CustomHostedZoneName        string
+	DelegationIAMRoleARN        string
+	BaseDomain                  string
 }
