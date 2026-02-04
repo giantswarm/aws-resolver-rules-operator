@@ -189,10 +189,18 @@ func (d *Zoner) getHostedZoneName(cluster Cluster) string {
 	if cluster.CustomHostedZoneName != "" {
 		return cluster.CustomHostedZoneName
 	}
-	return fmt.Sprintf("%s.%s", cluster.Name, d.workloadClusterBaseDomain)
+	baseDomain := d.workloadClusterBaseDomain
+	if cluster.BaseDomain != "" {
+		baseDomain = cluster.BaseDomain
+	}
+	return fmt.Sprintf("%s.%s", cluster.Name, baseDomain)
 }
 
 func (d *Zoner) getParentHostedZoneName(cluster Cluster) string {
+	if cluster.BaseDomain != "" {
+		return cluster.BaseDomain
+	}
+
 	if cluster.CustomHostedZoneName != "" {
 		// Custom zone: derive parent (e.g., "foo.bar.com" → "bar.com")
 		parts := strings.SplitN(cluster.CustomHostedZoneName, ".", 2)
@@ -201,6 +209,7 @@ func (d *Zoner) getParentHostedZoneName(cluster Cluster) string {
 		}
 		return "" // No valid parent → skip delegation
 	}
+
 	return d.workloadClusterBaseDomain
 }
 

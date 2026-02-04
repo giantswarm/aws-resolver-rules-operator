@@ -550,6 +550,64 @@ var _ = Describe("Dns Zone reconciler", func() {
 						})
 					})
 
+					When("a custom base domain is specified via annotation", func() {
+						const customBaseDomain = "other.parent.domain.com"
+
+						BeforeEach(func() {
+							awsCluster.Annotations = map[string]string{
+								controllers.DNSBaseDomainAnnotation: customBaseDomain,
+							}
+							route53Client.GetHostedZoneIdByNameReturns("custom-parent-hosted-zone-id", nil)
+							route53Client.CreateHostedZoneReturns("hosted-zone-id", nil)
+						})
+
+						It("creates hosted zone using custom base domain", func() {
+							Expect(route53Client.CreateHostedZoneCallCount()).To(Equal(1))
+							_, _, dnsZone := route53Client.CreateHostedZoneArgsForCall(0)
+							Expect(dnsZone.DnsName).To(Equal(fmt.Sprintf("%s.%s", awsCluster.Name, customBaseDomain)))
+							Expect(reconcileErr).NotTo(HaveOccurred())
+						})
+
+						It("uses custom base domain for parent zone delegation", func() {
+							Expect(route53Client.GetHostedZoneIdByNameCallCount()).To(Equal(1))
+							_, _, parentZoneName := route53Client.GetHostedZoneIdByNameArgsForCall(0)
+							Expect(parentZoneName).To(Equal(customBaseDomain))
+						})
+
+						It("creates delegation to the custom parent zone", func() {
+							Expect(route53Client.AddDelegationToParentZoneCallCount()).To(Equal(1))
+							_, _, parentHostedZoneId, _ := route53Client.AddDelegationToParentZoneArgsForCall(0)
+							Expect(parentHostedZoneId).To(Equal("custom-parent-hosted-zone-id"))
+						})
+					})
+
+					When("both custom hosted zone name and custom base domain are specified", func() {
+						const customHostedZoneName = "my-cluster.custom.domain.com"
+						const customBaseDomain = "other.parent.domain.com"
+
+						BeforeEach(func() {
+							awsCluster.Annotations = map[string]string{
+								controllers.DNSHostedZoneNameAnnotation: customHostedZoneName,
+								controllers.DNSBaseDomainAnnotation:     customBaseDomain,
+							}
+							route53Client.GetHostedZoneIdByNameReturns("parent-hosted-zone-id", nil)
+							route53Client.CreateHostedZoneReturns("hosted-zone-id", nil)
+						})
+
+						It("uses custom hosted zone name for the hosted zone", func() {
+							Expect(route53Client.CreateHostedZoneCallCount()).To(Equal(1))
+							_, _, dnsZone := route53Client.CreateHostedZoneArgsForCall(0)
+							Expect(dnsZone.DnsName).To(Equal(customHostedZoneName))
+							Expect(reconcileErr).NotTo(HaveOccurred())
+						})
+
+						It("uses base domain annotation for parent zone (takes priority over deriving from custom hosted zone name)", func() {
+							Expect(route53Client.GetHostedZoneIdByNameCallCount()).To(Equal(1))
+							_, _, parentZoneName := route53Client.GetHostedZoneIdByNameArgsForCall(0)
+							Expect(parentZoneName).To(Equal(customBaseDomain))
+						})
+					})
+
 					When("the cluster uses private dns mode", func() {
 						BeforeEach(func() {
 							awsCluster.Annotations = map[string]string{

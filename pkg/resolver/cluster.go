@@ -16,4 +16,5 @@ type Cluster struct {
 	Subnets                     []string
 	CustomHostedZoneName        string
 	DelegationIAMRoleARN        string
+	BaseDomain                  string
 }
