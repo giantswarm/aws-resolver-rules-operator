@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
@@ -1042,11 +1043,12 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 								Expect(updatedKarpenterMachinePool.Annotations).To(HaveKeyWithValue(controllers.BootstrapDataHashAnnotation, Equal(capiBootstrapSecretHash)))
 							})
 							When("there are NodeClaim resources in the workload cluster", func() {
+								var nodeClaim1, nodeClaim2 *unstructured.Unstructured
 								BeforeEach(func() {
-									nodeClaim1 := &unstructured.Unstructured{}
+									nodeClaim1 = &unstructured.Unstructured{}
 									nodeClaim1.Object = map[string]interface{}{
 										"metadata": map[string]interface{}{
-											"name": fmt.Sprintf("%s-z9y8x", KarpenterMachinePoolName),
+											"name": fmt.Sprintf("%s-%s", KarpenterMachinePoolName, uuid.NewString()[:8]),
 										},
 										"spec": map[string]interface{}{
 											"nodeClassRef": map[string]interface{}{
@@ -1078,10 +1080,10 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 									err = k8sClient.Status().Update(ctx, nodeClaim1)
 									Expect(err).NotTo(HaveOccurred())
 
-									nodeClaim2 := &unstructured.Unstructured{}
+									nodeClaim2 = &unstructured.Unstructured{}
 									nodeClaim2.Object = map[string]interface{}{
 										"metadata": map[string]interface{}{
-											"name": fmt.Sprintf("%s-m0n1o", KarpenterMachinePoolName),
+											"name": fmt.Sprintf("%s-%s", KarpenterMachinePoolName, uuid.NewString()[:8]),
 										},
 										"spec": map[string]interface{}{
 											"nodeClassRef": map[string]interface{}{
@@ -1113,6 +1115,15 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 									err = k8sClient.Status().Update(ctx, nodeClaim2)
 									Expect(err).NotTo(HaveOccurred())
 								})
+								AfterEach(func() {
+									// Clean up cluster-scoped NodeClaim resources
+									if nodeClaim1 != nil {
+										_ = k8sClient.Delete(ctx, nodeClaim1)
+									}
+									if nodeClaim2 != nil {
+										_ = k8sClient.Delete(ctx, nodeClaim2)
+									}
+								})
 								It("updates the KarpenterMachinePool spec and status accordingly", func() {
 									Expect(reconcileErr).NotTo(HaveOccurred())
 									updatedKarpenterMachinePool := &karpenterinfra.KarpenterMachinePool{}
@@ -1129,15 +1140,16 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 								})
 
 								When("there are also NodeClaims belonging to a different NodePool", func() {
+									var otherNodeClaim1, otherNodeClaim2, otherNodeClaim3, otherNodeClaim4 *unstructured.Unstructured
 									BeforeEach(func() {
 										// Create NodeClaims belonging to a different NodePool
 										// These should NOT be counted by the KarpenterMachinePool being reconciled
 										otherNodePoolName := "other-nodepool"
 
-										otherNodeClaim1 := &unstructured.Unstructured{}
+										otherNodeClaim1 = &unstructured.Unstructured{}
 										otherNodeClaim1.Object = map[string]interface{}{
 											"metadata": map[string]interface{}{
-												"name": fmt.Sprintf("%s-a1b2c", otherNodePoolName),
+												"name": fmt.Sprintf("%s-%s", otherNodePoolName, uuid.NewString()[:8]),
 											},
 											"spec": map[string]interface{}{
 												"nodeClassRef": map[string]interface{}{
@@ -1169,10 +1181,10 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 										err = k8sClient.Status().Update(ctx, otherNodeClaim1)
 										Expect(err).NotTo(HaveOccurred())
 
-										otherNodeClaim2 := &unstructured.Unstructured{}
+										otherNodeClaim2 = &unstructured.Unstructured{}
 										otherNodeClaim2.Object = map[string]interface{}{
 											"metadata": map[string]interface{}{
-												"name": fmt.Sprintf("%s-d3e4f", otherNodePoolName),
+												"name": fmt.Sprintf("%s-%s", otherNodePoolName, uuid.NewString()[:8]),
 											},
 											"spec": map[string]interface{}{
 												"nodeClassRef": map[string]interface{}{
@@ -1204,10 +1216,10 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 										err = k8sClient.Status().Update(ctx, otherNodeClaim2)
 										Expect(err).NotTo(HaveOccurred())
 
-										otherNodeClaim3 := &unstructured.Unstructured{}
+										otherNodeClaim3 = &unstructured.Unstructured{}
 										otherNodeClaim3.Object = map[string]interface{}{
 											"metadata": map[string]interface{}{
-												"name": fmt.Sprintf("%s-g5h6i", otherNodePoolName),
+												"name": fmt.Sprintf("%s-%s", otherNodePoolName, uuid.NewString()[:8]),
 											},
 											"spec": map[string]interface{}{
 												"nodeClassRef": map[string]interface{}{
@@ -1239,10 +1251,10 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 										err = k8sClient.Status().Update(ctx, otherNodeClaim3)
 										Expect(err).NotTo(HaveOccurred())
 
-										otherNodeClaim4 := &unstructured.Unstructured{}
+										otherNodeClaim4 = &unstructured.Unstructured{}
 										otherNodeClaim4.Object = map[string]interface{}{
 											"metadata": map[string]interface{}{
-												"name": fmt.Sprintf("%s-j7k8l", otherNodePoolName),
+												"name": fmt.Sprintf("%s-%s", otherNodePoolName, uuid.NewString()[:8]),
 											},
 											"spec": map[string]interface{}{
 												"nodeClassRef": map[string]interface{}{
@@ -1273,6 +1285,21 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 										Expect(err).NotTo(HaveOccurred())
 										err = k8sClient.Status().Update(ctx, otherNodeClaim4)
 										Expect(err).NotTo(HaveOccurred())
+									})
+									AfterEach(func() {
+										// Clean up cluster-scoped NodeClaim resources
+										if otherNodeClaim1 != nil {
+											_ = k8sClient.Delete(ctx, otherNodeClaim1)
+										}
+										if otherNodeClaim2 != nil {
+											_ = k8sClient.Delete(ctx, otherNodeClaim2)
+										}
+										if otherNodeClaim3 != nil {
+											_ = k8sClient.Delete(ctx, otherNodeClaim3)
+										}
+										if otherNodeClaim4 != nil {
+											_ = k8sClient.Delete(ctx, otherNodeClaim4)
+										}
 									})
 
 									It("only counts NodeClaims belonging to its own NodePool", func() {
