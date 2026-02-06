@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.3] - 2026-02-06
+
 ### Fixed
 
 - Avoid generating an invalid OIDC provider in an EKS cluster crossplane-config when the control plane hostname is not yet available.
@@ -334,7 +336,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
 
-[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.25.2...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.25.3...HEAD
+[0.25.3]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.25.2...v0.25.3
 [0.25.2]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.25.1...v0.25.2
 [0.25.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.24.1...v0.25.0
