@@ -186,6 +186,10 @@ func getEKSId(urlString string) (string, error) {
 		return "", err
 	}
 
+	if u.Hostname() == "" {
+		return "", fmt.Errorf("EKS control plane endpoint URL not yet available")
+	}
+
 	// The host part of the URL is in the form of "ED3AA07D016EA49EEBC31AB274E7F3DD.sk1.eu-west-2.eks.amazonaws.com"
 	// We can split it by '.' and take the first part
 	parts := strings.Split(u.Hostname(), ".")

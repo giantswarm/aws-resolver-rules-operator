@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Avoid generating an invalid OIDC provider in an EKS cluster crossplane-config when the control plane hostname is not yet available.
+
 ## [0.25.2] - 2026-01-22
 
 ### Fixed
