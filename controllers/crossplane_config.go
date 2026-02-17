@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -490,7 +491,7 @@ func (r *CrossplaneClusterConfigReconciler) updateConfigMap(ctx context.Context,
 func (r *CrossplaneClusterConfigReconciler) createProviderConfig(ctx context.Context, providerConfig *unstructured.Unstructured, clusterInfo *ClusterInfo) error {
 	logger := log.FromContext(ctx)
 
-	providerConfig.Object["spec"] = r.getProviderConfigSpec(clusterInfo)
+	providerConfig.Object["spec"] = r.getProviderConfigSpec(logger, clusterInfo)
 
 	err := r.Client.Create(ctx, providerConfig)
 	if k8serrors.IsAlreadyExists(err) {
@@ -509,7 +510,7 @@ func (r *CrossplaneClusterConfigReconciler) updateProviderConfig(ctx context.Con
 	logger := log.FromContext(ctx)
 
 	patchedConfig := providerConfig.DeepCopy()
-	patchedConfig.Object["spec"] = r.getProviderConfigSpec(clusterInfo)
+	patchedConfig.Object["spec"] = r.getProviderConfigSpec(logger, clusterInfo)
 	err := r.Client.Patch(ctx, patchedConfig, client.MergeFrom(providerConfig))
 	if err != nil {
 		logger.Error(err, "Failed to patch provider config")
@@ -519,7 +520,7 @@ func (r *CrossplaneClusterConfigReconciler) updateProviderConfig(ctx context.Con
 	return nil
 }
 
-func (r *CrossplaneClusterConfigReconciler) getProviderConfigSpec(clusterInfo *ClusterInfo) map[string]any {
+func (r *CrossplaneClusterConfigReconciler) getProviderConfigSpec(logger logr.Logger, clusterInfo *ClusterInfo) map[string]any {
 	partition := getPartition(clusterInfo.Region)
 
 	// We're migrating Crossplane from authenticating with IRSA – a chicken-egg situation
@@ -546,6 +547,8 @@ func (r *CrossplaneClusterConfigReconciler) getProviderConfigSpec(clusterInfo *C
 		}
 	} else {
 		// IRSA
+
+		logger.Info("Not using static AWS credentials. Please check if credentials are provided (look for `USE_CROSSPLANE_STATIC_AWS_CREDENTIALS` in aws-resolver-rules-operator code and chart). This code path is deprecated and should not be used anymore. It may be replaced with a hard error in the future.")
 
 		providerRole := fmt.Sprintf("giantswarm-%s-capa-controller", r.ManagementClusterName)
 
