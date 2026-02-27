@@ -114,16 +114,3 @@ workflows:
             ignore:
             - main
             - master
-    - architect/push-to-app-collection:
-        context: architect
-        name: push-to-capa-app-collection
-        app_name: aws-resolver-rules-operator
-        app_collection_repo: capa-app-collection
-        requires:
-        - push-to-app-catalog
-        - push-to-registries
-        filters:
-          branches:
-            ignore: /.*/
-          tags:
-            only: /^v.*/
