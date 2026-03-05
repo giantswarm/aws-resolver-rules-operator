@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
+	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
 	"sigs.k8s.io/cluster-api/util/annotations"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -76,7 +77,16 @@ func (r *EKSDnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
-	cluster := buildClusterFromAWSManagedControlPlane(awsManagedControlPlane, identity, mcIdentity)
+	var delegationIdentity *capa.AWSClusterRoleIdentity
+	if delegationIdentityName, ok := awsManagedControlPlane.Annotations[AWSDNSDelegationIdentityAnnotation]; ok && delegationIdentityName != "" {
+		delegationIdentity, err = r.clusterClient.GetIdentity(ctx, &capa.AWSIdentityReference{Name: delegationIdentityName})
+		if err != nil {
+			logger.Error(err, "Failed to get delegation AWSClusterRoleIdentity", "identityName", delegationIdentityName)
+			return ctrl.Result{}, errors.WithStack(err)
+		}
+	}
+
+	cluster := buildClusterFromAWSManagedControlPlane(awsManagedControlPlane, identity, mcIdentity, delegationIdentity)
 
 	if !capiCluster.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, awsManagedControlPlane, cluster)

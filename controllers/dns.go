@@ -88,7 +88,16 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, nil
 	}
 
-	cluster := buildClusterFromAWSCluster(awsCluster, identity, mcIdentity)
+	var delegationIdentity *capa.AWSClusterRoleIdentity
+	if delegationIdentityName, ok := awsCluster.Annotations[AWSDNSDelegationIdentityAnnotation]; ok && delegationIdentityName != "" {
+		delegationIdentity, err = r.clusterClient.GetIdentity(ctx, &capa.AWSIdentityReference{Name: delegationIdentityName})
+		if err != nil {
+			logger.Error(err, "Failed to get delegation AWSClusterRoleIdentity", "identityName", delegationIdentityName)
+			return ctrl.Result{}, errors.WithStack(err)
+		}
+	}
+
+	cluster := buildClusterFromAWSCluster(awsCluster, identity, mcIdentity, delegationIdentity)
 
 	if !capiCluster.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, awsCluster, cluster)

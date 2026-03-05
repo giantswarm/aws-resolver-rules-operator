@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
@@ -1048,7 +1047,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 									nodeClaim1 = &unstructured.Unstructured{}
 									nodeClaim1.Object = map[string]interface{}{
 										"metadata": map[string]interface{}{
-											"name": fmt.Sprintf("%s-%s", KarpenterMachinePoolName, uuid.NewString()[:8]),
+											"name": fmt.Sprintf("%s-%s-z9y8x", KarpenterMachinePoolName, namespace),
 										},
 										"spec": map[string]interface{}{
 											"nodeClassRef": map[string]interface{}{
@@ -1083,7 +1082,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 									nodeClaim2 = &unstructured.Unstructured{}
 									nodeClaim2.Object = map[string]interface{}{
 										"metadata": map[string]interface{}{
-											"name": fmt.Sprintf("%s-%s", KarpenterMachinePoolName, uuid.NewString()[:8]),
+											"name": fmt.Sprintf("%s-%s-m0n1o", KarpenterMachinePoolName, namespace),
 										},
 										"spec": map[string]interface{}{
 											"nodeClassRef": map[string]interface{}{
@@ -1114,6 +1113,11 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 									Expect(err).NotTo(HaveOccurred())
 									err = k8sClient.Status().Update(ctx, nodeClaim2)
 									Expect(err).NotTo(HaveOccurred())
+
+									DeferCleanup(func() {
+										_ = k8sClient.Delete(ctx, nodeClaim1)
+										_ = k8sClient.Delete(ctx, nodeClaim2)
+									})
 								})
 								AfterEach(func() {
 									// Clean up cluster-scoped NodeClaim resources
@@ -1149,7 +1153,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 										otherNodeClaim1 = &unstructured.Unstructured{}
 										otherNodeClaim1.Object = map[string]interface{}{
 											"metadata": map[string]interface{}{
-												"name": fmt.Sprintf("%s-%s", otherNodePoolName, uuid.NewString()[:8]),
+												"name": fmt.Sprintf("%s-%s-a1b2c", otherNodePoolName, namespace),
 											},
 											"spec": map[string]interface{}{
 												"nodeClassRef": map[string]interface{}{
@@ -1184,7 +1188,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 										otherNodeClaim2 = &unstructured.Unstructured{}
 										otherNodeClaim2.Object = map[string]interface{}{
 											"metadata": map[string]interface{}{
-												"name": fmt.Sprintf("%s-%s", otherNodePoolName, uuid.NewString()[:8]),
+												"name": fmt.Sprintf("%s-%s-d3e4f", otherNodePoolName, namespace),
 											},
 											"spec": map[string]interface{}{
 												"nodeClassRef": map[string]interface{}{
@@ -1219,7 +1223,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 										otherNodeClaim3 = &unstructured.Unstructured{}
 										otherNodeClaim3.Object = map[string]interface{}{
 											"metadata": map[string]interface{}{
-												"name": fmt.Sprintf("%s-%s", otherNodePoolName, uuid.NewString()[:8]),
+												"name": fmt.Sprintf("%s-%s-g5h6i", otherNodePoolName, namespace),
 											},
 											"spec": map[string]interface{}{
 												"nodeClassRef": map[string]interface{}{
@@ -1254,7 +1258,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 										otherNodeClaim4 = &unstructured.Unstructured{}
 										otherNodeClaim4.Object = map[string]interface{}{
 											"metadata": map[string]interface{}{
-												"name": fmt.Sprintf("%s-%s", otherNodePoolName, uuid.NewString()[:8]),
+												"name": fmt.Sprintf("%s-%s-j7k8l", otherNodePoolName, namespace),
 											},
 											"spec": map[string]interface{}{
 												"nodeClassRef": map[string]interface{}{
@@ -1285,6 +1289,13 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 										Expect(err).NotTo(HaveOccurred())
 										err = k8sClient.Status().Update(ctx, otherNodeClaim4)
 										Expect(err).NotTo(HaveOccurred())
+
+										DeferCleanup(func() {
+											_ = k8sClient.Delete(ctx, otherNodeClaim1)
+											_ = k8sClient.Delete(ctx, otherNodeClaim2)
+											_ = k8sClient.Delete(ctx, otherNodeClaim3)
+											_ = k8sClient.Delete(ctx, otherNodeClaim4)
+										})
 									})
 									AfterEach(func() {
 										// Clean up cluster-scoped NodeClaim resources
