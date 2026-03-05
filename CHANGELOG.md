@@ -14,6 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `giantswarm.io/base-domain`: Override the parent DNS hosted zone for NS delegation records. Default: derived from `giantswarm.io/dns-hosted-zone-name` if set, otherwise the operator's `basedomain` flag.
   - `aws.giantswarm.io/dns-delegation-identity`: Specify the name of an `AWSClusterRoleIdentity` to use for DNS delegation to the parent zone. Default: the management cluster's `AWSClusterRoleIdentity`.
 
+### Changed
+
+- Add warning if static AWS credentials aren't used, falling back to the deprecated IRSA code path
+
+### Removed
+
+- Removed `PodSecurityPolicy`.
+- Removed `global.podSecurityStandards.enforced` helm value.
+
+## [0.25.3] - 2026-02-06
+
+### Fixed
+
+- Avoid generating an invalid OIDC provider in an EKS cluster crossplane-config when the control plane hostname is not yet available.
+
 ## [0.25.2] - 2026-01-22
 
 ### Fixed
@@ -337,7 +352,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
 
-[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.25.2...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.25.3...HEAD
+[0.25.3]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.25.2...v0.25.3
 [0.25.2]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.25.1...v0.25.2
 [0.25.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.24.1...v0.25.0

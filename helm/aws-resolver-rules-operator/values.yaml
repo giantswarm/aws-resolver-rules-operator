@@ -60,7 +60,3 @@ securityContext:
 monitoring:
   enabled: true
   interval: 60s
-
-global:
-  podSecurityStandards:
-    enforced: false

@@ -1119,6 +1119,15 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 										_ = k8sClient.Delete(ctx, nodeClaim2)
 									})
 								})
+								AfterEach(func() {
+									// Clean up cluster-scoped NodeClaim resources
+									if nodeClaim1 != nil {
+										_ = k8sClient.Delete(ctx, nodeClaim1)
+									}
+									if nodeClaim2 != nil {
+										_ = k8sClient.Delete(ctx, nodeClaim2)
+									}
+								})
 								It("updates the KarpenterMachinePool spec and status accordingly", func() {
 									Expect(reconcileErr).NotTo(HaveOccurred())
 									updatedKarpenterMachinePool := &karpenterinfra.KarpenterMachinePool{}
@@ -1287,6 +1296,21 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 											_ = k8sClient.Delete(ctx, otherNodeClaim3)
 											_ = k8sClient.Delete(ctx, otherNodeClaim4)
 										})
+									})
+									AfterEach(func() {
+										// Clean up cluster-scoped NodeClaim resources
+										if otherNodeClaim1 != nil {
+											_ = k8sClient.Delete(ctx, otherNodeClaim1)
+										}
+										if otherNodeClaim2 != nil {
+											_ = k8sClient.Delete(ctx, otherNodeClaim2)
+										}
+										if otherNodeClaim3 != nil {
+											_ = k8sClient.Delete(ctx, otherNodeClaim3)
+										}
+										if otherNodeClaim4 != nil {
+											_ = k8sClient.Delete(ctx, otherNodeClaim4)
+										}
 									})
 
 									It("only counts NodeClaims belonging to its own NodePool", func() {
