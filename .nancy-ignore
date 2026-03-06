@@ -1,1 +1,1 @@
-CVE-2026-24051 until=2026-03-06 # go.opentelemetry.io/otel/sdk@v1.39.0
+CVE-2026-24051 until=2026-04-05 # go.opentelemetry.io/otel/sdk@v1.39.0
