@@ -336,6 +336,23 @@ var _ = Describe("Dns Zone reconciler", func() {
 							}))
 						})
 
+						When("the wildcard CNAME target annotation is set", func() {
+							BeforeEach(func() {
+								awsCluster.Annotations = map[string]string{
+									gsannotations.NetworkWildcardCNAMETarget: "custom-ingress.example.com",
+								}
+							})
+
+							It("uses the annotation value as the wildcard CNAME target", func() {
+								_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+								Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
+									Kind:   resolver.DnsRecordTypeCname,
+									Name:   fmt.Sprintf("*.%s.%s", ClusterName, WorkloadClusterBaseDomain),
+									Values: []string{"custom-ingress.example.com"},
+								}))
+							})
+						})
+
 						When("the k8s API endpoint of the CAPA workload cluster is set", func() {
 							BeforeEach(func() {
 								clusterClient.GetClusterReturns(cluster, nil)

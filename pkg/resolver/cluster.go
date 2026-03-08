@@ -5,6 +5,7 @@ type Cluster struct {
 	VPCsToAssociateToHostedZone []string
 	Name                        string
 	ControlPlaneEndpoint        string
+	WildcardCNAMETarget         string
 	IsDnsModePrivate            bool
 	IsVpcModePrivate            bool
 	IsEKS                       bool

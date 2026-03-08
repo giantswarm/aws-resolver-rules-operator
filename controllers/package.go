@@ -54,6 +54,9 @@ func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSC
 	if ok {
 		cluster.VPCsToAssociateToHostedZone = strings.Split(additionalVpcsAnnotation, ",")
 	}
+	if wildcardCNAMETarget, ok := awsCluster.Annotations[gsannotations.NetworkWildcardCNAMETarget]; ok {
+		cluster.WildcardCNAMETarget = wildcardCNAMETarget
+	}
 	if mcIdentity != nil {
 		cluster.MCIAMRoleARN = mcIdentity.Spec.RoleArn
 	}
@@ -85,6 +88,9 @@ func buildClusterFromAWSManagedControlPlane(awsManagedControlPlane *eks.AWSManag
 	additionalVpcsAnnotation, ok := awsManagedControlPlane.Annotations[gsannotations.AWSDNSAdditionalVPC]
 	if ok {
 		cluster.VPCsToAssociateToHostedZone = strings.Split(additionalVpcsAnnotation, ",")
+	}
+	if wildcardCNAMETarget, ok := awsManagedControlPlane.Annotations[gsannotations.NetworkWildcardCNAMETarget]; ok {
+		cluster.WildcardCNAMETarget = wildcardCNAMETarget
 	}
 	if mcIdentity != nil {
 		cluster.MCIAMRoleARN = mcIdentity.Spec.RoleArn
