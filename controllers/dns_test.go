@@ -339,16 +339,16 @@ var _ = Describe("Dns Zone reconciler", func() {
 						When("the wildcard CNAME target annotation is set", func() {
 							BeforeEach(func() {
 								awsCluster.Annotations = map[string]string{
-									gsannotations.NetworkWildcardCNAMETarget: "custom-ingress.example.com",
+									gsannotations.NetworkWildcardCNAMETarget: "custom-ingress",
 								}
 							})
 
-							It("uses the annotation value as the wildcard CNAME target", func() {
+							It("uses the annotation value as prefix with the base domain appended", func() {
 								_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
 								Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
 									Kind:   resolver.DnsRecordTypeCname,
 									Name:   fmt.Sprintf("*.%s.%s", ClusterName, WorkloadClusterBaseDomain),
-									Values: []string{"custom-ingress.example.com"},
+									Values: []string{fmt.Sprintf("custom-ingress.%s.%s", ClusterName, WorkloadClusterBaseDomain)},
 								}))
 							})
 						})
