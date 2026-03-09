@@ -23,12 +23,12 @@ const (
 
 	// DNSHostedZoneNameAnnotation is the annotation key for specifying a custom DNS hosted zone name.
 	// The value should be the full hosted zone name (e.g., "my-cluster.other.domain.com").
-	DNSHostedZoneNameAnnotation = "giantswarm.io/dns-hosted-zone-name"
+	DNSHostedZoneNameAnnotation = "network.giantswarm.io/dns-hosted-zone-name"
 
 	// DNSBaseDomainAnnotation is the annotation key for specifying the parent DNS hosted zone
 	// where the NS delegation records should be created. This overrides the default base domain
 	// configured at the operator level.
-	DNSBaseDomainAnnotation = "giantswarm.io/base-domain"
+	DNSBaseDomainAnnotation = "network.giantswarm.io/base-domain"
 
 	// AWSDNSDelegationIdentityAnnotation is the annotation key for specifying the name of an
 	// AWSClusterRoleIdentity to use for DNS delegation to the parent zone.
