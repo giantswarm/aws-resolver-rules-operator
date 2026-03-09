@@ -17,7 +17,7 @@ require (
 	github.com/aws/smithy-go v1.24.2
 	github.com/aws/smithy-go/metrics/smithyotelmetrics v1.0.12
 	github.com/blang/semver/v4 v4.0.0
-	github.com/giantswarm/k8smetadata v0.25.0
+	github.com/giantswarm/k8smetadata v0.26.0
 	github.com/go-logr/logr v1.4.3
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
