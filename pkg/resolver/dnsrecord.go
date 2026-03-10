@@ -8,6 +8,7 @@ const (
 	DnsRecordTypeA     DnsRecordType = "A"
 	DnsRecordTypeCname DnsRecordType = "CNAME"
 	DnsRecordTypeAlias DnsRecordType = "ALIAS"
+	DnsRecordTypeCAA   DnsRecordType = "CAA"
 )
 
 type DNSRecord struct {

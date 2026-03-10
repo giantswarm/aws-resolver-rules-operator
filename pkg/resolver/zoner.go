@@ -240,11 +240,23 @@ func (d *Zoner) getWorkloadClusterDnsRecords(workloadClusterHostedZoneName strin
 		wildcardCNAMETarget = fmt.Sprintf("%s.%s", cluster.WildcardCNAMETarget, workloadClusterHostedZoneName)
 	}
 
+	irsaCAARecordValues := []string{
+		"0 issue \"amazon.com\"",
+		"0 issue \"amazontrust.com\"",
+		"0 issue \"awstrust.com\"",
+		"0 issue \"amazonaws.com\"",
+	}
+
 	dnsRecords := []DNSRecord{
 		{
 			Kind:   DnsRecordTypeCname,
 			Name:   fmt.Sprintf("*.%s", workloadClusterHostedZoneName),
 			Values: []string{wildcardCNAMETarget},
+		},
+		{
+			Kind:   DnsRecordTypeCAA,
+			Name:   fmt.Sprintf("irsa.%s", workloadClusterHostedZoneName),
+			Values: irsaCAARecordValues,
 		},
 	}
 

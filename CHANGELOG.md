@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `network.giantswarm.io/base-domain`: Override the parent DNS hosted zone for NS delegation records. Default: derived from `giantswarm.io/dns-hosted-zone-name` if set, otherwise the operator's `basedomain` flag.
   - `aws.giantswarm.io/dns-delegation-identity`: Specify the name of an `AWSClusterRoleIdentity` to use for DNS delegation to the parent zone. Default: the management cluster's `AWSClusterRoleIdentity`.
 - Support configuring the wildcard CNAME target via the `network.giantswarm.io/wildcard-cname-target` cluster annotation, falling back to `ingress.<baseDomain>` when not set.
+- Create CAA records to allow AWS ACM to issue certificates for `irsa.<baseDomain>`.
 
 ### Changed
 
