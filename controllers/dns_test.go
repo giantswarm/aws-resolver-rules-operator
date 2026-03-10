@@ -198,6 +198,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 			When("the cluster has an identity set", func() {
 				BeforeEach(func() {
 					clusterClient.GetIdentityReturns(awsClusterRoleIdentity, nil)
+					clusterClient.GetIRSAClaimReturns(true, nil)
 				})
 
 				When("the cluster is being deleted", func() {
@@ -297,6 +298,21 @@ var _ = Describe("Dns Zone reconciler", func() {
 					It("adds the finalizer to the Cluster", func() {
 						Expect(clusterClient.AddAWSClusterFinalizerCallCount()).To(Equal(1))
 						Expect(reconcileErr).NotTo(HaveOccurred())
+					})
+
+					When("the IRSAClaim is not ready", func() {
+						BeforeEach(func() {
+							clusterClient.GetIRSAClaimReturns(false, nil)
+							route53Client.GetHostedZoneIdByNameReturns("parent-hosted-zone-id", nil)
+							route53Client.CreateHostedZoneReturns("hosted-zone-id", nil)
+						})
+
+						It("does not create the wildcard DNS record", func() {
+							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+							Expect(dnsRecords).ToNot(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+								"Name": ContainSubstring("*."),
+							})))
+						})
 					})
 
 					When("the cluster uses public dns mode", func() {

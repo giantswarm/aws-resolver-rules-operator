@@ -235,17 +235,19 @@ func (d *Zoner) getTagsForHostedZone(cluster Cluster) map[string]string {
 }
 
 func (d *Zoner) getWorkloadClusterDnsRecords(workloadClusterHostedZoneName string, cluster Cluster) []DNSRecord {
-	wildcardCNAMETarget := fmt.Sprintf("ingress.%s", workloadClusterHostedZoneName)
-	if cluster.WildcardCNAMETarget != "" {
-		wildcardCNAMETarget = fmt.Sprintf("%s.%s", cluster.WildcardCNAMETarget, workloadClusterHostedZoneName)
-	}
+	var dnsRecords []DNSRecord
 
-	dnsRecords := []DNSRecord{
-		{
+	if cluster.IsIrsaReady {
+		wildcardCNAMETarget := fmt.Sprintf("ingress.%s", workloadClusterHostedZoneName)
+		if cluster.WildcardCNAMETarget != "" {
+			wildcardCNAMETarget = fmt.Sprintf("%s.%s", cluster.WildcardCNAMETarget, workloadClusterHostedZoneName)
+		}
+
+		dnsRecords = append(dnsRecords, DNSRecord{
 			Kind:   DnsRecordTypeCname,
 			Name:   fmt.Sprintf("*.%s", workloadClusterHostedZoneName),
 			Values: []string{wildcardCNAMETarget},
-		},
+		})
 	}
 
 	if cluster.ControlPlaneEndpoint != "" {

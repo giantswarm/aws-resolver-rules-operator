@@ -9,6 +9,7 @@ type Cluster struct {
 	IsDnsModePrivate            bool
 	IsVpcModePrivate            bool
 	IsEKS                       bool
+	IsIrsaReady                 bool
 	Region                      string
 	VPCCidr                     string
 	VPCId                       string

@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Skip creating the wildcard DNS record when the `IRSAClaim` CR for the cluster is not in ready state.
 - Add warning if static AWS credentials aren't used, falling back to the deprecated IRSA code path
 
 ### Removed

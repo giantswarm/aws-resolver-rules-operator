@@ -4,6 +4,9 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
@@ -12,6 +15,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
+
+var irsaClaimGVK = schema.GroupVersionKind{
+	Group:   "crossplane.giantswarm.io",
+	Version: "v1",
+	Kind:    "IRSAClaim",
+}
 
 type ClusterClient struct {
 	client client.Client
@@ -98,6 +107,36 @@ func (a *ClusterClient) RemoveClusterFinalizer(ctx context.Context, cluster *cap
 	originalCluster := cluster.DeepCopy()
 	controllerutil.RemoveFinalizer(cluster, finalizer)
 	return a.client.Patch(ctx, cluster, client.MergeFrom(originalCluster))
+}
+
+func (a *ClusterClient) GetIRSAClaim(ctx context.Context, namespacedName types.NamespacedName) (bool, error) {
+	irsaClaim := &unstructured.Unstructured{}
+	irsaClaim.SetGroupVersionKind(irsaClaimGVK)
+
+	err := a.client.Get(ctx, namespacedName, irsaClaim)
+	if k8serrors.IsNotFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, errors.WithStack(err)
+	}
+
+	conditions, found, err := unstructured.NestedSlice(irsaClaim.Object, "status", "conditions")
+	if err != nil || !found {
+		return false, nil
+	}
+
+	for _, c := range conditions {
+		condition, ok := c.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if condition["type"] == "Ready" && condition["status"] == "True" {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (a *ClusterClient) GetIdentity(ctx context.Context, identityRef *capa.AWSIdentityReference) (*capa.AWSClusterRoleIdentity, error) {

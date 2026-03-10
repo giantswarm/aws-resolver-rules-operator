@@ -123,6 +123,7 @@ type ClusterClient interface {
 	GetAWSCluster(context.Context, types.NamespacedName) (*capa.AWSCluster, error)
 	GetAWSManagedControlPlane(context.Context, types.NamespacedName) (*eks.AWSManagedControlPlane, error)
 	GetCluster(context.Context, types.NamespacedName) (*capi.Cluster, error)
+	GetIRSAClaim(context.Context, types.NamespacedName) (bool, error)
 	AddAWSClusterFinalizer(ctx context.Context, cluster *capa.AWSCluster, finalizer string) error
 	AddAWSManagedControlPlaneFinalizer(ctx context.Context, awsManagedControlPlane *eks.AWSManagedControlPlane, finalizer string) error
 	AddClusterFinalizer(context.Context, *capi.Cluster, string) error

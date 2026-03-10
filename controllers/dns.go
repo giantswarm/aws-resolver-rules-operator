@@ -97,7 +97,13 @@ func (r *DnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		}
 	}
 
+	irsaReady, err := r.clusterClient.GetIRSAClaim(ctx, req.NamespacedName)
+	if err != nil {
+		return ctrl.Result{}, errors.WithStack(err)
+	}
+
 	cluster := buildClusterFromAWSCluster(awsCluster, identity, mcIdentity, delegationIdentity)
+	cluster.IsIrsaReady = irsaReady
 
 	if !capiCluster.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, awsCluster, cluster)
