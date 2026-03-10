@@ -79,6 +79,7 @@ func buildClusterFromAWSManagedControlPlane(awsManagedControlPlane *eks.AWSManag
 		IsDnsModePrivate:     awsManagedControlPlane.Annotations[gsannotations.AWSDNSMode] == gsannotations.DNSModePrivate,
 		IsVpcModePrivate:     awsManagedControlPlane.Annotations[gsannotations.AWSVPCMode] == gsannotations.AWSVPCModePrivate,
 		IsEKS:                true,
+		IsIrsaReady:          true,
 		VPCCidr:              awsManagedControlPlane.Spec.NetworkSpec.VPC.CidrBlock,
 		VPCId:                awsManagedControlPlane.Spec.NetworkSpec.VPC.ID,
 		IAMRoleARN:           identity.Spec.RoleArn,
