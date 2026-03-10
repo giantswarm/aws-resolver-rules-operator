@@ -451,6 +451,22 @@ func getAWSSdkChangesFromDnsRecords(logger logr.Logger, dnsRecords []resolver.DN
 					},
 				},
 			})
+		case resolver.DnsRecordTypeCAA:
+			var resourceRecords []route53types.ResourceRecord
+			for _, value := range record.Values {
+				resourceRecords = append(resourceRecords, route53types.ResourceRecord{
+					Value: awssdk.String(value),
+				})
+			}
+			changes = append(changes, route53types.Change{
+				Action: route53types.ChangeActionUpsert,
+				ResourceRecordSet: &route53types.ResourceRecordSet{
+					Name:            awssdk.String(record.Name),
+					Type:            route53types.RRTypeCaa,
+					TTL:             awssdk.Int64(300),
+					ResourceRecords: resourceRecords,
+				},
+			})
 		default:
 			logger.Info("dns record type not supported, skipping", "dnsRecord", record)
 		}
