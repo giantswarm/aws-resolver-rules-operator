@@ -198,6 +198,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 			When("the cluster has an identity set", func() {
 				BeforeEach(func() {
 					clusterClient.GetIdentityReturns(awsClusterRoleIdentity, nil)
+					route53Client.DnsRecordExistsReturns(true, nil)
 				})
 
 				When("the cluster is being deleted", func() {
@@ -297,6 +298,38 @@ var _ = Describe("Dns Zone reconciler", func() {
 					It("adds the finalizer to the Cluster", func() {
 						Expect(clusterClient.AddAWSClusterFinalizerCallCount()).To(Equal(1))
 						Expect(reconcileErr).NotTo(HaveOccurred())
+					})
+
+					When("the irsa Route53 record does not exist", func() {
+						BeforeEach(func() {
+							route53Client.DnsRecordExistsReturns(false, nil)
+							route53Client.GetHostedZoneIdByNameReturns("parent-hosted-zone-id", nil)
+							route53Client.CreateHostedZoneReturns("hosted-zone-id", nil)
+						})
+
+						It("does not create any DNS records", func() {
+							Expect(route53Client.AddDnsRecordsToHostedZoneCallCount()).To(Equal(0))
+						})
+
+						When("the k8s API endpoint of the CAPA workload cluster is set", func() {
+							BeforeEach(func() {
+								clusterClient.GetClusterReturns(cluster, nil)
+								awsCluster.Spec.ControlPlaneEndpoint.Host = ControlPlaneEndpointHost
+							})
+
+							It("creates the api DNS record for workload cluster", func() {
+								_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+								Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
+									Kind:   resolver.DnsRecordTypeAlias,
+									Name:   fmt.Sprintf("api.%s.%s", ClusterName, WorkloadClusterBaseDomain),
+									Values: []string{ControlPlaneEndpointHost},
+									Region: awsCluster.Spec.Region,
+								}))
+								Expect(dnsRecords).ToNot(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+									"Name": ContainSubstring("*."),
+								})))
+							})
+						})
 					})
 
 					When("the cluster uses public dns mode", func() {

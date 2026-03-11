@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Skip creating the wildcard DNS record when the `irsa` DNS record does not exist in the cluster's Route53 hosted zone (indicating IRSA is not yet ready).
 - Add warning if static AWS credentials aren't used, falling back to the deprecated IRSA code path
 
 ### Removed
