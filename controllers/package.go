@@ -44,6 +44,7 @@ func buildClusterFromAWSCluster(awsCluster *capa.AWSCluster, identity *capa.AWSC
 		IsDnsModePrivate:     awsCluster.Annotations[gsannotations.AWSDNSMode] == gsannotations.DNSModePrivate,
 		IsVpcModePrivate:     awsCluster.Annotations[gsannotations.AWSVPCMode] == gsannotations.AWSVPCModePrivate,
 		IsEKS:                false,
+		IsIrsaReady:          false, // Will be determined later by checking the existence of the IRSA record in Route53
 		VPCCidr:              awsCluster.Spec.NetworkSpec.VPC.CidrBlock,
 		VPCId:                awsCluster.Spec.NetworkSpec.VPC.ID,
 		IAMRoleARN:           identity.Spec.RoleArn,
@@ -79,7 +80,7 @@ func buildClusterFromAWSManagedControlPlane(awsManagedControlPlane *eks.AWSManag
 		IsDnsModePrivate:     awsManagedControlPlane.Annotations[gsannotations.AWSDNSMode] == gsannotations.DNSModePrivate,
 		IsVpcModePrivate:     awsManagedControlPlane.Annotations[gsannotations.AWSVPCMode] == gsannotations.AWSVPCModePrivate,
 		IsEKS:                true,
-		IsIrsaReady:          true,
+		IsIrsaReady:          true, // EKS managed control planes always have IRSA enabled, so we can assume it's ready from the start
 		VPCCidr:              awsManagedControlPlane.Spec.NetworkSpec.VPC.CidrBlock,
 		VPCId:                awsManagedControlPlane.Spec.NetworkSpec.VPC.ID,
 		IAMRoleARN:           identity.Spec.RoleArn,
