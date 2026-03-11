@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-03-11
+
 ### Added
 
 - Support for custom DNS hosted zone via annotations:
@@ -354,7 +356,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
 
-[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.25.3...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.26.0...HEAD
+[0.26.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.25.3...v0.26.0
 [0.25.3]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.25.2...v0.25.3
 [0.25.2]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.25.1...v0.25.2
 [0.25.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.25.0...v0.25.1
