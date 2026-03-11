@@ -176,7 +176,23 @@ func (d *Zoner) createDnsRecords(ctx context.Context, logger logr.Logger, cluste
 		return errors.WithStack(err)
 	}
 
-	dnsRecordsToCreate := d.getWorkloadClusterDnsRecords(d.getHostedZoneName(cluster), cluster)
+	hostedZoneName := d.getHostedZoneName(cluster)
+
+	if !cluster.IsIrsaReady {
+		irsaRecordName := fmt.Sprintf("irsa.%s", hostedZoneName)
+		irsaReady, err := route53Client.DnsRecordExists(ctx, logger, hostedZoneId, irsaRecordName)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		cluster.IsIrsaReady = irsaReady
+	}
+
+	dnsRecordsToCreate := d.getWorkloadClusterDnsRecords(hostedZoneName, cluster)
+	if len(dnsRecordsToCreate) == 0 {
+		logger.Info("No DNS records to create, skipping")
+		return nil
+	}
+
 	err = route53Client.AddDnsRecordsToHostedZone(ctx, logger, hostedZoneId, dnsRecordsToCreate)
 	if err != nil {
 		return errors.WithStack(err)

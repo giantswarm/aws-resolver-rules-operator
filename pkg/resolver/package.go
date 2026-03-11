@@ -45,6 +45,7 @@ type RAMClient interface {
 type Route53Client interface {
 	CreateHostedZone(ctx context.Context, logger logr.Logger, dnsZone DnsZone) (string, error)
 	DeleteHostedZone(ctx context.Context, logger logr.Logger, zoneId string) error
+	DnsRecordExists(ctx context.Context, logger logr.Logger, hostedZoneId, recordName string) (bool, error)
 	GetHostedZoneIdByName(ctx context.Context, logger logr.Logger, zoneName string) (string, error)
 	GetHostedZoneNSRecord(ctx context.Context, logger logr.Logger, zoneId string, zoneName string) (*DNSRecord, error)
 	AddDelegationToParentZone(ctx context.Context, logger logr.Logger, parentZoneId string, resourceRecord *DNSRecord) error

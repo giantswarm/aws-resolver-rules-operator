@@ -164,6 +164,26 @@ func (r *Route53) associateHostedZoneWithAdditionalVPCs(ctx context.Context, log
 	}
 }
 
+func (r *Route53) DnsRecordExists(ctx context.Context, logger logr.Logger, hostedZoneId, recordName string) (bool, error) {
+	listResponse, err := r.client.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{
+		HostedZoneId:    awssdk.String(hostedZoneId),
+		MaxItems:        awssdk.Int32(1),
+		StartRecordName: awssdk.String(recordName),
+	})
+	if err != nil {
+		return false, errors.WithStack(err)
+	}
+
+	wantedName := strings.TrimSuffix(recordName, ".") + "."
+	for _, recordSet := range listResponse.ResourceRecordSets {
+		if awssdk.ToString(recordSet.Name) == wantedName {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func (r *Route53) DeleteHostedZone(ctx context.Context, logger logr.Logger, zoneId string) error {
 	logger.Info("Deleting hosted zone")
 	for zoneName, item := range r.zoneNameToIdCache.Items() {

@@ -94,20 +94,6 @@ type FakeClusterClient struct {
 		result1 *v1beta1.Cluster
 		result2 error
 	}
-	GetIRSAClaimStub        func(context.Context, types.NamespacedName) (bool, error)
-	getIRSAClaimMutex       sync.RWMutex
-	getIRSAClaimArgsForCall []struct {
-		arg1 context.Context
-		arg2 types.NamespacedName
-	}
-	getIRSAClaimReturns struct {
-		result1 bool
-		result2 error
-	}
-	getIRSAClaimReturnsOnCall map[int]struct {
-		result1 bool
-		result2 error
-	}
 	GetIdentityStub        func(context.Context, *v1beta2.AWSIdentityReference) (*v1beta2.AWSClusterRoleIdentity, error)
 	getIdentityMutex       sync.RWMutex
 	getIdentityArgsForCall []struct {
@@ -571,71 +557,6 @@ func (fake *FakeClusterClient) GetClusterReturnsOnCall(i int, result1 *v1beta1.C
 	}
 	fake.getClusterReturnsOnCall[i] = struct {
 		result1 *v1beta1.Cluster
-		result2 error
-	}{result1, result2}
-}
-
-func (fake *FakeClusterClient) GetIRSAClaim(arg1 context.Context, arg2 types.NamespacedName) (bool, error) {
-	fake.getIRSAClaimMutex.Lock()
-	ret, specificReturn := fake.getIRSAClaimReturnsOnCall[len(fake.getIRSAClaimArgsForCall)]
-	fake.getIRSAClaimArgsForCall = append(fake.getIRSAClaimArgsForCall, struct {
-		arg1 context.Context
-		arg2 types.NamespacedName
-	}{arg1, arg2})
-	stub := fake.GetIRSAClaimStub
-	fakeReturns := fake.getIRSAClaimReturns
-	fake.recordInvocation("GetIRSAClaim", []interface{}{arg1, arg2})
-	fake.getIRSAClaimMutex.Unlock()
-	if stub != nil {
-		return stub(arg1, arg2)
-	}
-	if specificReturn {
-		return ret.result1, ret.result2
-	}
-	return fakeReturns.result1, fakeReturns.result2
-}
-
-func (fake *FakeClusterClient) GetIRSAClaimCallCount() int {
-	fake.getIRSAClaimMutex.RLock()
-	defer fake.getIRSAClaimMutex.RUnlock()
-	return len(fake.getIRSAClaimArgsForCall)
-}
-
-func (fake *FakeClusterClient) GetIRSAClaimCalls(stub func(context.Context, types.NamespacedName) (bool, error)) {
-	fake.getIRSAClaimMutex.Lock()
-	defer fake.getIRSAClaimMutex.Unlock()
-	fake.GetIRSAClaimStub = stub
-}
-
-func (fake *FakeClusterClient) GetIRSAClaimArgsForCall(i int) (context.Context, types.NamespacedName) {
-	fake.getIRSAClaimMutex.RLock()
-	defer fake.getIRSAClaimMutex.RUnlock()
-	argsForCall := fake.getIRSAClaimArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
-}
-
-func (fake *FakeClusterClient) GetIRSAClaimReturns(result1 bool, result2 error) {
-	fake.getIRSAClaimMutex.Lock()
-	defer fake.getIRSAClaimMutex.Unlock()
-	fake.GetIRSAClaimStub = nil
-	fake.getIRSAClaimReturns = struct {
-		result1 bool
-		result2 error
-	}{result1, result2}
-}
-
-func (fake *FakeClusterClient) GetIRSAClaimReturnsOnCall(i int, result1 bool, result2 error) {
-	fake.getIRSAClaimMutex.Lock()
-	defer fake.getIRSAClaimMutex.Unlock()
-	fake.GetIRSAClaimStub = nil
-	if fake.getIRSAClaimReturnsOnCall == nil {
-		fake.getIRSAClaimReturnsOnCall = make(map[int]struct {
-			result1 bool
-			result2 error
-		})
-	}
-	fake.getIRSAClaimReturnsOnCall[i] = struct {
-		result1 bool
 		result2 error
 	}{result1, result2}
 }

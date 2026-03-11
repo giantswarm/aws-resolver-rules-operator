@@ -93,6 +93,22 @@ type FakeRoute53Client struct {
 	deleteHostedZoneReturnsOnCall map[int]struct {
 		result1 error
 	}
+	DnsRecordExistsStub        func(context.Context, logr.Logger, string, string) (bool, error)
+	dnsRecordExistsMutex       sync.RWMutex
+	dnsRecordExistsArgsForCall []struct {
+		arg1 context.Context
+		arg2 logr.Logger
+		arg3 string
+		arg4 string
+	}
+	dnsRecordExistsReturns struct {
+		result1 bool
+		result2 error
+	}
+	dnsRecordExistsReturnsOnCall map[int]struct {
+		result1 bool
+		result2 error
+	}
 	GetHostedZoneIdByNameStub        func(context.Context, logr.Logger, string) (string, error)
 	getHostedZoneIdByNameMutex       sync.RWMutex
 	getHostedZoneIdByNameArgsForCall []struct {
@@ -515,6 +531,73 @@ func (fake *FakeRoute53Client) DeleteHostedZoneReturnsOnCall(i int, result1 erro
 	fake.deleteHostedZoneReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
+}
+
+func (fake *FakeRoute53Client) DnsRecordExists(arg1 context.Context, arg2 logr.Logger, arg3 string, arg4 string) (bool, error) {
+	fake.dnsRecordExistsMutex.Lock()
+	ret, specificReturn := fake.dnsRecordExistsReturnsOnCall[len(fake.dnsRecordExistsArgsForCall)]
+	fake.dnsRecordExistsArgsForCall = append(fake.dnsRecordExistsArgsForCall, struct {
+		arg1 context.Context
+		arg2 logr.Logger
+		arg3 string
+		arg4 string
+	}{arg1, arg2, arg3, arg4})
+	stub := fake.DnsRecordExistsStub
+	fakeReturns := fake.dnsRecordExistsReturns
+	fake.recordInvocation("DnsRecordExists", []interface{}{arg1, arg2, arg3, arg4})
+	fake.dnsRecordExistsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3, arg4)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeRoute53Client) DnsRecordExistsCallCount() int {
+	fake.dnsRecordExistsMutex.RLock()
+	defer fake.dnsRecordExistsMutex.RUnlock()
+	return len(fake.dnsRecordExistsArgsForCall)
+}
+
+func (fake *FakeRoute53Client) DnsRecordExistsCalls(stub func(context.Context, logr.Logger, string, string) (bool, error)) {
+	fake.dnsRecordExistsMutex.Lock()
+	defer fake.dnsRecordExistsMutex.Unlock()
+	fake.DnsRecordExistsStub = stub
+}
+
+func (fake *FakeRoute53Client) DnsRecordExistsArgsForCall(i int) (context.Context, logr.Logger, string, string) {
+	fake.dnsRecordExistsMutex.RLock()
+	defer fake.dnsRecordExistsMutex.RUnlock()
+	argsForCall := fake.dnsRecordExistsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+}
+
+func (fake *FakeRoute53Client) DnsRecordExistsReturns(result1 bool, result2 error) {
+	fake.dnsRecordExistsMutex.Lock()
+	defer fake.dnsRecordExistsMutex.Unlock()
+	fake.DnsRecordExistsStub = nil
+	fake.dnsRecordExistsReturns = struct {
+		result1 bool
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeRoute53Client) DnsRecordExistsReturnsOnCall(i int, result1 bool, result2 error) {
+	fake.dnsRecordExistsMutex.Lock()
+	defer fake.dnsRecordExistsMutex.Unlock()
+	fake.DnsRecordExistsStub = nil
+	if fake.dnsRecordExistsReturnsOnCall == nil {
+		fake.dnsRecordExistsReturnsOnCall = make(map[int]struct {
+			result1 bool
+			result2 error
+		})
+	}
+	fake.dnsRecordExistsReturnsOnCall[i] = struct {
+		result1 bool
+		result2 error
+	}{result1, result2}
 }
 
 func (fake *FakeRoute53Client) GetHostedZoneIdByName(arg1 context.Context, arg2 logr.Logger, arg3 string) (string, error) {
