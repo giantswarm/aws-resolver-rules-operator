@@ -176,18 +176,11 @@ func (d *Zoner) createDnsRecords(ctx context.Context, logger logr.Logger, cluste
 		return errors.WithStack(err)
 	}
 
-	hostedZoneName := d.getHostedZoneName(cluster)
-
-	if !cluster.IsIrsaReady {
-		irsaRecordName := fmt.Sprintf("irsa.%s", hostedZoneName)
-		irsaReady, err := route53Client.DnsRecordExists(ctx, logger, hostedZoneId, irsaRecordName)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-		cluster.IsIrsaReady = irsaReady
+	dnsRecordsToCreate, err := d.getWorkloadClusterDnsRecords(ctx, logger, route53Client, d.getHostedZoneName(cluster), cluster, hostedZoneId)
+	if err != nil {
+		return errors.WithStack(err)
 	}
 
-	dnsRecordsToCreate := d.getWorkloadClusterDnsRecords(hostedZoneName, cluster)
 	if len(dnsRecordsToCreate) == 0 {
 		logger.Info("No DNS records to create, skipping")
 		return nil
@@ -250,10 +243,23 @@ func (d *Zoner) getTagsForHostedZone(cluster Cluster) map[string]string {
 	return tags
 }
 
-func (d *Zoner) getWorkloadClusterDnsRecords(workloadClusterHostedZoneName string, cluster Cluster) []DNSRecord {
+func (d *Zoner) getWorkloadClusterDnsRecords(ctx context.Context, logger logr.Logger, route53Client Route53Client, workloadClusterHostedZoneName string, cluster Cluster, hostedZoneId string) ([]DNSRecord, error) {
 	var dnsRecords []DNSRecord
+	var createWildcardRecord bool
 
-	if cluster.IsIrsaReady {
+	if !cluster.IsEKS {
+		irsaRecordName := fmt.Sprintf("irsa.%s", workloadClusterHostedZoneName)
+		var err error
+		createWildcardRecord, err = route53Client.DnsRecordExists(ctx, logger, hostedZoneId, irsaRecordName)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+	} else {
+		// For EKS clusters we can assume IRSA is ready from the start, so we can create the wildcard record immediately
+		createWildcardRecord = true
+	}
+
+	if createWildcardRecord {
 		wildcardCNAMETarget := fmt.Sprintf("ingress.%s", workloadClusterHostedZoneName)
 		if cluster.WildcardCNAMETarget != "" {
 			wildcardCNAMETarget = fmt.Sprintf("%s.%s", cluster.WildcardCNAMETarget, workloadClusterHostedZoneName)
@@ -284,5 +290,5 @@ func (d *Zoner) getWorkloadClusterDnsRecords(workloadClusterHostedZoneName strin
 		}
 	}
 
-	return dnsRecords
+	return dnsRecords, nil
 }
