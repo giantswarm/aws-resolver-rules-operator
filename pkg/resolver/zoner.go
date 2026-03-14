@@ -247,7 +247,7 @@ func (d *Zoner) getWorkloadClusterDnsRecords(ctx context.Context, logger logr.Lo
 	var dnsRecords []DNSRecord
 	var createWildcardRecord bool
 
-	if !cluster.IsEKS {
+	if !cluster.IsEKS && !isAWSChinaRegion(cluster.Region) {
 		irsaRecordName := fmt.Sprintf("irsa.%s", workloadClusterHostedZoneName)
 		var err error
 		createWildcardRecord, err = route53Client.DnsRecordExists(ctx, logger, hostedZoneId, irsaRecordName)
@@ -255,7 +255,9 @@ func (d *Zoner) getWorkloadClusterDnsRecords(ctx context.Context, logger logr.Lo
 			return nil, errors.WithStack(err)
 		}
 	} else {
-		// For EKS clusters we can assume IRSA is ready from the start, so we can create the wildcard record immediately
+		// For EKS clusters and AWS China regions we can create the wildcard record immediately.
+		// EKS has IRSA ready from the start. China regions (cn-*) do not use IRSA at all,
+		// so waiting for an irsa DNS record would block wildcard creation indefinitely.
 		createWildcardRecord = true
 	}
 
@@ -291,4 +293,9 @@ func (d *Zoner) getWorkloadClusterDnsRecords(ctx context.Context, logger logr.Lo
 	}
 
 	return dnsRecords, nil
+}
+
+// isAWSChinaRegion returns true for AWS China partition regions (cn-north-1, cn-northwest-1).
+func isAWSChinaRegion(region string) bool {
+	return strings.HasPrefix(region, "cn-")
 }
