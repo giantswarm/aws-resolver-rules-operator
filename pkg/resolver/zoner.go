@@ -256,7 +256,7 @@ func (d *Zoner) getWorkloadClusterDnsRecords(ctx context.Context, logger logr.Lo
 		}
 	} else {
 		// For EKS clusters and AWS China regions we can create the wildcard record immediately.
-		// EKS has IRSA ready from the start. China regions (cn-*) do not use IRSA at all,
+		// EKS has IRSA ready from the start. China regions (cn-*) do not use CloudFront, they don't have an IRSA dns record,
 		// so waiting for an irsa DNS record would block wildcard creation indefinitely.
 		createWildcardRecord = true
 	}
