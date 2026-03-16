@@ -332,6 +332,25 @@ var _ = Describe("Dns Zone reconciler", func() {
 						})
 					})
 
+					When("the cluster is in an AWS China region", func() {
+						BeforeEach(func() {
+							awsCluster.Spec.Region = "cn-north-1"
+							awsCluster.Spec.ControlPlaneEndpoint.Host = ControlPlaneEndpointHost
+							route53Client.DnsRecordExistsReturns(false, nil)
+							route53Client.GetHostedZoneIdByNameReturns("parent-hosted-zone-id", nil)
+							route53Client.CreateHostedZoneReturns("hosted-zone-id", nil)
+						})
+
+						It("creates the wildcard DNS record without waiting for IRSA", func() {
+							_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+							Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
+								Kind:   resolver.DnsRecordTypeCname,
+								Name:   fmt.Sprintf("*.%s.%s", ClusterName, WorkloadClusterBaseDomain),
+								Values: []string{fmt.Sprintf("ingress.%s.%s", ClusterName, WorkloadClusterBaseDomain)},
+							}))
+						})
+					})
+
 					When("the cluster uses public dns mode", func() {
 						BeforeEach(func() {
 							route53Client.GetHostedZoneIdByNameReturns("parent-hosted-zone-id", nil)
