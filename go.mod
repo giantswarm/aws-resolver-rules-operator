@@ -14,7 +14,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/route53resolver v1.42.5
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.0
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.10
-	github.com/aws/smithy-go v1.25.0
+	github.com/aws/smithy-go v1.25.1
 	github.com/aws/smithy-go/metrics/smithyotelmetrics v1.0.14
 	github.com/blang/semver/v4 v4.0.0
 	github.com/giantswarm/k8smetadata v0.26.0
