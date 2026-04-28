@@ -32,7 +32,9 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -46,6 +48,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	karpv1 "sigs.k8s.io/karpenter/pkg/apis/v1"
 
 	"github.com/aws-resolver-rules-operator/api/v1alpha1"
 	"github.com/aws-resolver-rules-operator/controllers"
@@ -63,6 +66,10 @@ func init() {
 	utilruntime.Must(eks.AddToScheme(scheme))
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
+
+	karpv1GV := schema.GroupVersion{Group: "karpenter.sh", Version: "v1"}
+	scheme.AddKnownTypes(karpv1GV, &karpv1.NodePool{}, &karpv1.NodePoolList{}, &karpv1.NodeClaim{}, &karpv1.NodeClaimList{})
+	metav1.AddToGroupVersion(scheme, karpv1GV)
 }
 
 var (
