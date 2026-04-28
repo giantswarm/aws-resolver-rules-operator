@@ -91,7 +91,7 @@ var _ = Describe("RouteReconciler", func() {
 	Describe("pre-reconciliation", func() {
 		It("adds a finalizer to the cluster", func() {
 			Expect(reconcileErr).NotTo(HaveOccurred())
-			Expect(result.Requeue).To(BeFalse())
+			Expect(result.RequeueAfter).To(BeZero())
 
 			actualCluster := getActualCluster()
 			Expect(actualCluster.Finalizers).To(ContainElement(controllers.RouteFinalizer))
@@ -104,7 +104,7 @@ var _ = Describe("RouteReconciler", func() {
 
 			It("does not reconcile", func() {
 				Expect(reconcileErr).NotTo(HaveOccurred())
-				Expect(result.Requeue).To(BeFalse())
+				Expect(result.RequeueAfter).To(BeZero())
 				Expect(routeTableClient.Invocations()).To(BeEmpty())
 			})
 		})

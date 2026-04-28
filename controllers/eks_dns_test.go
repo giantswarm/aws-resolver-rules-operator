@@ -248,7 +248,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 
 				It("doesn't really reconcile", func() {
 					Expect(clusterClient.AddAWSManagedControlPlaneFinalizerCallCount()).To(BeZero())
-					Expect(result.Requeue).To(BeFalse())
+					Expect(result.RequeueAfter).To(BeZero())
 					Expect(result.RequeueAfter).To(BeZero())
 					Expect(reconcileErr).NotTo(HaveOccurred())
 				})
