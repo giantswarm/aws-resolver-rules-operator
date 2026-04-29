@@ -464,14 +464,11 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 
 	operation, err := controllerutil.CreateOrUpdate(ctx, workloadClusterClient, ec2NodeClass, func() error {
 		spec := karpawsv1.EC2NodeClassSpec{
-			AMIFamily:           new("Custom"),
-			AMISelectorTerms:    toKarpenterAMISelectorTerms(karpenterMachinePool.Spec.EC2NodeClass.AMISelectorTerms),
-			BlockDeviceMappings: toKarpenterBlockDeviceMappings(karpenterMachinePool.Spec.EC2NodeClass.BlockDeviceMappings),
-			InstanceProfile:     karpenterMachinePool.Spec.EC2NodeClass.InstanceProfile,
-			MetadataOptions: &karpawsv1.MetadataOptions{
-				HTTPPutResponseHopLimit: karpenterMachinePool.Spec.EC2NodeClass.MetadataOptions.HTTPPutResponseHopLimit,
-				HTTPTokens:              karpenterMachinePool.Spec.EC2NodeClass.MetadataOptions.HTTPTokens,
-			},
+			AMIFamily:                  new("Custom"),
+			AMISelectorTerms:           toKarpenterAMISelectorTerms(karpenterMachinePool.Spec.EC2NodeClass.AMISelectorTerms),
+			BlockDeviceMappings:        toKarpenterBlockDeviceMappings(karpenterMachinePool.Spec.EC2NodeClass.BlockDeviceMappings),
+			InstanceProfile:            karpenterMachinePool.Spec.EC2NodeClass.InstanceProfile,
+			MetadataOptions:            toKarpenterMetadataOptions(karpenterMachinePool.Spec.EC2NodeClass.MetadataOptions),
 			SecurityGroupSelectorTerms: toKarpenterSecurityGroupSelectorTerms(karpenterMachinePool.Spec.EC2NodeClass.SecurityGroupSelectorTerms),
 			SubnetSelectorTerms:        toKarpenterSubnetSelectorTerms(karpenterMachinePool.Spec.EC2NodeClass.SubnetSelectorTerms),
 			UserData:                   &userData,
@@ -705,6 +702,19 @@ func toKarpenterBlockDevice(src *v1alpha1.BlockDevice) *karpawsv1.BlockDevice {
 		VolumeInitializationRate: src.VolumeInitializationRate,
 		VolumeSize:               src.VolumeSize,
 		VolumeType:               src.VolumeType,
+	}
+}
+
+func toKarpenterMetadataOptions(src *v1alpha1.MetadataOptions) *karpawsv1.MetadataOptions {
+	if src == nil {
+		return nil
+	}
+
+	return &karpawsv1.MetadataOptions{
+		HTTPEndpoint:            src.HTTPEndpoint,
+		HTTPProtocolIPv6:        src.HTTPProtocolIPv6,
+		HTTPPutResponseHopLimit: src.HTTPPutResponseHopLimit,
+		HTTPTokens:              src.HTTPTokens,
 	}
 }
 
