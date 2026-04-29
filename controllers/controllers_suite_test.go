@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	karpawsv1 "github.com/aws/karpenter-provider-aws/pkg/apis/v1"
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
@@ -116,6 +117,10 @@ var _ = BeforeSuite(func() {
 	karpv1GV := schema.GroupVersion{Group: "karpenter.sh", Version: "v1"}
 	scheme.Scheme.AddKnownTypes(karpv1GV, &karpv1.NodePool{}, &karpv1.NodePoolList{}, &karpv1.NodeClaim{}, &karpv1.NodeClaimList{})
 	metav1.AddToGroupVersion(scheme.Scheme, karpv1GV)
+
+	karpAWSv1GV := schema.GroupVersion{Group: controllers.EC2NodeClassAPIGroup, Version: "v1"}
+	scheme.Scheme.AddKnownTypes(karpAWSv1GV, &karpawsv1.EC2NodeClass{}, &karpawsv1.EC2NodeClassList{})
+	metav1.AddToGroupVersion(scheme.Scheme, karpAWSv1GV)
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())

@@ -9,6 +9,7 @@ import (
 	"path"
 	"time"
 
+	karpawsv1 "github.com/aws/karpenter-provider-aws/pkg/apis/v1"
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -453,14 +454,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx co
 // EC2NodeClass defines the EC2-specific configuration for nodes that Karpenter will provision,
 // including AMI selection, instance profiles, security groups, and user data.
 func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool) error {
-	ec2NodeClassGVR := schema.GroupVersionResource{
-		Group:    EC2NodeClassAPIGroup,
-		Version:  "v1",
-		Resource: "ec2nodeclasses",
-	}
-
-	ec2NodeClass := &unstructured.Unstructured{}
-	ec2NodeClass.SetGroupVersionKind(ec2NodeClassGVR.GroupVersion().WithKind("EC2NodeClass"))
+	ec2NodeClass := &karpawsv1.EC2NodeClass{}
 	ec2NodeClass.SetName(karpenterMachinePool.Name)
 	ec2NodeClass.SetNamespace("")
 	ec2NodeClass.SetLabels(map[string]string{"app.kubernetes.io/managed-by": "aws-resolver-rules-operator"})
@@ -469,25 +463,25 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 	userData := r.generateUserData(awsCluster.Spec.S3Bucket.Name, karpenterMachinePool.Name)
 
 	operation, err := controllerutil.CreateOrUpdate(ctx, workloadClusterClient, ec2NodeClass, func() error {
-		spec := map[string]interface{}{
-			"amiFamily":           "Custom",
-			"amiSelectorTerms":    karpenterMachinePool.Spec.EC2NodeClass.AMISelectorTerms,
-			"blockDeviceMappings": karpenterMachinePool.Spec.EC2NodeClass.BlockDeviceMappings,
-			"instanceProfile":     karpenterMachinePool.Spec.EC2NodeClass.InstanceProfile,
-			"metadataOptions": map[string]interface{}{
-				"httpPutResponseHopLimit": karpenterMachinePool.Spec.EC2NodeClass.MetadataOptions.HTTPPutResponseHopLimit,
-				"httpTokens":              karpenterMachinePool.Spec.EC2NodeClass.MetadataOptions.HTTPTokens,
+		spec := karpawsv1.EC2NodeClassSpec{
+			AMIFamily:           new("Custom"),
+			AMISelectorTerms:    toKarpenterAMISelectorTerms(karpenterMachinePool.Spec.EC2NodeClass.AMISelectorTerms),
+			BlockDeviceMappings: toKarpenterBlockDeviceMappings(karpenterMachinePool.Spec.EC2NodeClass.BlockDeviceMappings),
+			InstanceProfile:     karpenterMachinePool.Spec.EC2NodeClass.InstanceProfile,
+			MetadataOptions: &karpawsv1.MetadataOptions{
+				HTTPPutResponseHopLimit: karpenterMachinePool.Spec.EC2NodeClass.MetadataOptions.HTTPPutResponseHopLimit,
+				HTTPTokens:              karpenterMachinePool.Spec.EC2NodeClass.MetadataOptions.HTTPTokens,
 			},
-			"securityGroupSelectorTerms": karpenterMachinePool.Spec.EC2NodeClass.SecurityGroupSelectorTerms,
-			"subnetSelectorTerms":        karpenterMachinePool.Spec.EC2NodeClass.SubnetSelectorTerms,
-			"userData":                   userData,
-			"tags":                       mergeMaps(awsCluster.Spec.AdditionalTags, karpenterMachinePool.Spec.EC2NodeClass.Tags),
-			"kubelet": map[string]interface{}{
-				"systemReserved": map[string]string{
+			SecurityGroupSelectorTerms: toKarpenterSecurityGroupSelectorTerms(karpenterMachinePool.Spec.EC2NodeClass.SecurityGroupSelectorTerms),
+			SubnetSelectorTerms:        toKarpenterSubnetSelectorTerms(karpenterMachinePool.Spec.EC2NodeClass.SubnetSelectorTerms),
+			UserData:                   &userData,
+			Tags:                       mergeMaps(awsCluster.Spec.AdditionalTags, karpenterMachinePool.Spec.EC2NodeClass.Tags),
+			Kubelet: &karpawsv1.KubeletConfiguration{
+				SystemReserved: map[string]string{
 					"cpu":    "250m",
 					"memory": "384Mi",
 				},
-				"kubeReserved": map[string]string{
+				KubeReserved: map[string]string{
 					"cpu":               "350m",
 					"memory":            "1280Mi",
 					"ephemeral-storage": "1024Mi",
@@ -495,7 +489,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 			},
 		}
 
-		ec2NodeClass.Object["spec"] = spec
+		ec2NodeClass.Spec = spec
 		return nil
 	})
 
@@ -627,6 +621,93 @@ func toKarpenterBudgets(src []v1alpha1.Budget) []karpv1.Budget {
 	return ret
 }
 
+func toKarpenterAMISelectorTerms(src []v1alpha1.AMISelectorTerm) []karpawsv1.AMISelectorTerm {
+	if len(src) == 0 {
+		return nil
+	}
+
+	ret := make([]karpawsv1.AMISelectorTerm, len(src))
+	for i, term := range src {
+		ret[i] = karpawsv1.AMISelectorTerm{
+			Alias:        term.Alias,
+			Tags:         term.Tags,
+			ID:           term.ID,
+			Name:         term.Name,
+			Owner:        term.Owner,
+			SSMParameter: term.SSMParameter,
+		}
+	}
+	return ret
+}
+
+func toKarpenterSubnetSelectorTerms(src []v1alpha1.SubnetSelectorTerm) []karpawsv1.SubnetSelectorTerm {
+	if len(src) == 0 {
+		return nil
+	}
+
+	ret := make([]karpawsv1.SubnetSelectorTerm, len(src))
+	for i, term := range src {
+		ret[i] = karpawsv1.SubnetSelectorTerm{
+			Tags: term.Tags,
+			ID:   term.ID,
+		}
+	}
+	return ret
+}
+
+func toKarpenterSecurityGroupSelectorTerms(src []v1alpha1.SecurityGroupSelectorTerm) []karpawsv1.SecurityGroupSelectorTerm {
+	if len(src) == 0 {
+		return nil
+	}
+
+	ret := make([]karpawsv1.SecurityGroupSelectorTerm, len(src))
+	for i, term := range src {
+		ret[i] = karpawsv1.SecurityGroupSelectorTerm{
+			Tags: term.Tags,
+			ID:   term.ID,
+			Name: term.Name,
+		}
+	}
+	return ret
+}
+
+func toKarpenterBlockDeviceMappings(src []*v1alpha1.BlockDeviceMapping) []*karpawsv1.BlockDeviceMapping {
+	if len(src) == 0 {
+		return nil
+	}
+
+	ret := make([]*karpawsv1.BlockDeviceMapping, len(src))
+	for i, mapping := range src {
+		if mapping == nil {
+			continue
+		}
+		ret[i] = &karpawsv1.BlockDeviceMapping{
+			DeviceName: mapping.DeviceName,
+			EBS:        toKarpenterBlockDevice(mapping.EBS),
+			RootVolume: mapping.RootVolume,
+		}
+	}
+	return ret
+}
+
+func toKarpenterBlockDevice(src *v1alpha1.BlockDevice) *karpawsv1.BlockDevice {
+	if src == nil {
+		return nil
+	}
+
+	return &karpawsv1.BlockDevice{
+		DeleteOnTermination:      src.DeleteOnTermination,
+		Encrypted:                src.Encrypted,
+		IOPS:                     src.IOPS,
+		KMSKeyID:                 src.KMSKeyID,
+		SnapshotID:               src.SnapshotID,
+		Throughput:               src.Throughput,
+		VolumeInitializationRate: src.VolumeInitializationRate,
+		VolumeSize:               src.VolumeSize,
+		VolumeType:               src.VolumeType,
+	}
+}
+
 func toKarpenterRequirements(src []v1alpha1.NodeSelectorRequirementWithMinValues) []karpv1.NodeSelectorRequirementWithMinValues {
 	if len(src) == 0 {
 		return nil
@@ -662,14 +743,7 @@ func (r *KarpenterMachinePoolReconciler) deleteKarpenterResources(ctx context.Co
 	}
 
 	// Delete EC2NodeClass
-	ec2NodeClassGVR := schema.GroupVersionResource{
-		Group:    EC2NodeClassAPIGroup,
-		Version:  "v1",
-		Resource: "ec2nodeclasses",
-	}
-
-	ec2NodeClass := &unstructured.Unstructured{}
-	ec2NodeClass.SetGroupVersionKind(ec2NodeClassGVR.GroupVersion().WithKind("EC2NodeClass"))
+	ec2NodeClass := &karpawsv1.EC2NodeClass{}
 	ec2NodeClass.SetName(karpenterMachinePool.Name)
 	ec2NodeClass.SetNamespace("default")
 

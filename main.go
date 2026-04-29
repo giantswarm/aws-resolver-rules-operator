@@ -50,6 +50,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	karpv1 "sigs.k8s.io/karpenter/pkg/apis/v1"
 
+	karpawsv1 "github.com/aws/karpenter-provider-aws/pkg/apis/v1"
+
 	"github.com/aws-resolver-rules-operator/api/v1alpha1"
 	"github.com/aws-resolver-rules-operator/controllers"
 	"github.com/aws-resolver-rules-operator/pkg/aws"
@@ -70,6 +72,10 @@ func init() {
 	karpv1GV := schema.GroupVersion{Group: "karpenter.sh", Version: "v1"}
 	scheme.AddKnownTypes(karpv1GV, &karpv1.NodePool{}, &karpv1.NodePoolList{}, &karpv1.NodeClaim{}, &karpv1.NodeClaimList{})
 	metav1.AddToGroupVersion(scheme, karpv1GV)
+
+	karpAWSv1GV := schema.GroupVersion{Group: controllers.EC2NodeClassAPIGroup, Version: "v1"}
+	scheme.AddKnownTypes(karpAWSv1GV, &karpawsv1.EC2NodeClass{}, &karpawsv1.EC2NodeClassList{})
+	metav1.AddToGroupVersion(scheme, karpAWSv1GV)
 }
 
 var (

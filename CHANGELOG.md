@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Use the Karpenter `NodePool` CRD instead of `unstructured.Unstructured` to avoid constant API Update requests.
+- Use the Karpenter `NodePool` and `EC2NodeClass` CRDs instead of `unstructured.Unstructured` to avoid constant API Update requests.
 
 ## [0.26.1] - 2026-03-16
 
