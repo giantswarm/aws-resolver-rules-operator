@@ -9,6 +9,7 @@ import (
 	"path"
 	"time"
 
+	karpawsv1 "github.com/aws/karpenter-provider-aws/pkg/apis/v1"
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	karpv1 "sigs.k8s.io/karpenter/pkg/apis/v1"
 
 	"github.com/aws-resolver-rules-operator/api/v1alpha1"
 	"github.com/aws-resolver-rules-operator/pkg/conditions"
@@ -452,14 +454,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx co
 // EC2NodeClass defines the EC2-specific configuration for nodes that Karpenter will provision,
 // including AMI selection, instance profiles, security groups, and user data.
 func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool) error {
-	ec2NodeClassGVR := schema.GroupVersionResource{
-		Group:    EC2NodeClassAPIGroup,
-		Version:  "v1",
-		Resource: "ec2nodeclasses",
-	}
-
-	ec2NodeClass := &unstructured.Unstructured{}
-	ec2NodeClass.SetGroupVersionKind(ec2NodeClassGVR.GroupVersion().WithKind("EC2NodeClass"))
+	ec2NodeClass := &karpawsv1.EC2NodeClass{}
 	ec2NodeClass.SetName(karpenterMachinePool.Name)
 	ec2NodeClass.SetNamespace("")
 	ec2NodeClass.SetLabels(map[string]string{"app.kubernetes.io/managed-by": "aws-resolver-rules-operator"})
@@ -468,25 +463,22 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 	userData := r.generateUserData(awsCluster.Spec.S3Bucket.Name, karpenterMachinePool.Name)
 
 	operation, err := controllerutil.CreateOrUpdate(ctx, workloadClusterClient, ec2NodeClass, func() error {
-		spec := map[string]interface{}{
-			"amiFamily":           "Custom",
-			"amiSelectorTerms":    karpenterMachinePool.Spec.EC2NodeClass.AMISelectorTerms,
-			"blockDeviceMappings": karpenterMachinePool.Spec.EC2NodeClass.BlockDeviceMappings,
-			"instanceProfile":     karpenterMachinePool.Spec.EC2NodeClass.InstanceProfile,
-			"metadataOptions": map[string]interface{}{
-				"httpPutResponseHopLimit": karpenterMachinePool.Spec.EC2NodeClass.MetadataOptions.HTTPPutResponseHopLimit,
-				"httpTokens":              karpenterMachinePool.Spec.EC2NodeClass.MetadataOptions.HTTPTokens,
-			},
-			"securityGroupSelectorTerms": karpenterMachinePool.Spec.EC2NodeClass.SecurityGroupSelectorTerms,
-			"subnetSelectorTerms":        karpenterMachinePool.Spec.EC2NodeClass.SubnetSelectorTerms,
-			"userData":                   userData,
-			"tags":                       mergeMaps(awsCluster.Spec.AdditionalTags, karpenterMachinePool.Spec.EC2NodeClass.Tags),
-			"kubelet": map[string]interface{}{
-				"systemReserved": map[string]string{
+		spec := karpawsv1.EC2NodeClassSpec{
+			AMIFamily:                  &karpawsv1.AMIFamilyCustom,
+			AMISelectorTerms:           toKarpenterAMISelectorTerms(karpenterMachinePool.Spec.EC2NodeClass.AMISelectorTerms),
+			BlockDeviceMappings:        toKarpenterBlockDeviceMappings(karpenterMachinePool.Spec.EC2NodeClass.BlockDeviceMappings),
+			InstanceProfile:            karpenterMachinePool.Spec.EC2NodeClass.InstanceProfile,
+			MetadataOptions:            toKarpenterMetadataOptions(karpenterMachinePool.Spec.EC2NodeClass.MetadataOptions),
+			SecurityGroupSelectorTerms: toKarpenterSecurityGroupSelectorTerms(karpenterMachinePool.Spec.EC2NodeClass.SecurityGroupSelectorTerms),
+			SubnetSelectorTerms:        toKarpenterSubnetSelectorTerms(karpenterMachinePool.Spec.EC2NodeClass.SubnetSelectorTerms),
+			UserData:                   &userData,
+			Tags:                       mergeMaps(awsCluster.Spec.AdditionalTags, karpenterMachinePool.Spec.EC2NodeClass.Tags),
+			Kubelet: &karpawsv1.KubeletConfiguration{
+				SystemReserved: map[string]string{
 					"cpu":    "250m",
 					"memory": "384Mi",
 				},
-				"kubeReserved": map[string]string{
+				KubeReserved: map[string]string{
 					"cpu":               "350m",
 					"memory":            "1280Mi",
 					"ephemeral-storage": "1024Mi",
@@ -494,7 +486,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 			},
 		}
 
-		ec2NodeClass.Object["spec"] = spec
+		ec2NodeClass.Spec = spec
 		return nil
 	})
 
@@ -527,75 +519,56 @@ func mergeMaps[A comparable, B any](maps ...map[A]B) map[A]B {
 // NodePool defines the desired state and constraints for nodes that Karpenter should provision,
 // including resource limits, disruption policies, and node requirements.
 func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool) error {
-	nodePoolGVR := schema.GroupVersionResource{
-		Group:    "karpenter.sh",
-		Version:  "v1",
-		Resource: "nodepools",
-	}
-
-	nodePool := &unstructured.Unstructured{}
-	nodePool.SetGroupVersionKind(nodePoolGVR.GroupVersion().WithKind("NodePool"))
+	nodePool := &karpv1.NodePool{}
 	nodePool.SetName(karpenterMachinePool.Name)
 	nodePool.SetNamespace("")
 	nodePool.SetLabels(map[string]string{"app.kubernetes.io/managed-by": "aws-resolver-rules-operator"})
 
 	operation, err := controllerutil.CreateOrUpdate(ctx, workloadClusterClient, nodePool, func() error {
-		spec := map[string]interface{}{
-			"template": map[string]interface{}{
-				"metadata": map[string]interface{}{},
-				"spec": map[string]interface{}{
-					"startupTaints": []interface{}{
-						map[string]interface{}{
-							"effect": "NoExecute",
-							"key":    "node.cilium.io/agent-not-ready",
-							"value":  "true",
-						},
-						map[string]interface{}{
-							"effect": "NoExecute",
-							"key":    "node.cluster.x-k8s.io/uninitialized",
-							"value":  "true",
-						},
+		spec := karpv1.NodePoolSpec{
+			Template: karpv1.NodeClaimTemplate{
+				Spec: karpv1.NodeClaimTemplateSpec{
+					StartupTaints: []v1.Taint{
+						{Effect: v1.TaintEffectNoExecute, Key: "node.cilium.io/agent-not-ready", Value: "true"},
+						{Effect: v1.TaintEffectNoExecute, Key: "node.cluster.x-k8s.io/uninitialized", Value: "true"},
 					},
-					"nodeClassRef": map[string]interface{}{
-						"group": EC2NodeClassAPIGroup,
-						"kind":  "EC2NodeClass",
-						"name":  karpenterMachinePool.Name,
+					NodeClassRef: &karpv1.NodeClassReference{
+						Group: EC2NodeClassAPIGroup,
+						Kind:  "EC2NodeClass",
+						Name:  karpenterMachinePool.Name,
 					},
 				},
 			},
-			"disruption": map[string]interface{}{},
 		}
 
 		if karpenterMachinePool.Spec.NodePool != nil {
-			dis := spec["disruption"].(map[string]interface{})
-			dis["budgets"] = karpenterMachinePool.Spec.NodePool.Disruption.Budgets
-			dis["consolidateAfter"] = karpenterMachinePool.Spec.NodePool.Disruption.ConsolidateAfter
-			dis["consolidationPolicy"] = karpenterMachinePool.Spec.NodePool.Disruption.ConsolidationPolicy
+			spec.Disruption = karpv1.Disruption{
+				Budgets:             toKarpenterBudgets(karpenterMachinePool.Spec.NodePool.Disruption.Budgets),
+				ConsolidateAfter:    toKarpenterNillableDuration(karpenterMachinePool.Spec.NodePool.Disruption.ConsolidateAfter),
+				ConsolidationPolicy: karpv1.ConsolidationPolicy(karpenterMachinePool.Spec.NodePool.Disruption.ConsolidationPolicy),
+			}
 
 			if karpenterMachinePool.Spec.NodePool.Limits != nil {
-				spec["limits"] = karpenterMachinePool.Spec.NodePool.Limits
+				spec.Limits = karpv1.Limits(karpenterMachinePool.Spec.NodePool.Limits)
 			}
 
 			if karpenterMachinePool.Spec.NodePool.Weight != nil {
-				spec["weight"] = *karpenterMachinePool.Spec.NodePool.Weight
+				spec.Weight = karpenterMachinePool.Spec.NodePool.Weight
 			}
 
-			templateMetadata := spec["template"].(map[string]interface{})["metadata"].(map[string]interface{})
-			templateMetadata["labels"] = karpenterMachinePool.Spec.NodePool.Template.Labels
+			spec.Template.Labels = karpenterMachinePool.Spec.NodePool.Template.Labels
 
-			templateSpec := spec["template"].(map[string]interface{})["spec"].(map[string]interface{})
-
-			templateSpec["taints"] = karpenterMachinePool.Spec.NodePool.Template.Spec.Taints
-			templateSpec["startupTaints"] = karpenterMachinePool.Spec.NodePool.Template.Spec.StartupTaints
-			templateSpec["requirements"] = karpenterMachinePool.Spec.NodePool.Template.Spec.Requirements
-			templateSpec["expireAfter"] = karpenterMachinePool.Spec.NodePool.Template.Spec.ExpireAfter
+			spec.Template.Spec.Taints = karpenterMachinePool.Spec.NodePool.Template.Spec.Taints
+			spec.Template.Spec.StartupTaints = karpenterMachinePool.Spec.NodePool.Template.Spec.StartupTaints
+			spec.Template.Spec.Requirements = toKarpenterRequirements(karpenterMachinePool.Spec.NodePool.Template.Spec.Requirements)
+			spec.Template.Spec.ExpireAfter = toKarpenterNillableDuration(karpenterMachinePool.Spec.NodePool.Template.Spec.ExpireAfter)
 
 			if karpenterMachinePool.Spec.NodePool.Template.Spec.TerminationGracePeriod != nil {
-				templateSpec["terminationGracePeriod"] = karpenterMachinePool.Spec.NodePool.Template.Spec.TerminationGracePeriod
+				spec.Template.Spec.TerminationGracePeriod = karpenterMachinePool.Spec.NodePool.Template.Spec.TerminationGracePeriod
 			}
 		}
 
-		nodePool.Object["spec"] = spec
+		nodePool.Spec = spec
 
 		return nil
 	})
@@ -614,6 +587,154 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 	return nil
 }
 
+func toKarpenterNillableDuration(src v1alpha1.NillableDuration) karpv1.NillableDuration {
+	return karpv1.NillableDuration{
+		Duration: src.Duration,
+		Raw:      src.Raw,
+	}
+}
+
+func toKarpenterBudgets(src []v1alpha1.Budget) []karpv1.Budget {
+	if len(src) == 0 {
+		return nil
+	}
+
+	ret := make([]karpv1.Budget, len(src))
+	for i, budget := range src {
+		var reasons []karpv1.DisruptionReason
+		if len(budget.Reasons) > 0 {
+			reasons = make([]karpv1.DisruptionReason, len(budget.Reasons))
+			for j, reason := range budget.Reasons {
+				reasons[j] = karpv1.DisruptionReason(reason)
+			}
+		}
+		ret[i] = karpv1.Budget{
+			Reasons:  reasons,
+			Nodes:    budget.Nodes,
+			Schedule: budget.Schedule,
+			Duration: budget.Duration,
+		}
+	}
+	return ret
+}
+
+func toKarpenterAMISelectorTerms(src []v1alpha1.AMISelectorTerm) []karpawsv1.AMISelectorTerm {
+	if len(src) == 0 {
+		return nil
+	}
+
+	ret := make([]karpawsv1.AMISelectorTerm, len(src))
+	for i, term := range src {
+		ret[i] = karpawsv1.AMISelectorTerm{
+			Alias:        term.Alias,
+			Tags:         term.Tags,
+			ID:           term.ID,
+			Name:         term.Name,
+			Owner:        term.Owner,
+			SSMParameter: term.SSMParameter,
+		}
+	}
+	return ret
+}
+
+func toKarpenterSubnetSelectorTerms(src []v1alpha1.SubnetSelectorTerm) []karpawsv1.SubnetSelectorTerm {
+	if len(src) == 0 {
+		return nil
+	}
+
+	ret := make([]karpawsv1.SubnetSelectorTerm, len(src))
+	for i, term := range src {
+		ret[i] = karpawsv1.SubnetSelectorTerm{
+			Tags: term.Tags,
+			ID:   term.ID,
+		}
+	}
+	return ret
+}
+
+func toKarpenterSecurityGroupSelectorTerms(src []v1alpha1.SecurityGroupSelectorTerm) []karpawsv1.SecurityGroupSelectorTerm {
+	if len(src) == 0 {
+		return nil
+	}
+
+	ret := make([]karpawsv1.SecurityGroupSelectorTerm, len(src))
+	for i, term := range src {
+		ret[i] = karpawsv1.SecurityGroupSelectorTerm{
+			Tags: term.Tags,
+			ID:   term.ID,
+			Name: term.Name,
+		}
+	}
+	return ret
+}
+
+func toKarpenterBlockDeviceMappings(src []*v1alpha1.BlockDeviceMapping) []*karpawsv1.BlockDeviceMapping {
+	if len(src) == 0 {
+		return nil
+	}
+
+	ret := make([]*karpawsv1.BlockDeviceMapping, len(src))
+	for i, mapping := range src {
+		if mapping == nil {
+			continue
+		}
+		ret[i] = &karpawsv1.BlockDeviceMapping{
+			DeviceName: mapping.DeviceName,
+			EBS:        toKarpenterBlockDevice(mapping.EBS),
+			RootVolume: mapping.RootVolume,
+		}
+	}
+	return ret
+}
+
+func toKarpenterBlockDevice(src *v1alpha1.BlockDevice) *karpawsv1.BlockDevice {
+	if src == nil {
+		return nil
+	}
+
+	return &karpawsv1.BlockDevice{
+		DeleteOnTermination:      src.DeleteOnTermination,
+		Encrypted:                src.Encrypted,
+		IOPS:                     src.IOPS,
+		KMSKeyID:                 src.KMSKeyID,
+		SnapshotID:               src.SnapshotID,
+		Throughput:               src.Throughput,
+		VolumeInitializationRate: src.VolumeInitializationRate,
+		VolumeSize:               src.VolumeSize,
+		VolumeType:               src.VolumeType,
+	}
+}
+
+func toKarpenterMetadataOptions(src *v1alpha1.MetadataOptions) *karpawsv1.MetadataOptions {
+	if src == nil {
+		return nil
+	}
+
+	return &karpawsv1.MetadataOptions{
+		HTTPEndpoint:            src.HTTPEndpoint,
+		HTTPProtocolIPv6:        src.HTTPProtocolIPv6,
+		HTTPPutResponseHopLimit: src.HTTPPutResponseHopLimit,
+		HTTPTokens:              src.HTTPTokens,
+	}
+}
+
+func toKarpenterRequirements(src []v1alpha1.NodeSelectorRequirementWithMinValues) []karpv1.NodeSelectorRequirementWithMinValues {
+	if len(src) == 0 {
+		return nil
+	}
+
+	ret := make([]karpv1.NodeSelectorRequirementWithMinValues, len(src))
+	for i, requirement := range src {
+		ret[i] = karpv1.NodeSelectorRequirementWithMinValues{
+			Key:       requirement.Key,
+			Operator:  requirement.Operator,
+			Values:    requirement.Values,
+			MinValues: requirement.MinValues,
+		}
+	}
+	return ret
+}
+
 // deleteKarpenterResources deletes the Karpenter NodePool and EC2NodeClass resources from the workload cluster.
 func (r *KarpenterMachinePoolReconciler) deleteKarpenterResources(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool) error {
 	workloadClusterClient, err := r.clusterClientGetter(ctx, "", r.client, client.ObjectKeyFromObject(cluster))
@@ -622,14 +743,7 @@ func (r *KarpenterMachinePoolReconciler) deleteKarpenterResources(ctx context.Co
 	}
 
 	// Delete NodePool
-	nodePoolGVR := schema.GroupVersionResource{
-		Group:    "karpenter.sh",
-		Version:  "v1",
-		Resource: "nodepools",
-	}
-
-	nodePool := &unstructured.Unstructured{}
-	nodePool.SetGroupVersionKind(nodePoolGVR.GroupVersion().WithKind("NodePool"))
+	nodePool := &karpv1.NodePool{}
 	nodePool.SetName(karpenterMachinePool.Name)
 	nodePool.SetNamespace("default")
 
@@ -639,14 +753,7 @@ func (r *KarpenterMachinePoolReconciler) deleteKarpenterResources(ctx context.Co
 	}
 
 	// Delete EC2NodeClass
-	ec2NodeClassGVR := schema.GroupVersionResource{
-		Group:    EC2NodeClassAPIGroup,
-		Version:  "v1",
-		Resource: "ec2nodeclasses",
-	}
-
-	ec2NodeClass := &unstructured.Unstructured{}
-	ec2NodeClass.SetGroupVersionKind(ec2NodeClassGVR.GroupVersion().WithKind("EC2NodeClass"))
+	ec2NodeClass := &karpawsv1.EC2NodeClass{}
 	ec2NodeClass.SetName(karpenterMachinePool.Name)
 	ec2NodeClass.SetNamespace("default")
 

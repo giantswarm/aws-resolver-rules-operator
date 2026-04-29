@@ -110,7 +110,7 @@ var _ = Describe("CrossplaneClusterConfigMapReconcilerCAPA", func() {
 	JustBeforeEach(func() {
 		result, err := reconciler.Reconcile(ctx, request)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(result.Requeue).To(BeFalse())
+		Expect(result.RequeueAfter).To(BeZero())
 	})
 
 	AfterEach(func() {
@@ -124,7 +124,7 @@ var _ = Describe("CrossplaneClusterConfigMapReconcilerCAPA", func() {
 	JustBeforeEach(func() {
 		result, err := reconciler.Reconcile(ctx, request)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(result.Requeue).To(BeFalse())
+		Expect(result.RequeueAfter).To(BeZero())
 	})
 
 	It("creates the configmap", func() {
