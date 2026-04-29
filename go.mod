@@ -33,7 +33,7 @@ require (
 	k8s.io/api v0.35.3
 	k8s.io/apimachinery v0.35.3
 	k8s.io/client-go v0.35.3
-	k8s.io/kubectl v0.32.3
+	k8s.io/kubectl v0.35.3
 	sigs.k8s.io/cluster-api v1.10.2
 	sigs.k8s.io/cluster-api-provider-aws/v2 v2.9.3
 	sigs.k8s.io/controller-runtime v0.22.4
@@ -127,8 +127,8 @@ require (
 	k8s.io/apiextensions-apiserver v0.35.0 // indirect
 	k8s.io/cloud-provider v0.35.0 // indirect
 	k8s.io/cluster-bootstrap v0.32.3 // indirect
-	k8s.io/component-base v0.35.0 // indirect
-	k8s.io/component-helpers v0.35.0 // indirect
+	k8s.io/component-base v0.35.3 // indirect
+	k8s.io/component-helpers v0.35.3 // indirect
 	k8s.io/csi-translation-lib v0.35.0 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20251125145642-4e65d59e963e // indirect

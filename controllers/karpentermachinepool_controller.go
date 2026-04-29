@@ -464,7 +464,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 
 	operation, err := controllerutil.CreateOrUpdate(ctx, workloadClusterClient, ec2NodeClass, func() error {
 		spec := karpawsv1.EC2NodeClassSpec{
-			AMIFamily:                  new("Custom"),
+			AMIFamily:                  &karpawsv1.AMIFamilyCustom,
 			AMISelectorTerms:           toKarpenterAMISelectorTerms(karpenterMachinePool.Spec.EC2NodeClass.AMISelectorTerms),
 			BlockDeviceMappings:        toKarpenterBlockDeviceMappings(karpenterMachinePool.Spec.EC2NodeClass.BlockDeviceMappings),
 			InstanceProfile:            karpenterMachinePool.Spec.EC2NodeClass.InstanceProfile,
@@ -602,7 +602,7 @@ func toKarpenterBudgets(src []v1alpha1.Budget) []karpv1.Budget {
 	ret := make([]karpv1.Budget, len(src))
 	for i, budget := range src {
 		var reasons []karpv1.DisruptionReason
-		if budget.Reasons != nil {
+		if len(budget.Reasons) > 0 {
 			reasons = make([]karpv1.DisruptionReason, len(budget.Reasons))
 			for j, reason := range budget.Reasons {
 				reasons[j] = karpv1.DisruptionReason(reason)
