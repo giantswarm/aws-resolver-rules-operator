@@ -9,11 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- KarpenterMachinePool finalizer removal is now gated on AWS-side state. The controller keeps the finalizer in place until `DescribeInstances` reports zero non-terminated EC2 instances tagged with the pool's `karpenter.sh/nodepool` value, instead of relying on the parent Cluster's deletionTimestamp being visible in the local informer cache. This fixes a race where, during `helm uninstall` of the cluster-aws chart, the Cluster's deletionTimestamp had not yet propagated when the KarpenterMachinePool delete reconcile ran, the controller skipped EC2 termination entirely, and the Karpenter-provisioned nodes were left running. The orphan ENIs then blocked CAPA from deleting the cluster's security groups and node subnets indefinitely.
+- KarpenterMachinePool finalizer removal is now gated on AWS-side state. The controller keeps the finalizer in place until `DescribeInstances` reports zero non-terminated EC2 instances matching both the pool's `karpenter.sh/nodepool` value and the parent cluster's `giantswarm.io/cluster` tag, instead of relying on the parent Cluster's deletionTimestamp being visible in the local informer cache. This fixes a race where, during `helm uninstall` of the cluster-aws chart, the Cluster's deletionTimestamp had not yet propagated when the KarpenterMachinePool delete reconcile ran, the controller skipped EC2 termination entirely, and the Karpenter-provisioned nodes were left running. The orphan ENIs then blocked CAPA from deleting the cluster's security groups and node subnets indefinitely.
+- The EC2 lookup is now scoped by cluster as well as NodePool name, so two clusters that happen to use the same NodePool name cannot cause a KarpenterMachinePool delete reconcile in one cluster to terminate (or wait on) instances belonging to the other.
 
 ### Changed
 
-- The `EC2Client` interface now exposes `GetNonTerminatedInstancesByTag` and `TerminateInstances` in place of the single-call `TerminateInstancesByTag`. The new split lets callers gate finalizer removal on AWS-side state independently of issuing termination, which is necessary while in-cluster Karpenter (the rightful drainer) is still alive.
+- The `EC2Client` interface now exposes `GetNonTerminatedInstancesByTags` (accepting an arbitrary set of tag key/value filters that are ANDed by the EC2 API) and `TerminateInstances` in place of the single-call `TerminateInstancesByTag`. The new split lets callers gate finalizer removal on AWS-side state independently of issuing termination, which is necessary while in-cluster Karpenter (the rightful drainer) is still alive.
 
 ## [0.26.1] - 2026-03-16
 

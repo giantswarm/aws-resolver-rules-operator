@@ -162,22 +162,28 @@ func getEc2Tags(t map[string]string) []ec2types.Tag {
 	return tags
 }
 
-// GetNonTerminatedInstancesByTag returns the IDs of EC2 instances matching the given
-// tag that are NOT in the `terminated` state (i.e., still in pending, running, shutting-down,
-// stopping or stopped). Callers use this to decide whether finalizer removal is safe:
-// while the result is non-empty, AWS still has matching resources backing live ENIs.
-func (a *AWSEC2) GetNonTerminatedInstancesByTag(ctx context.Context, logger logr.Logger, tagKey, tagValue string) ([]string, error) {
-	logger.Info("Finding EC2 instances with tag", "tagKey", tagKey, "tagValue", tagValue)
+// GetNonTerminatedInstancesByTags returns the IDs of EC2 instances that carry ALL of the
+// given tag key/value pairs and are NOT in the `terminated` state (i.e., still in pending,
+// running, shutting-down, stopping or stopped). Multiple `tag:` filters are ANDed by the
+// EC2 API. Callers use this to decide whether finalizer removal is safe: while the result
+// is non-empty, AWS still has matching resources backing live ENIs.
+func (a *AWSEC2) GetNonTerminatedInstancesByTags(ctx context.Context, logger logr.Logger, tags map[string]string) ([]string, error) {
+	if len(tags) == 0 {
+		return nil, errors.New("at least one tag filter is required")
+	}
 
-	filter := []ec2types.Filter{
-		{
-			Name:   aws.String("tag:" + tagKey),
-			Values: []string{tagValue},
-		},
+	logger.Info("Finding EC2 instances with tags", "tags", tags)
+
+	filters := make([]ec2types.Filter, 0, len(tags))
+	for k, v := range tags {
+		filters = append(filters, ec2types.Filter{
+			Name:   aws.String("tag:" + k),
+			Values: []string{v},
+		})
 	}
 
 	resp, err := a.client.DescribeInstances(ctx, &ec2.DescribeInstancesInput{
-		Filters: filter,
+		Filters: filters,
 	})
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -192,7 +198,7 @@ func (a *AWSEC2) GetNonTerminatedInstancesByTag(ctx context.Context, logger logr
 		}
 	}
 
-	logger.Info("Found non-terminated instances", "count", len(instanceIDs), "tagKey", tagKey, "tagValue", tagValue)
+	logger.Info("Found non-terminated instances", "count", len(instanceIDs), "tags", tags)
 	return instanceIDs, nil
 }
 

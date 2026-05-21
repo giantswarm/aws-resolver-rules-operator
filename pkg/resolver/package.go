@@ -26,10 +26,12 @@ type AWSClients interface {
 type EC2Client interface {
 	CreateSecurityGroupForResolverEndpoints(ctx context.Context, vpcId, groupName string, tags map[string]string) (string, error)
 	DeleteSecurityGroupForResolverEndpoints(ctx context.Context, logger logr.Logger, vpcId, groupName string) error
-	// GetNonTerminatedInstancesByTag returns the IDs of EC2 instances matching the given tag
-	// that are not in the `terminated` state. Used by callers to gate finalizer removal on
-	// AWS-side state (i.e., keep the finalizer until AWS confirms zero matching instances).
-	GetNonTerminatedInstancesByTag(ctx context.Context, logger logr.Logger, tagKey, tagValue string) ([]string, error)
+	// GetNonTerminatedInstancesByTags returns the IDs of EC2 instances that carry ALL of
+	// the given tag key/value pairs and are not in the `terminated` state. Callers should
+	// scope the match by both pool identity and cluster ownership so node-pool name
+	// collisions across clusters cannot cause the operator to touch the wrong instances.
+	// Used to gate finalizer removal on AWS-side state.
+	GetNonTerminatedInstancesByTags(ctx context.Context, logger logr.Logger, tags map[string]string) ([]string, error)
 	// TerminateInstances requests termination of the given EC2 instance IDs. The call is
 	// idempotent: instances already terminating are accepted by the AWS API.
 	TerminateInstances(ctx context.Context, logger logr.Logger, instanceIDs []string) error

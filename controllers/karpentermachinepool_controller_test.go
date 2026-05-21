@@ -308,19 +308,24 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 			// This test is a bit cumbersome because we are deleting CRs, so we can't use different `It` blocks or the CRs would be gone.
-			// We first mock the call to `GetNonTerminatedInstancesByTag` to return some instances so that we can test
+			// We first mock the call to `GetNonTerminatedInstancesByTags` to return some instances so that we can test
 			// the behavior when there are pending instances to remove.
 			// Then we manually/explicitly call the reconciler inside the test again, to be able to test the behavior
 			// when there are no instances to remove.
 			When("there are ec2 instances from karpenter", func() {
 				BeforeEach(func() {
-					ec2Client.GetNonTerminatedInstancesByTagReturnsOnCall(0, []string{"i-abc123", "i-def456"}, nil)
+					ec2Client.GetNonTerminatedInstancesByTagsReturnsOnCall(0, []string{"i-abc123", "i-def456"}, nil)
 				})
 
 				It("terminates ec2 instances, keeps the finalizer until AWS is clean, and only then removes it", func() {
 					// First reconcile: instances still present, controller terminates them and requeues.
 					Expect(reconcileErr).NotTo(HaveOccurred())
-					Expect(ec2Client.GetNonTerminatedInstancesByTagCallCount()).To(Equal(1))
+					Expect(ec2Client.GetNonTerminatedInstancesByTagsCallCount()).To(Equal(1))
+					// The lookup must be scoped by both NodePool name AND cluster ownership,
+					// so two clusters sharing a NodePool name cannot interfere with each other.
+					_, _, tagFilters := ec2Client.GetNonTerminatedInstancesByTagsArgsForCall(0)
+					Expect(tagFilters).To(HaveKeyWithValue("karpenter.sh/nodepool", KarpenterMachinePoolName))
+					Expect(tagFilters).To(HaveKeyWithValue("giantswarm.io/cluster", ClusterName))
 					Expect(ec2Client.TerminateInstancesCallCount()).To(Equal(1))
 					_, _, terminatedIDs := ec2Client.TerminateInstancesArgsForCall(0)
 					Expect(terminatedIDs).To(ConsistOf("i-abc123", "i-def456"))
@@ -333,7 +338,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 					Expect(karpenterMachinePoolList.Items).To(HaveLen(1))
 
 					// Second reconcile: AWS reports zero non-terminated instances, controller removes the finalizer.
-					ec2Client.GetNonTerminatedInstancesByTagReturnsOnCall(1, nil, nil)
+					ec2Client.GetNonTerminatedInstancesByTagsReturnsOnCall(1, nil, nil)
 
 					reconcileResult, reconcileErr = reconciler.Reconcile(ctx, ctrl.Request{
 						NamespacedName: types.NamespacedName{
@@ -342,7 +347,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 						},
 					})
 
-					Expect(ec2Client.GetNonTerminatedInstancesByTagCallCount()).To(Equal(2))
+					Expect(ec2Client.GetNonTerminatedInstancesByTagsCallCount()).To(Equal(2))
 					// TerminateInstances was not called again because the list was empty.
 					Expect(ec2Client.TerminateInstancesCallCount()).To(Equal(1))
 
@@ -386,12 +391,12 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 
 			When("there are still ec2 instances from karpenter", func() {
 				BeforeEach(func() {
-					ec2Client.GetNonTerminatedInstancesByTagReturnsOnCall(0, []string{"i-abc123", "i-def456"}, nil)
+					ec2Client.GetNonTerminatedInstancesByTagsReturnsOnCall(0, []string{"i-abc123", "i-def456"}, nil)
 				})
 
 				It("keeps the finalizer, does not terminate, and requeues", func() {
 					Expect(reconcileErr).NotTo(HaveOccurred())
-					Expect(ec2Client.GetNonTerminatedInstancesByTagCallCount()).To(Equal(1))
+					Expect(ec2Client.GetNonTerminatedInstancesByTagsCallCount()).To(Equal(1))
 					// Cluster is alive: we must not terminate behind in-WC Karpenter's back.
 					Expect(ec2Client.TerminateInstancesCallCount()).To(Equal(0))
 					Expect(reconcileResult.RequeueAfter).To(Equal(30 * time.Second))
@@ -406,12 +411,12 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 
 			When("karpenter has already terminated the ec2 instances", func() {
 				BeforeEach(func() {
-					ec2Client.GetNonTerminatedInstancesByTagReturnsOnCall(0, nil, nil)
+					ec2Client.GetNonTerminatedInstancesByTagsReturnsOnCall(0, nil, nil)
 				})
 
 				It("removes the finalizer without calling TerminateInstances", func() {
 					Expect(reconcileErr).NotTo(HaveOccurred())
-					Expect(ec2Client.GetNonTerminatedInstancesByTagCallCount()).To(Equal(1))
+					Expect(ec2Client.GetNonTerminatedInstancesByTagsCallCount()).To(Equal(1))
 					Expect(ec2Client.TerminateInstancesCallCount()).To(Equal(0))
 
 					karpenterMachinePoolList := &karpenterinfra.KarpenterMachinePoolList{}

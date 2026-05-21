@@ -40,19 +40,18 @@ type FakeEC2Client struct {
 	deleteSecurityGroupForResolverEndpointsReturnsOnCall map[int]struct {
 		result1 error
 	}
-	GetNonTerminatedInstancesByTagStub        func(context.Context, logr.Logger, string, string) ([]string, error)
-	getNonTerminatedInstancesByTagMutex       sync.RWMutex
-	getNonTerminatedInstancesByTagArgsForCall []struct {
+	GetNonTerminatedInstancesByTagsStub        func(context.Context, logr.Logger, map[string]string) ([]string, error)
+	getNonTerminatedInstancesByTagsMutex       sync.RWMutex
+	getNonTerminatedInstancesByTagsArgsForCall []struct {
 		arg1 context.Context
 		arg2 logr.Logger
-		arg3 string
-		arg4 string
+		arg3 map[string]string
 	}
-	getNonTerminatedInstancesByTagReturns struct {
+	getNonTerminatedInstancesByTagsReturns struct {
 		result1 []string
 		result2 error
 	}
-	getNonTerminatedInstancesByTagReturnsOnCall map[int]struct {
+	getNonTerminatedInstancesByTagsReturnsOnCall map[int]struct {
 		result1 []string
 		result2 error
 	}
@@ -204,21 +203,20 @@ func (fake *FakeEC2Client) DeleteSecurityGroupForResolverEndpointsReturnsOnCall(
 	}{result1}
 }
 
-func (fake *FakeEC2Client) GetNonTerminatedInstancesByTag(arg1 context.Context, arg2 logr.Logger, arg3 string, arg4 string) ([]string, error) {
-	fake.getNonTerminatedInstancesByTagMutex.Lock()
-	ret, specificReturn := fake.getNonTerminatedInstancesByTagReturnsOnCall[len(fake.getNonTerminatedInstancesByTagArgsForCall)]
-	fake.getNonTerminatedInstancesByTagArgsForCall = append(fake.getNonTerminatedInstancesByTagArgsForCall, struct {
+func (fake *FakeEC2Client) GetNonTerminatedInstancesByTags(arg1 context.Context, arg2 logr.Logger, arg3 map[string]string) ([]string, error) {
+	fake.getNonTerminatedInstancesByTagsMutex.Lock()
+	ret, specificReturn := fake.getNonTerminatedInstancesByTagsReturnsOnCall[len(fake.getNonTerminatedInstancesByTagsArgsForCall)]
+	fake.getNonTerminatedInstancesByTagsArgsForCall = append(fake.getNonTerminatedInstancesByTagsArgsForCall, struct {
 		arg1 context.Context
 		arg2 logr.Logger
-		arg3 string
-		arg4 string
-	}{arg1, arg2, arg3, arg4})
-	stub := fake.GetNonTerminatedInstancesByTagStub
-	fakeReturns := fake.getNonTerminatedInstancesByTagReturns
-	fake.recordInvocation("GetNonTerminatedInstancesByTag", []interface{}{arg1, arg2, arg3, arg4})
-	fake.getNonTerminatedInstancesByTagMutex.Unlock()
+		arg3 map[string]string
+	}{arg1, arg2, arg3})
+	stub := fake.GetNonTerminatedInstancesByTagsStub
+	fakeReturns := fake.getNonTerminatedInstancesByTagsReturns
+	fake.recordInvocation("GetNonTerminatedInstancesByTags", []interface{}{arg1, arg2, arg3})
+	fake.getNonTerminatedInstancesByTagsMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3, arg4)
+		return stub(arg1, arg2, arg3)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -226,46 +224,46 @@ func (fake *FakeEC2Client) GetNonTerminatedInstancesByTag(arg1 context.Context, 
 	return fakeReturns.result1, fakeReturns.result2
 }
 
-func (fake *FakeEC2Client) GetNonTerminatedInstancesByTagCallCount() int {
-	fake.getNonTerminatedInstancesByTagMutex.RLock()
-	defer fake.getNonTerminatedInstancesByTagMutex.RUnlock()
-	return len(fake.getNonTerminatedInstancesByTagArgsForCall)
+func (fake *FakeEC2Client) GetNonTerminatedInstancesByTagsCallCount() int {
+	fake.getNonTerminatedInstancesByTagsMutex.RLock()
+	defer fake.getNonTerminatedInstancesByTagsMutex.RUnlock()
+	return len(fake.getNonTerminatedInstancesByTagsArgsForCall)
 }
 
-func (fake *FakeEC2Client) GetNonTerminatedInstancesByTagCalls(stub func(context.Context, logr.Logger, string, string) ([]string, error)) {
-	fake.getNonTerminatedInstancesByTagMutex.Lock()
-	defer fake.getNonTerminatedInstancesByTagMutex.Unlock()
-	fake.GetNonTerminatedInstancesByTagStub = stub
+func (fake *FakeEC2Client) GetNonTerminatedInstancesByTagsCalls(stub func(context.Context, logr.Logger, map[string]string) ([]string, error)) {
+	fake.getNonTerminatedInstancesByTagsMutex.Lock()
+	defer fake.getNonTerminatedInstancesByTagsMutex.Unlock()
+	fake.GetNonTerminatedInstancesByTagsStub = stub
 }
 
-func (fake *FakeEC2Client) GetNonTerminatedInstancesByTagArgsForCall(i int) (context.Context, logr.Logger, string, string) {
-	fake.getNonTerminatedInstancesByTagMutex.RLock()
-	defer fake.getNonTerminatedInstancesByTagMutex.RUnlock()
-	argsForCall := fake.getNonTerminatedInstancesByTagArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+func (fake *FakeEC2Client) GetNonTerminatedInstancesByTagsArgsForCall(i int) (context.Context, logr.Logger, map[string]string) {
+	fake.getNonTerminatedInstancesByTagsMutex.RLock()
+	defer fake.getNonTerminatedInstancesByTagsMutex.RUnlock()
+	argsForCall := fake.getNonTerminatedInstancesByTagsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
-func (fake *FakeEC2Client) GetNonTerminatedInstancesByTagReturns(result1 []string, result2 error) {
-	fake.getNonTerminatedInstancesByTagMutex.Lock()
-	defer fake.getNonTerminatedInstancesByTagMutex.Unlock()
-	fake.GetNonTerminatedInstancesByTagStub = nil
-	fake.getNonTerminatedInstancesByTagReturns = struct {
+func (fake *FakeEC2Client) GetNonTerminatedInstancesByTagsReturns(result1 []string, result2 error) {
+	fake.getNonTerminatedInstancesByTagsMutex.Lock()
+	defer fake.getNonTerminatedInstancesByTagsMutex.Unlock()
+	fake.GetNonTerminatedInstancesByTagsStub = nil
+	fake.getNonTerminatedInstancesByTagsReturns = struct {
 		result1 []string
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeEC2Client) GetNonTerminatedInstancesByTagReturnsOnCall(i int, result1 []string, result2 error) {
-	fake.getNonTerminatedInstancesByTagMutex.Lock()
-	defer fake.getNonTerminatedInstancesByTagMutex.Unlock()
-	fake.GetNonTerminatedInstancesByTagStub = nil
-	if fake.getNonTerminatedInstancesByTagReturnsOnCall == nil {
-		fake.getNonTerminatedInstancesByTagReturnsOnCall = make(map[int]struct {
+func (fake *FakeEC2Client) GetNonTerminatedInstancesByTagsReturnsOnCall(i int, result1 []string, result2 error) {
+	fake.getNonTerminatedInstancesByTagsMutex.Lock()
+	defer fake.getNonTerminatedInstancesByTagsMutex.Unlock()
+	fake.GetNonTerminatedInstancesByTagsStub = nil
+	if fake.getNonTerminatedInstancesByTagsReturnsOnCall == nil {
+		fake.getNonTerminatedInstancesByTagsReturnsOnCall = make(map[int]struct {
 			result1 []string
 			result2 error
 		})
 	}
-	fake.getNonTerminatedInstancesByTagReturnsOnCall[i] = struct {
+	fake.getNonTerminatedInstancesByTagsReturnsOnCall[i] = struct {
 		result1 []string
 		result2 error
 	}{result1, result2}

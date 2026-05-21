@@ -335,8 +335,16 @@ func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, lo
 		logger.Error(err, "failed to delete Karpenter resources in workload cluster; continuing with EC2-side cleanup")
 	}
 
-	// Authoritative AWS-side check that gates finalizer removal.
-	instanceIDs, err := ec2Client.GetNonTerminatedInstancesByTag(ctx, logger, "karpenter.sh/nodepool", karpenterMachinePool.Name)
+	// Authoritative AWS-side check that gates finalizer removal. We scope the match by
+	// BOTH pool identity and cluster ownership so that two clusters using the same
+	// NodePool name (e.g. both have a pool named "default") cannot cause this reconcile
+	// to touch instances belonging to the other cluster. The `giantswarm.io/cluster`
+	// tag is set on every Karpenter-provisioned instance via
+	// `awsCluster.Spec.AdditionalTags` -> EC2NodeClass tags by this same controller.
+	instanceIDs, err := ec2Client.GetNonTerminatedInstancesByTags(ctx, logger, map[string]string{
+		"karpenter.sh/nodepool": karpenterMachinePool.Name,
+		"giantswarm.io/cluster": cluster.Name,
+	})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to list EC2 instances: %w", err)
 	}
