@@ -182,18 +182,23 @@ func (a *AWSEC2) GetNonTerminatedInstancesByTags(ctx context.Context, logger log
 		})
 	}
 
-	resp, err := a.client.DescribeInstances(ctx, &ec2.DescribeInstancesInput{
+	var instanceIDs []string
+	paginator := ec2.NewDescribeInstancesPaginator(a.client, &ec2.DescribeInstancesInput{
 		Filters: filters,
 	})
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	var instanceIDs []string
-	for _, reservation := range resp.Reservations {
-		for _, instance := range reservation.Instances {
-			if instance.State.Name != ec2types.InstanceStateNameTerminated {
-				instanceIDs = append(instanceIDs, *instance.InstanceId)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		for _, reservation := range page.Reservations {
+			for _, instance := range reservation.Instances {
+				if instance.InstanceId == nil || instance.State == nil {
+					continue
+				}
+				if instance.State.Name != ec2types.InstanceStateNameTerminated {
+					instanceIDs = append(instanceIDs, *instance.InstanceId)
+				}
 			}
 		}
 	}

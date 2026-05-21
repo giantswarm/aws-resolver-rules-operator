@@ -328,19 +328,27 @@ func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, lo
 	}
 
 	// Delete the Karpenter NodePool/EC2NodeClass in the workload cluster so the in-WC
-	// Karpenter starts disrupting NodeClaims for this pool. Best-effort: if the workload
-	// cluster has already been torn down the client lookup will fail and we still proceed
-	// to clean up EC2 directly below.
+	// Karpenter starts disrupting NodeClaims for this pool. While the parent Cluster
+	// is alive the workload-cluster API is expected to be reachable, so a failure here
+	// is treated as a real error and propagated; controller-runtime will requeue with
+	// backoff. Once the parent Cluster is being deleted the workload cluster may
+	// already be torn down (kubeconfig secret gone, control plane removed), so we
+	// tolerate the failure and proceed to clean up EC2 directly.
 	if err := r.deleteKarpenterResources(ctx, logger, cluster, karpenterMachinePool); err != nil {
-		logger.Error(err, "failed to delete Karpenter resources in workload cluster; continuing with EC2-side cleanup")
+		if cluster.GetDeletionTimestamp().IsZero() {
+			return reconcile.Result{}, fmt.Errorf("failed to delete Karpenter resources in workload cluster: %w", err)
+		}
+		logger.Error(err, "failed to delete Karpenter resources in workload cluster; cluster is being deleted, continuing with EC2-side cleanup")
 	}
 
 	// Authoritative AWS-side check that gates finalizer removal. We scope the match by
 	// BOTH pool identity and cluster ownership so that two clusters using the same
 	// NodePool name (e.g. both have a pool named "default") cannot cause this reconcile
 	// to touch instances belonging to the other cluster. The `giantswarm.io/cluster`
-	// tag is set on every Karpenter-provisioned instance via
-	// `awsCluster.Spec.AdditionalTags` -> EC2NodeClass tags by this same controller.
+	// tag is propagated to every Karpenter-provisioned instance via the EC2NodeClass
+	// tags built by `createOrUpdateEC2NodeClass`, sourced from
+	// `awsCluster.Spec.AdditionalTags` (populated by the cluster-aws Helm chart at
+	// `helm/cluster-aws/templates/_aws_cluster.tpl`).
 	instanceIDs, err := ec2Client.GetNonTerminatedInstancesByTags(ctx, logger, map[string]string{
 		"karpenter.sh/nodepool": karpenterMachinePool.Name,
 		"giantswarm.io/cluster": cluster.Name,
