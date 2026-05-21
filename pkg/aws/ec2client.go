@@ -162,13 +162,13 @@ func getEc2Tags(t map[string]string) []ec2types.Tag {
 	return tags
 }
 
-// TerminateInstancesByTag terminates all EC2 instances that have the specified tag key and value.
-func (a *AWSEC2) TerminateInstancesByTag(ctx context.Context, logger logr.Logger, tagKey, tagValue string) ([]string, error) {
-	ids := []string{}
-
+// GetNonTerminatedInstancesByTag returns the IDs of EC2 instances matching the given
+// tag that are NOT in the `terminated` state (i.e., still in pending, running, shutting-down,
+// stopping or stopped). Callers use this to decide whether finalizer removal is safe:
+// while the result is non-empty, AWS still has matching resources backing live ENIs.
+func (a *AWSEC2) GetNonTerminatedInstancesByTag(ctx context.Context, logger logr.Logger, tagKey, tagValue string) ([]string, error) {
 	logger.Info("Finding EC2 instances with tag", "tagKey", tagKey, "tagValue", tagValue)
 
-	// Create filter for the tag
 	filter := []ec2types.Filter{
 		{
 			Name:   aws.String("tag:" + tagKey),
@@ -176,43 +176,40 @@ func (a *AWSEC2) TerminateInstancesByTag(ctx context.Context, logger logr.Logger
 		},
 	}
 
-	// Describe instances with the tag
 	resp, err := a.client.DescribeInstances(ctx, &ec2.DescribeInstancesInput{
 		Filters: filter,
-	})
-	if err != nil {
-		return ids, errors.WithStack(err)
-	}
-
-	// Collect instance IDs
-	var instanceIds []string
-	for _, reservation := range resp.Reservations {
-		for _, instance := range reservation.Instances {
-			// Only include running or pending instances
-			if instance.State.Name == ec2types.InstanceStateNameRunning || instance.State.Name == ec2types.InstanceStateNamePending {
-				logger.Info("Found instance to terminate", "instanceId", *instance.InstanceId)
-				instanceIds = append(instanceIds, *instance.InstanceId)
-			}
-		}
-	}
-
-	// If no instances found, return
-	if len(instanceIds) == 0 {
-		logger.Info("No instances found with the specified tag")
-		return ids, nil
-	}
-
-	// Terminate the instances
-	logger.Info("Terminating instances", "count", len(instanceIds))
-	_, err = a.client.TerminateInstances(ctx, &ec2.TerminateInstancesInput{
-		InstanceIds: instanceIds,
 	})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	ids = append(ids, instanceIds...)
+	var instanceIDs []string
+	for _, reservation := range resp.Reservations {
+		for _, instance := range reservation.Instances {
+			if instance.State.Name != ec2types.InstanceStateNameTerminated {
+				instanceIDs = append(instanceIDs, *instance.InstanceId)
+			}
+		}
+	}
 
-	logger.Info("Successfully requested termination of instances", "count", len(ids), "instances", ids, "tagKey", tagKey, "tagValue", tagValue)
-	return ids, nil
+	logger.Info("Found non-terminated instances", "count", len(instanceIDs), "tagKey", tagKey, "tagValue", tagValue)
+	return instanceIDs, nil
+}
+
+// TerminateInstances requests termination of the given EC2 instance IDs. Idempotent:
+// AWS accepts instance IDs that are already in the shutting-down or terminated state.
+// Returns nil and emits no AWS call when instanceIDs is empty.
+func (a *AWSEC2) TerminateInstances(ctx context.Context, logger logr.Logger, instanceIDs []string) error {
+	if len(instanceIDs) == 0 {
+		return nil
+	}
+
+	logger.Info("Requesting termination of instances", "count", len(instanceIDs), "instances", instanceIDs)
+	_, err := a.client.TerminateInstances(ctx, &ec2.TerminateInstancesInput{
+		InstanceIds: instanceIDs,
+	})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	return nil
 }

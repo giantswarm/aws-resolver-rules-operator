@@ -240,6 +240,14 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
+		// AWSClusterRoleIdentity is cluster-scoped, so it survives the per-spec namespace
+		// teardown. Clean it up here to avoid AlreadyExists collisions between specs in
+		// this `When` block.
+		AfterEach(func() {
+			roleIdentity := &capa.AWSClusterRoleIdentity{ObjectMeta: metav1.ObjectMeta{Name: "default-delete-test"}}
+			_ = k8sClient.Delete(ctx, roleIdentity)
+		})
+
 		When("the owner cluster is also being deleted", func() {
 			BeforeEach(func() {
 				kubeadmControlPlane := &unstructured.Unstructured{}
@@ -300,18 +308,22 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 			// This test is a bit cumbersome because we are deleting CRs, so we can't use different `It` blocks or the CRs would be gone.
-			// We first mock the call to `TerminateInstancesByTag` to return some instances so that we can test
+			// We first mock the call to `GetNonTerminatedInstancesByTag` to return some instances so that we can test
 			// the behavior when there are pending instances to remove.
 			// Then we manually/explicitly call the reconciler inside the test again, to be able to test the behavior
 			// when there are no instances to remove.
 			When("there are ec2 instances from karpenter", func() {
 				BeforeEach(func() {
-					ec2Client.TerminateInstancesByTagReturnsOnCall(0, []string{"i-abc123", "i-def456"}, nil)
+					ec2Client.GetNonTerminatedInstancesByTagReturnsOnCall(0, []string{"i-abc123", "i-def456"}, nil)
 				})
 
-				It("deletes KarpenterMachinePool ec2 instances and finalizer", func() {
+				It("terminates ec2 instances, keeps the finalizer until AWS is clean, and only then removes it", func() {
+					// First reconcile: instances still present, controller terminates them and requeues.
 					Expect(reconcileErr).NotTo(HaveOccurred())
-					Expect(ec2Client.TerminateInstancesByTagCallCount()).To(Equal(1))
+					Expect(ec2Client.GetNonTerminatedInstancesByTagCallCount()).To(Equal(1))
+					Expect(ec2Client.TerminateInstancesCallCount()).To(Equal(1))
+					_, _, terminatedIDs := ec2Client.TerminateInstancesArgsForCall(0)
+					Expect(terminatedIDs).To(ConsistOf("i-abc123", "i-def456"))
 					Expect(reconcileResult.RequeueAfter).To(Equal(30 * time.Second))
 
 					karpenterMachinePoolList := &karpenterinfra.KarpenterMachinePoolList{}
@@ -320,7 +332,8 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 					// Finalizer should be there blocking the deletion of the CR
 					Expect(karpenterMachinePoolList.Items).To(HaveLen(1))
 
-					ec2Client.TerminateInstancesByTagReturnsOnCall(0, nil, nil)
+					// Second reconcile: AWS reports zero non-terminated instances, controller removes the finalizer.
+					ec2Client.GetNonTerminatedInstancesByTagReturnsOnCall(1, nil, nil)
 
 					reconcileResult, reconcileErr = reconciler.Reconcile(ctx, ctrl.Request{
 						NamespacedName: types.NamespacedName{
@@ -329,10 +342,81 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 						},
 					})
 
+					Expect(ec2Client.GetNonTerminatedInstancesByTagCallCount()).To(Equal(2))
+					// TerminateInstances was not called again because the list was empty.
+					Expect(ec2Client.TerminateInstancesCallCount()).To(Equal(1))
+
 					karpenterMachinePoolList = &karpenterinfra.KarpenterMachinePoolList{}
 					err = k8sClient.List(ctx, karpenterMachinePoolList, client.InNamespace(namespace))
 					Expect(err).NotTo(HaveOccurred())
 					// Finalizer should've been removed and the CR should be gone
+					Expect(karpenterMachinePoolList.Items).To(HaveLen(0))
+				})
+			})
+		})
+
+		// This covers the previously-leaking case: the KarpenterMachinePool is being
+		// deleted but the parent Cluster is still alive (e.g., the user removed only
+		// the node pool, or the Cluster's deletionTimestamp has not yet propagated to
+		// the controller's informer cache during a helm uninstall). The controller
+		// must defer EC2 termination to in-WC Karpenter while keeping the finalizer
+		// in place until AWS confirms zero matching instances.
+		When("the owner cluster is not being deleted", func() {
+			BeforeEach(func() {
+				cluster := &capi.Cluster{
+					ObjectMeta: ctrl.ObjectMeta{
+						Namespace: namespace,
+						Name:      ClusterName,
+						Labels: map[string]string{
+							capi.ClusterNameLabel: ClusterName,
+						},
+					},
+					Spec: capi.ClusterSpec{
+						InfrastructureRef: &v1.ObjectReference{
+							Kind:       "AWSCluster",
+							Namespace:  namespace,
+							Name:       ClusterName,
+							APIVersion: "infrastructure.cluster.x-k8s.io/v1beta2",
+						},
+					},
+				}
+				err := k8sClient.Create(ctx, cluster)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			When("there are still ec2 instances from karpenter", func() {
+				BeforeEach(func() {
+					ec2Client.GetNonTerminatedInstancesByTagReturnsOnCall(0, []string{"i-abc123", "i-def456"}, nil)
+				})
+
+				It("keeps the finalizer, does not terminate, and requeues", func() {
+					Expect(reconcileErr).NotTo(HaveOccurred())
+					Expect(ec2Client.GetNonTerminatedInstancesByTagCallCount()).To(Equal(1))
+					// Cluster is alive: we must not terminate behind in-WC Karpenter's back.
+					Expect(ec2Client.TerminateInstancesCallCount()).To(Equal(0))
+					Expect(reconcileResult.RequeueAfter).To(Equal(30 * time.Second))
+
+					karpenterMachinePoolList := &karpenterinfra.KarpenterMachinePoolList{}
+					err := k8sClient.List(ctx, karpenterMachinePoolList, client.InNamespace(namespace))
+					Expect(err).NotTo(HaveOccurred())
+					// Finalizer still in place because EC2 instances remain.
+					Expect(karpenterMachinePoolList.Items).To(HaveLen(1))
+				})
+			})
+
+			When("karpenter has already terminated the ec2 instances", func() {
+				BeforeEach(func() {
+					ec2Client.GetNonTerminatedInstancesByTagReturnsOnCall(0, nil, nil)
+				})
+
+				It("removes the finalizer without calling TerminateInstances", func() {
+					Expect(reconcileErr).NotTo(HaveOccurred())
+					Expect(ec2Client.GetNonTerminatedInstancesByTagCallCount()).To(Equal(1))
+					Expect(ec2Client.TerminateInstancesCallCount()).To(Equal(0))
+
+					karpenterMachinePoolList := &karpenterinfra.KarpenterMachinePoolList{}
+					err := k8sClient.List(ctx, karpenterMachinePoolList, client.InNamespace(namespace))
+					Expect(err).NotTo(HaveOccurred())
 					Expect(karpenterMachinePoolList.Items).To(HaveLen(0))
 				})
 			})
