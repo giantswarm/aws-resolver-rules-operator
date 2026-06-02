@@ -305,36 +305,61 @@ func (r *KarpenterMachinePoolReconciler) reconcileMachinePoolBootstrapUserData(c
 	return nil
 }
 
-// reconcileDelete deletes the karpenter custom resources from the workload cluster.
-// When the cluster itself is being deleted, it also terminates all EC2 instances
-// created by Karpenter to prevent orphaned resources.
+// reconcileDelete drives the deletion of a KarpenterMachinePool, ensuring that no
+// Karpenter-provisioned EC2 instance is orphaned before the finalizer is removed.
+//
+// Finalizer removal is gated on AWS-side state: while any non-terminated EC2 instance
+// tagged `karpenter.sh/nodepool=<KMP-name>` exists, the finalizer stays in place. This
+// avoids a previously observed leak in which the parent Cluster's deletionTimestamp
+// had not yet propagated to the controller's informer cache by the time the KMP delete
+// reconcile ran. In that race the controller used to skip both EC2 termination and the
+// finalizer-protecting wait, and the instances were left running after the cluster was
+// torn down (CAPA then looped forever on DependencyViolation deleting SGs/subnets).
+//
+// While the parent Cluster is still alive the in-WC Karpenter is the rightful drainer
+// (PDBs, graceful eviction); the controller deletes its NodePool/EC2NodeClass to signal
+// disruption and polls until Karpenter has terminated the instances. Once the parent
+// Cluster is being deleted the in-WC Karpenter is going away with it, so the controller
+// terminates the remaining instances directly.
 func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, roleIdentity *capa.AWSClusterRoleIdentity, patchHelper *patch.Helper) (reconcile.Result, error) {
-	// We check if the owner Cluster is also being deleted (on top of the `KarpenterMachinePool` being deleted).
-	// If the Cluster is being deleted, we terminate all the ec2 instances that karpenter may have launched.
-	// These are normally removed by Karpenter, but when deleting a cluster, karpenter may not have enough time to clean them up.
-	if !cluster.GetDeletionTimestamp().IsZero() {
-		ec2Client, err := r.awsClients.NewEC2Client(awsCluster.Spec.Region, roleIdentity.Spec.RoleArn)
-		if err != nil {
-			return reconcile.Result{}, fmt.Errorf("failed to create EC2 client: %w", err)
-		}
-
-		// Terminate EC2 instances with the karpenter.sh/nodepool tag matching the KarpenterMachinePool name
-		instanceIDs, err := ec2Client.TerminateInstancesByTag(ctx, logger, "karpenter.sh/nodepool", karpenterMachinePool.Name)
-		if err != nil {
-			return reconcile.Result{}, fmt.Errorf("failed to terminate EC2 instances: %w", err)
-		}
-
-		// Requeue if we find instances to terminate. On the next reconciliation, once there are no instances to terminate, we proceed to remove the finalizer.
-		// We don't want to remove the finalizer when there may be ec2 instances still around to be cleaned up.
-		if len(instanceIDs) > 0 {
-			return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
-		}
+	ec2Client, err := r.awsClients.NewEC2Client(awsCluster.Spec.Region, roleIdentity.Spec.RoleArn)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("failed to create EC2 client: %w", err)
 	}
 
-	// Delete Karpenter resources from the workload cluster
+	// Delete the Karpenter NodePool/EC2NodeClass in the workload cluster so the in-WC
+	// Karpenter starts disrupting NodeClaims for this pool. While the parent Cluster
+	// is alive the workload-cluster API is expected to be reachable, so a failure here
+	// is treated as a real error and propagated; controller-runtime will requeue with
+	// backoff. Once the parent Cluster is being deleted the workload cluster may
+	// already be torn down (kubeconfig secret gone, control plane removed), so we
+	// tolerate the failure and proceed to clean up EC2 directly.
 	if err := r.deleteKarpenterResources(ctx, logger, cluster, karpenterMachinePool); err != nil {
-		logger.Error(err, "failed to delete Karpenter resources")
-		return reconcile.Result{}, err
+		if cluster.GetDeletionTimestamp().IsZero() {
+			return reconcile.Result{}, fmt.Errorf("failed to delete Karpenter resources in workload cluster: %w", err)
+		}
+		logger.Error(err, "failed to delete Karpenter resources in workload cluster; cluster is being deleted, continuing with EC2-side cleanup")
+	}
+
+	// Authoritative AWS-side check that gates finalizer removal.
+	instanceIDs, err := ec2Client.GetNonTerminatedInstancesByTags(ctx, logger, map[string]string{
+		"karpenter.sh/nodepool": karpenterMachinePool.Name,
+		"giantswarm.io/cluster": cluster.Name,
+	})
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("failed to list EC2 instances: %w", err)
+	}
+
+	if len(instanceIDs) > 0 {
+		if !cluster.GetDeletionTimestamp().IsZero() {
+			logger.Info("Cluster is being deleted; terminating remaining EC2 instances", "count", len(instanceIDs), "instances", instanceIDs)
+			if err := ec2Client.TerminateInstances(ctx, logger, instanceIDs); err != nil {
+				return reconcile.Result{}, fmt.Errorf("failed to terminate EC2 instances: %w", err)
+			}
+		} else {
+			logger.Info("Cluster is still alive; waiting for Karpenter to terminate EC2 instances", "count", len(instanceIDs), "instances", instanceIDs)
+		}
+		return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
 	logger.Info("Removing finalizer", "finalizer", KarpenterFinalizer)
