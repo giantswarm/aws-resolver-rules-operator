@@ -745,7 +745,7 @@ func (r *KarpenterMachinePoolReconciler) deleteKarpenterResources(ctx context.Co
 	// Delete NodePool
 	nodePool := &karpv1.NodePool{}
 	nodePool.SetName(karpenterMachinePool.Name)
-	nodePool.SetNamespace("default")
+	nodePool.SetNamespace("")
 
 	if err := workloadClusterClient.Delete(ctx, nodePool); err != nil && !k8serrors.IsNotFound(err) && !meta.IsNoMatchError(err) {
 		logger.Error(err, "failed to delete NodePool", "name", karpenterMachinePool.Name)
@@ -755,7 +755,7 @@ func (r *KarpenterMachinePoolReconciler) deleteKarpenterResources(ctx context.Co
 	// Delete EC2NodeClass
 	ec2NodeClass := &karpawsv1.EC2NodeClass{}
 	ec2NodeClass.SetName(karpenterMachinePool.Name)
-	ec2NodeClass.SetNamespace("default")
+	ec2NodeClass.SetNamespace("")
 
 	if err := workloadClusterClient.Delete(ctx, ec2NodeClass); err != nil && !k8serrors.IsNotFound(err) && !meta.IsNoMatchError(err) {
 		logger.Error(err, "failed to delete EC2NodeClass", "name", karpenterMachinePool.Name)
