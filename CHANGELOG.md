@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.27.1] - 2026-06-09
 
+### Fixed
+
+- Previous releases didn't work. This syncs CI pipeline files to fix that.
+
 ## [0.27.0] - 2026-06-09
 
 ### Changed
