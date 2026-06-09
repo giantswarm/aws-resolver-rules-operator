@@ -35,6 +35,8 @@ jobs:
       image: ubuntu-2204:2024.05.1
     steps:
     - checkout
+    - attach_workspace:
+        at: .
     - architect/machine-install-go
     - architect/integration-test-install-tools:
         apptestctl-version: v0.18.0
