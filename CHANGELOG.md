@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-06-09
+
+### Changed
+
+- Use the Karpenter `NodePool` and `EC2NodeClass` CRDs instead of `unstructured.Unstructured` to avoid constant API Update requests.
+
+## [0.26.2] - 2026-06-08
+
+### Fixed
+
+- KarpenterMachinePool finalizer removal is now gated on AWS-side state. The controller keeps the finalizer in place until `DescribeInstances` reports zero non-terminated EC2 instances matching both the pool's `karpenter.sh/nodepool` value and the parent cluster's `giantswarm.io/cluster` tag, instead of relying on the parent Cluster's deletionTimestamp being visible in the local informer cache. This fixes a race where, during `helm uninstall` of the cluster-aws chart, the Cluster's deletionTimestamp had not yet propagated when the KarpenterMachinePool delete reconcile ran, the controller skipped EC2 termination entirely, and the Karpenter-provisioned nodes were left running. The orphan ENIs then blocked CAPA from deleting the cluster's security groups and node subnets indefinitely.
+- `GetNonTerminatedInstancesByTags` now paginates `DescribeInstances` (using `NewDescribeInstancesPaginator`) instead of reading only the first page, and guards against a nil `instance.State` from the AWS SDK before dereferencing it.
+- Failures to delete the Karpenter `NodePool`/`EC2NodeClass` in the workload cluster are now propagated (instead of silently swallowed) when the parent Cluster is still alive, so transient workload-cluster API errors trigger a normal controller-runtime retry. The error is still tolerated when the parent Cluster is being deleted, where the workload cluster may legitimately be unreachable.
+
 ## [0.26.1] - 2026-03-16
 
 ### Fixed
@@ -362,7 +376,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
 
-[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.26.1...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.0...HEAD
+[0.27.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.26.2...v0.27.0
+[0.26.2]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.26.1...v0.26.2
 [0.26.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.26.0...v0.26.1
 [0.26.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.25.3...v0.26.0
 [0.25.3]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.25.2...v0.25.3

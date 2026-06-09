@@ -1,6 +1,6 @@
 version: 2.1
 orbs:
-  architect: giantswarm/architect@6.15.0
+  architect: giantswarm/architect@9.2.0
 
 jobs:
   unit-tests:
@@ -35,6 +35,8 @@ jobs:
       image: ubuntu-2204:2024.05.1
     steps:
     - checkout
+    - attach_workspace:
+        at: .
     - architect/machine-install-go
     - architect/integration-test-install-tools:
         apptestctl-version: v0.18.0
@@ -65,19 +67,20 @@ workflows:
           tags:
             only: /^v.*/
 
-    - acceptance-tests:
-        context: architect
-        requires:
-        - hold
-        filters:
-          tags:
-            only: /^v.*/
-
     - architect/go-build:
         context: architect
         name: go-build
         binary: aws-resolver-rules-operator
         resource_class: xlarge
+        filters:
+          tags:
+            only: /^v.*/
+
+    - acceptance-tests:
+        context: architect
+        requires:
+        - hold
+        - go-build
         filters:
           tags:
             only: /^v.*/

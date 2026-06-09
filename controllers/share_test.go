@@ -85,7 +85,7 @@ var _ = Describe("Share", func() {
 	It("shares the transit gateway", func() {
 		result, err := reconciler.Reconcile(ctx, request)
 
-		Expect(result.Requeue).To(BeFalse())
+		Expect(result.RequeueAfter).To(BeZero())
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(ramClient.ApplyResourceShareCallCount()).To(Equal(2))
@@ -101,7 +101,7 @@ var _ = Describe("Share", func() {
 
 	It("adds a finalizer", func() {
 		result, err := reconciler.Reconcile(ctx, request)
-		Expect(result.Requeue).To(BeFalse())
+		Expect(result.RequeueAfter).To(BeZero())
 		Expect(err).NotTo(HaveOccurred())
 
 		actualCluster := &capa.AWSCluster{}
@@ -126,7 +126,7 @@ var _ = Describe("Share", func() {
 
 		It("deletes the resource share", func() {
 			result, err := reconciler.Reconcile(ctx, request)
-			Expect(result.Requeue).To(BeFalse())
+			Expect(result.RequeueAfter).To(BeZero())
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(ramClient.DeleteResourceShareCallCount()).To(Equal(2))
@@ -138,7 +138,7 @@ var _ = Describe("Share", func() {
 
 		It("removes the finalizer", func() {
 			result, err := reconciler.Reconcile(ctx, request)
-			Expect(result.Requeue).To(BeFalse())
+			Expect(result.RequeueAfter).To(BeZero())
 			Expect(err).NotTo(HaveOccurred())
 
 			err = k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), &capa.AWSCluster{})
@@ -173,7 +173,7 @@ var _ = Describe("Share", func() {
 			It("does not reconcile", func() {
 				result, err := reconciler.Reconcile(ctx, request)
 
-				Expect(result.Requeue).To(BeFalse())
+				Expect(result.RequeueAfter).To(BeZero())
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(ramClient.DeleteResourceShareCallCount()).To(Equal(0))
@@ -191,7 +191,7 @@ var _ = Describe("Share", func() {
 			It("does not reconcile", func() {
 				result, err := reconciler.Reconcile(ctx, request)
 
-				Expect(result.Requeue).To(BeFalse())
+				Expect(result.RequeueAfter).To(BeZero())
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(ramClient.DeleteResourceShareCallCount()).To(Equal(0))
@@ -210,7 +210,7 @@ var _ = Describe("Share", func() {
 		It("does not reconcile", func() {
 			result, err := reconciler.Reconcile(ctx, request)
 
-			Expect(result.Requeue).To(BeFalse())
+			Expect(result.RequeueAfter).To(BeNumerically(">", 0))
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(ramClient.ApplyResourceShareCallCount()).To(Equal(1))
@@ -228,7 +228,7 @@ var _ = Describe("Share", func() {
 		It("still shares the prefix list", func() {
 			result, err := reconciler.Reconcile(ctx, request)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result.Requeue).To(BeFalse())
+			Expect(result.RequeueAfter).To(BeNumerically(">", 0))
 
 			Expect(ramClient.ApplyResourceShareCallCount()).To(Equal(1))
 			_, resourceShare := ramClient.ApplyResourceShareArgsForCall(0)
@@ -255,7 +255,7 @@ var _ = Describe("Share", func() {
 		It("overrides the management cluster transit gateway", func() {
 			result, err := reconciler.Reconcile(ctx, request)
 
-			Expect(result.Requeue).To(BeFalse())
+			Expect(result.RequeueAfter).To(BeZero())
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(ramClient.ApplyResourceShareCallCount()).To(Equal(2))
@@ -289,7 +289,7 @@ var _ = Describe("Share", func() {
 		It("does not reconcile", func() {
 			result, err := reconciler.Reconcile(ctx, request)
 
-			Expect(result.Requeue).To(BeFalse())
+			Expect(result.RequeueAfter).To(BeZero())
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(ramClient.ApplyResourceShareCallCount()).To(Equal(0))

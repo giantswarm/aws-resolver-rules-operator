@@ -162,57 +162,65 @@ func getEc2Tags(t map[string]string) []ec2types.Tag {
 	return tags
 }
 
-// TerminateInstancesByTag terminates all EC2 instances that have the specified tag key and value.
-func (a *AWSEC2) TerminateInstancesByTag(ctx context.Context, logger logr.Logger, tagKey, tagValue string) ([]string, error) {
-	ids := []string{}
-
-	logger.Info("Finding EC2 instances with tag", "tagKey", tagKey, "tagValue", tagValue)
-
-	// Create filter for the tag
-	filter := []ec2types.Filter{
-		{
-			Name:   aws.String("tag:" + tagKey),
-			Values: []string{tagValue},
-		},
+// GetNonTerminatedInstancesByTags returns the IDs of EC2 instances that carry ALL of the
+// given tag key/value pairs and are NOT in the `terminated` state (i.e., still in pending,
+// running, shutting-down, stopping or stopped). Multiple `tag:` filters are ANDed by the
+// EC2 API. Callers use this to decide whether finalizer removal is safe: while the result
+// is non-empty, AWS still has matching resources backing live ENIs.
+func (a *AWSEC2) GetNonTerminatedInstancesByTags(ctx context.Context, logger logr.Logger, tags map[string]string) ([]string, error) {
+	if len(tags) == 0 {
+		return nil, errors.New("at least one tag filter is required")
 	}
 
-	// Describe instances with the tag
-	resp, err := a.client.DescribeInstances(ctx, &ec2.DescribeInstancesInput{
-		Filters: filter,
+	logger.Info("Finding EC2 instances with tags", "tags", tags)
+
+	filters := make([]ec2types.Filter, 0, len(tags))
+	for k, v := range tags {
+		filters = append(filters, ec2types.Filter{
+			Name:   aws.String("tag:" + k),
+			Values: []string{v},
+		})
+	}
+
+	var instanceIDs []string
+	paginator := ec2.NewDescribeInstancesPaginator(a.client, &ec2.DescribeInstancesInput{
+		Filters: filters,
 	})
-	if err != nil {
-		return ids, errors.WithStack(err)
-	}
-
-	// Collect instance IDs
-	var instanceIds []string
-	for _, reservation := range resp.Reservations {
-		for _, instance := range reservation.Instances {
-			// Only include running or pending instances
-			if instance.State.Name == ec2types.InstanceStateNameRunning || instance.State.Name == ec2types.InstanceStateNamePending {
-				logger.Info("Found instance to terminate", "instanceId", *instance.InstanceId)
-				instanceIds = append(instanceIds, *instance.InstanceId)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		for _, reservation := range page.Reservations {
+			for _, instance := range reservation.Instances {
+				if instance.InstanceId == nil || instance.State == nil {
+					continue
+				}
+				if instance.State.Name != ec2types.InstanceStateNameTerminated {
+					instanceIDs = append(instanceIDs, *instance.InstanceId)
+				}
 			}
 		}
 	}
 
-	// If no instances found, return
-	if len(instanceIds) == 0 {
-		logger.Info("No instances found with the specified tag")
-		return ids, nil
+	logger.Info("Found non-terminated instances", "count", len(instanceIDs), "tags", tags)
+	return instanceIDs, nil
+}
+
+// TerminateInstances requests termination of the given EC2 instance IDs. Idempotent:
+// AWS accepts instance IDs that are already in the shutting-down or terminated state.
+// Returns nil and emits no AWS call when instanceIDs is empty.
+func (a *AWSEC2) TerminateInstances(ctx context.Context, logger logr.Logger, instanceIDs []string) error {
+	if len(instanceIDs) == 0 {
+		return nil
 	}
 
-	// Terminate the instances
-	logger.Info("Terminating instances", "count", len(instanceIds))
-	_, err = a.client.TerminateInstances(ctx, &ec2.TerminateInstancesInput{
-		InstanceIds: instanceIds,
+	logger.Info("Requesting termination of instances", "count", len(instanceIDs), "instances", instanceIDs)
+	_, err := a.client.TerminateInstances(ctx, &ec2.TerminateInstancesInput{
+		InstanceIds: instanceIDs,
 	})
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return errors.WithStack(err)
 	}
-
-	ids = append(ids, instanceIds...)
-
-	logger.Info("Successfully requested termination of instances", "count", len(ids), "instances", ids, "tagKey", tagKey, "tagValue", tagValue)
-	return ids, nil
+	return nil
 }
