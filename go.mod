@@ -1,6 +1,6 @@
 module github.com/aws-resolver-rules-operator
 
-go 1.26.2
+go 1.26.3
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.6
@@ -12,7 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/route53resolver v1.42.5
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.0
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.10
-	github.com/aws/karpenter-provider-aws v1.12.0
+	github.com/aws/karpenter-provider-aws v1.12.1
 	github.com/aws/smithy-go v1.26.0
 	github.com/aws/smithy-go/metrics/smithyotelmetrics v1.0.16
 	github.com/blang/semver/v4 v4.0.0
@@ -29,7 +29,7 @@ require (
 	go.opentelemetry.io/otel/exporters/prometheus v0.61.0
 	go.opentelemetry.io/otel/sdk/metric v1.40.0
 	go.uber.org/zap v1.27.1
-	golang.org/x/tools v0.43.0
+	golang.org/x/tools v0.44.0
 	k8s.io/api v0.35.3
 	k8s.io/apimachinery v0.35.3
 	k8s.io/client-go v0.35.3
@@ -37,7 +37,7 @@ require (
 	sigs.k8s.io/cluster-api v1.10.2
 	sigs.k8s.io/cluster-api-provider-aws/v2 v2.9.3
 	sigs.k8s.io/controller-runtime v0.22.4
-	sigs.k8s.io/karpenter v1.12.0
+	sigs.k8s.io/karpenter v1.12.1
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -110,15 +110,15 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.49.0 // indirect
-	golang.org/x/mod v0.34.0 // indirect
-	golang.org/x/net v0.52.0 // indirect
+	golang.org/x/crypto v0.51.0 // indirect
+	golang.org/x/mod v0.35.0 // indirect
+	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/oauth2 v0.34.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
-	golang.org/x/telemetry v0.0.0-20260311193753-579e4da9a98c // indirect
-	golang.org/x/term v0.41.0 // indirect
-	golang.org/x/text v0.36.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/telemetry v0.0.0-20260409153401-be6f6cb8b1fa // indirect
+	golang.org/x/term v0.43.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
