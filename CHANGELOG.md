@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.1] - 2026-06-09
+
+### Fixed
+
+- Previous releases didn't work. This syncs CI pipeline files to fix that.
+
 ## [0.27.0] - 2026-06-09
 
 ### Changed
@@ -376,7 +382,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
 
-[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.0...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.1...HEAD
+[0.27.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.0...v0.27.1
 [0.27.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.26.2...v0.27.0
 [0.26.2]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.26.1...v0.26.2
 [0.26.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.26.0...v0.26.1
