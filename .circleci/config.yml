@@ -65,19 +65,20 @@ workflows:
           tags:
             only: /^v.*/
 
-    - acceptance-tests:
-        context: architect
-        requires:
-        - hold
-        filters:
-          tags:
-            only: /^v.*/
-
     - architect/go-build:
         context: architect
         name: go-build
         binary: aws-resolver-rules-operator
         resource_class: xlarge
+        filters:
+          tags:
+            only: /^v.*/
+
+    - acceptance-tests:
+        context: architect
+        requires:
+        - hold
+        - go-build
         filters:
           tags:
             only: /^v.*/
