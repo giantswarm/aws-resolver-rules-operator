@@ -109,7 +109,7 @@ var _ = Describe("TransitGatewayAttachment", func() {
 	Describe("pre-reconciliation", func() {
 		It("adds a finalizer to the cluster", func() {
 			Expect(reconcileErr).NotTo(HaveOccurred())
-			Expect(reconcileResult.Requeue).To(BeFalse())
+			Expect(reconcileResult.RequeueAfter).To(BeZero())
 
 			actualCluster := getActualCluster()
 			Expect(actualCluster.Finalizers).To(ContainElement(controllers.FinalizerTransitGatewayAttachment))
@@ -130,7 +130,7 @@ var _ = Describe("TransitGatewayAttachment", func() {
 
 			It("does not reconcile", func() {
 				Expect(reconcileErr).NotTo(HaveOccurred())
-				Expect(reconcileResult.Requeue).To(BeFalse())
+				Expect(reconcileResult.RequeueAfter).To(BeZero())
 				Expect(transitGatewayClient.Invocations()).To(BeEmpty())
 			})
 		})
@@ -146,7 +146,7 @@ var _ = Describe("TransitGatewayAttachment", func() {
 
 			It("does not reconcile", func() {
 				Expect(reconcileErr).NotTo(HaveOccurred())
-				Expect(reconcileResult.Requeue).To(BeFalse())
+				Expect(reconcileResult.RequeueAfter).To(BeZero())
 				Expect(transitGatewayClient.Invocations()).To(BeEmpty())
 			})
 		})
@@ -176,7 +176,7 @@ var _ = Describe("TransitGatewayAttachment", func() {
 
 			It("does not reconcile", func() {
 				Expect(reconcileErr).NotTo(HaveOccurred())
-				Expect(reconcileResult.Requeue).To(BeFalse())
+				Expect(reconcileResult.RequeueAfter).To(BeZero())
 				Expect(transitGatewayClient.Invocations()).To(BeEmpty())
 			})
 		})

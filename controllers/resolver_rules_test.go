@@ -154,7 +154,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 
 			It("doesn't really reconcile", func() {
 				Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
-				Expect(result.Requeue).To(BeFalse())
+				Expect(result.RequeueAfter).To(BeZero())
 				Expect(result.RequeueAfter).To(BeZero())
 				Expect(reconcileErr).NotTo(HaveOccurred())
 			})
@@ -190,7 +190,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 					When("the VPC condition is not marked as ready", func() {
 						It("does not really reconcile", func() {
 							Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
-							Expect(result.Requeue).To(BeFalse())
+							Expect(result.RequeueAfter).To(BeZero())
 							Expect(reconcileErr).NotTo(HaveOccurred())
 						})
 					})
@@ -207,7 +207,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 
 						It("does not really reconcile", func() {
 							Expect(awsClusterClient.AddFinalizerCallCount()).To(BeZero())
-							Expect(result.Requeue).To(BeFalse())
+							Expect(result.RequeueAfter).To(BeZero())
 							Expect(reconcileErr).NotTo(HaveOccurred())
 						})
 					})

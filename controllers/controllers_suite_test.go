@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	karpawsv1 "github.com/aws/karpenter-provider-aws/pkg/apis/v1"
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
@@ -33,6 +34,7 @@ import (
 	"golang.org/x/tools/go/packages"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubectl/pkg/scheme"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
@@ -42,6 +44,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	karpv1 "sigs.k8s.io/karpenter/pkg/apis/v1"
 
 	// +kubebuilder:scaffold:imports
 
@@ -110,6 +113,14 @@ var _ = BeforeSuite(func() {
 
 	err = eks.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
+
+	karpv1GV := schema.GroupVersion{Group: "karpenter.sh", Version: "v1"}
+	scheme.Scheme.AddKnownTypes(karpv1GV, &karpv1.NodePool{}, &karpv1.NodePoolList{}, &karpv1.NodeClaim{}, &karpv1.NodeClaimList{})
+	metav1.AddToGroupVersion(scheme.Scheme, karpv1GV)
+
+	karpAWSv1GV := schema.GroupVersion{Group: controllers.EC2NodeClassAPIGroup, Version: "v1"}
+	scheme.Scheme.AddKnownTypes(karpAWSv1GV, &karpawsv1.EC2NodeClass{}, &karpawsv1.EC2NodeClassList{})
+	metav1.AddToGroupVersion(scheme.Scheme, karpAWSv1GV)
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())

@@ -91,7 +91,7 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 	Describe("pre-reconciliation", func() {
 		It("adds a finalizer to the cluster", func() {
 			Expect(reconcileErr).NotTo(HaveOccurred())
-			Expect(reconcileResult.Requeue).To(BeFalse())
+			Expect(reconcileResult.RequeueAfter).To(BeZero())
 
 			actualCluster := getActualCluster()
 			Expect(actualCluster.Finalizers).To(ContainElement(controllers.FinalizerManagementCluster))
@@ -112,7 +112,7 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 
 			It("does not reconcile", func() {
 				Expect(reconcileErr).NotTo(HaveOccurred())
-				Expect(reconcileResult.Requeue).To(BeFalse())
+				Expect(reconcileResult.RequeueAfter).To(BeZero())
 				Expect(transitGatewayClient.Invocations()).To(BeEmpty())
 			})
 		})
@@ -130,7 +130,7 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 
 			It("does not reconcile", func() {
 				Expect(reconcileErr).NotTo(HaveOccurred())
-				Expect(reconcileResult.Requeue).To(BeFalse())
+				Expect(reconcileResult.RequeueAfter).To(BeZero())
 				Expect(transitGatewayClient.Invocations()).To(BeEmpty())
 			})
 		})
@@ -143,7 +143,7 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 
 			It("does not reconcile", func() {
 				Expect(reconcileErr).NotTo(HaveOccurred())
-				Expect(reconcileResult.Requeue).To(BeFalse())
+				Expect(reconcileResult.RequeueAfter).To(BeZero())
 				Expect(transitGatewayClient.Invocations()).To(BeEmpty())
 			})
 		})
@@ -161,7 +161,7 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 
 			It("does not reconcile", func() {
 				Expect(reconcileErr).NotTo(HaveOccurred())
-				Expect(reconcileResult.Requeue).To(BeFalse())
+				Expect(reconcileResult.RequeueAfter).To(BeZero())
 				Expect(transitGatewayClient.Invocations()).To(BeEmpty())
 			})
 		})
@@ -179,7 +179,7 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 
 			It("does not reconcile", func() {
 				Expect(reconcileErr).NotTo(HaveOccurred())
-				Expect(reconcileResult.Requeue).To(BeFalse())
+				Expect(reconcileResult.RequeueAfter).To(BeZero())
 				Expect(transitGatewayClient.Invocations()).To(BeEmpty())
 			})
 		})
@@ -209,7 +209,7 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 
 		It("does not requeue the event", func() {
 			Expect(reconcileErr).NotTo(HaveOccurred())
-			Expect(reconcileResult.Requeue).To(BeFalse())
+			Expect(reconcileResult.RequeueAfter).To(BeZero())
 		})
 
 		It("creates a transit gateway", func() {
