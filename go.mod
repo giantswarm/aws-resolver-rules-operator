@@ -1,6 +1,6 @@
 module github.com/aws-resolver-rules-operator
 
-go 1.26.3
+go 1.26.4
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.6
@@ -28,7 +28,7 @@ require (
 	github.com/samber/lo v1.53.0
 	go.opentelemetry.io/otel/exporters/prometheus v0.61.0
 	go.opentelemetry.io/otel/sdk/metric v1.40.0
-	go.uber.org/zap v1.27.1
+	go.uber.org/zap v1.28.0
 	golang.org/x/tools v0.45.0
 	k8s.io/api v0.35.3
 	k8s.io/apimachinery v0.35.3
@@ -36,8 +36,8 @@ require (
 	k8s.io/kubectl v0.35.3
 	sigs.k8s.io/cluster-api v1.10.2
 	sigs.k8s.io/cluster-api-provider-aws/v2 v2.9.3
-	sigs.k8s.io/controller-runtime v0.22.4
-	sigs.k8s.io/karpenter v1.12.1
+	sigs.k8s.io/controller-runtime v0.23.1
+	sigs.k8s.io/karpenter v1.13.0
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -57,7 +57,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.9 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.30.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.19 // indirect
-	github.com/awslabs/operatorpkg v0.0.0-20251222193911-34e9a1898737 // indirect
+	github.com/awslabs/operatorpkg v0.0.0-20260501204335-c49b4ca8d58d // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -135,7 +135,7 @@ require (
 	k8s.io/utils v0.0.0-20251222233032-718f0e51e6d2 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
-	sigs.k8s.io/structured-merge-diff/v6 v6.3.1 // indirect
+	sigs.k8s.io/structured-merge-diff/v6 v6.3.2-0.20260122202528-d9cc6641c482 // indirect
 )
 
 replace google.golang.org/protobuf v1.31.0 => google.golang.org/protobuf v1.33.0
