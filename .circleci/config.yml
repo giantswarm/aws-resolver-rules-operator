@@ -88,6 +88,7 @@ workflows:
     - architect/push-to-registries:
         context: architect
         name: push-to-registries
+        split-china-push: true
         requires:
         - go-build
         - unit-tests
