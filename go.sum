@@ -80,8 +80,8 @@ github.com/aws/aws-sdk-go-v2/service/timestreamwrite v1.35.17 h1:Wlwn7YHQD3EWt1n
 github.com/aws/aws-sdk-go-v2/service/timestreamwrite v1.35.17/go.mod h1:ENvCiX8Lsds2dgCXynL6PcPgxcdzmsG6BYH0RZ+xPng=
 github.com/aws/karpenter-provider-aws v1.12.1 h1:GOIYhlnXOmiVrxIMRPQrxor0KXSJw7x3p1FH3eBaBPs=
 github.com/aws/karpenter-provider-aws v1.12.1/go.mod h1:xGAZxAILxs35rchZzde4gmvzQ5gs78QqngRYRYxpKeU=
-github.com/aws/smithy-go v1.27.3 h1:F3Zb497UhhskkfpJmfkXswyo+t0sh9OTBnIHjogWbVY=
-github.com/aws/smithy-go v1.27.3/go.mod h1:YE2RhdIuDbA5E5bTdciG9KrW3+TiEONeUWCqxX9i1Fc=
+github.com/aws/smithy-go v1.27.4 h1:JQcphmBN4f0q/sPqXqROIItRNV/hy10cgu7CsFy616M=
+github.com/aws/smithy-go v1.27.4/go.mod h1:YE2RhdIuDbA5E5bTdciG9KrW3+TiEONeUWCqxX9i1Fc=
 github.com/aws/smithy-go/metrics/smithyotelmetrics v1.0.20 h1:GqCUMytk9cuDotqCdrMjH/6Og0ZoLtfmiQRL2jR5zNw=
 github.com/aws/smithy-go/metrics/smithyotelmetrics v1.0.20/go.mod h1:cCOmLrPPIWlfw75tn/7YA2g4e6wA7ZQIX8OeOaHJ7J4=
 github.com/awslabs/amazon-eks-ami/nodeadm v0.0.0-20240229193347-cfab22a10647 h1:8yRBVsjGmI7qQsPWtIrbWP+XfwHO9Wq7gdLVzjqiZFs=
