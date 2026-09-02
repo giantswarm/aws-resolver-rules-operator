@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
+	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
 	capalogger "sigs.k8s.io/cluster-api-provider-aws/v2/pkg/logger"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/controllers/remote"
@@ -115,17 +116,6 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	}
 	logger = logger.WithValues("machinePool", machinePool.Name)
 
-	// Bootstrap data must be available before we can proceed with creating Karpenter resources
-	if machinePool.Spec.Template.Spec.Bootstrap.DataSecretName == nil {
-		conditions.MarkBootstrapDataNotReady(karpenterMachinePool, conditions.BootstrapDataSecretMissingReferenceReason, "Bootstrap data secret reference is not yet available in MachinePool")
-		conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, "Bootstrap data secret reference is not yet available in MachinePool")
-		karpenterMachinePool.Status.Ready = false
-		logger.Info("Bootstrap data secret reference is not yet available")
-		return reconcile.Result{RequeueAfter: time.Duration(10) * time.Second}, nil
-	}
-
-	logger = logger.WithValues("dataSecretName", *machinePool.Spec.Template.Spec.Bootstrap.DataSecretName)
-
 	cluster, err := capiutil.GetClusterFromMetadata(ctx, r.client, machinePool.ObjectMeta)
 	if err != nil {
 		conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, fmt.Sprintf("Failed to get Cluster owning the MachinePool: %v", err))
@@ -140,28 +130,83 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 		return ctrl.Result{}, nil
 	}
 
-	awsCluster := &capa.AWSCluster{}
-	if err := r.client.Get(ctx, client.ObjectKey{Namespace: cluster.Spec.InfrastructureRef.Namespace, Name: cluster.Spec.InfrastructureRef.Name}, awsCluster); err != nil {
-		conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, fmt.Sprintf("Failed to get AWSCluster: %v", err))
-		karpenterMachinePool.Status.Ready = false
-		return reconcile.Result{}, fmt.Errorf("failed to get AWSCluster referenced in Cluster.spec.infrastructureRef: %w", err)
-	}
+	// EKS clusters are described by an AWSManagedControlPlane instead of an AWSCluster. They have
+	// neither an S3 bucket nor a kubeadm bootstrap secret, because Karpenter renders the node
+	// userdata itself there.
+	var additionalTags capa.Tags
+	var amiFamily, userData *string
+	var identityRefName, region, s3BucketName string
 
-	if annotations.IsPaused(cluster, awsCluster) {
-		logger.Info("Reconciliation is paused for this object")
-		return ctrl.Result{}, nil
-	}
+	isEKS := IsEKS(*cluster)
+	if isEKS {
+		awsManagedControlPlane := &eks.AWSManagedControlPlane{}
+		if err := r.client.Get(ctx, client.ObjectKey{Namespace: cluster.Spec.ControlPlaneRef.Namespace, Name: cluster.Spec.ControlPlaneRef.Name}, awsManagedControlPlane); err != nil {
+			conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, fmt.Sprintf("Failed to get AWSManagedControlPlane: %v", err))
+			karpenterMachinePool.Status.Ready = false
+			return reconcile.Result{}, fmt.Errorf("failed to get AWSManagedControlPlane referenced in Cluster.spec.controlPlaneRef: %w", err)
+		}
 
-	// S3 bucket is required for storing bootstrap data that Karpenter nodes will fetch
-	if awsCluster.Spec.S3Bucket == nil {
-		conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, "S3 bucket is required but not configured in AWSCluster.spec.s3Bucket")
-		karpenterMachinePool.Status.Ready = false
-		return reconcile.Result{}, errors.New("a cluster wide object storage configured at `AWSCluster.spec.s3Bucket` is required")
+		if annotations.IsPaused(cluster, awsManagedControlPlane) {
+			logger.Info("Reconciliation is paused for this object")
+			return ctrl.Result{}, nil
+		}
+
+		additionalTags = awsManagedControlPlane.Spec.AdditionalTags
+		identityRefName = awsManagedControlPlane.Spec.IdentityRef.Name
+		region = awsManagedControlPlane.Spec.Region
+
+		// Karpenter renders the nodeadm userdata itself from the AMI family, so the EC2NodeClass
+		// carries none of ours.
+		amiFamily = karpenterMachinePool.Spec.EC2NodeClass.AMIFamily
+		if amiFamily == nil {
+			amiFamily = &karpawsv1.AMIFamilyAL2023
+		}
+	} else {
+		awsCluster := &capa.AWSCluster{}
+		if err := r.client.Get(ctx, client.ObjectKey{Namespace: cluster.Spec.InfrastructureRef.Namespace, Name: cluster.Spec.InfrastructureRef.Name}, awsCluster); err != nil {
+			conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, fmt.Sprintf("Failed to get AWSCluster: %v", err))
+			karpenterMachinePool.Status.Ready = false
+			return reconcile.Result{}, fmt.Errorf("failed to get AWSCluster referenced in Cluster.spec.infrastructureRef: %w", err)
+		}
+
+		if annotations.IsPaused(cluster, awsCluster) {
+			logger.Info("Reconciliation is paused for this object")
+			return ctrl.Result{}, nil
+		}
+
+		// S3 bucket is required for storing bootstrap data that Karpenter nodes will fetch
+		if awsCluster.Spec.S3Bucket == nil {
+			conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, "S3 bucket is required but not configured in AWSCluster.spec.s3Bucket")
+			karpenterMachinePool.Status.Ready = false
+			return reconcile.Result{}, errors.New("a cluster wide object storage configured at `AWSCluster.spec.s3Bucket` is required")
+		}
+
+		// Bootstrap data must be available before we can proceed with creating Karpenter resources
+		if machinePool.Spec.Template.Spec.Bootstrap.DataSecretName == nil {
+			conditions.MarkBootstrapDataNotReady(karpenterMachinePool, conditions.BootstrapDataSecretMissingReferenceReason, "Bootstrap data secret reference is not yet available in MachinePool")
+			conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, "Bootstrap data secret reference is not yet available in MachinePool")
+			karpenterMachinePool.Status.Ready = false
+			logger.Info("Bootstrap data secret reference is not yet available")
+			return reconcile.Result{RequeueAfter: time.Duration(10) * time.Second}, nil
+		}
+
+		logger = logger.WithValues("dataSecretName", *machinePool.Spec.Template.Spec.Bootstrap.DataSecretName)
+
+		additionalTags = awsCluster.Spec.AdditionalTags
+		identityRefName = awsCluster.Spec.IdentityRef.Name
+		region = awsCluster.Spec.Region
+		s3BucketName = awsCluster.Spec.S3Bucket.Name
+
+		// The node is handed a hand-built Ignition stub pointing at the bootstrap data in S3, which
+		// only a Custom AMI family can consume.
+		ignitionUserData := r.generateUserData(s3BucketName, karpenterMachinePool.Name)
+		userData = &ignitionUserData
+		amiFamily = &karpawsv1.AMIFamilyCustom
 	}
 
 	// Get AWS credentials for S3 and EC2 operations
 	roleIdentity := &capa.AWSClusterRoleIdentity{}
-	if err = r.client.Get(ctx, client.ObjectKey{Name: awsCluster.Spec.IdentityRef.Name}, roleIdentity); err != nil {
+	if err = r.client.Get(ctx, client.ObjectKey{Name: identityRefName}, roleIdentity); err != nil {
 		conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, fmt.Sprintf("Failed to get AWSClusterRoleIdentity: %v", err))
 		karpenterMachinePool.Status.Ready = false
 		return reconcile.Result{}, fmt.Errorf("failed to get AWSClusterRoleIdentity referenced in AWSCluster: %w", err)
@@ -169,7 +214,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 
 	// Handle deletion: cleanup EC2 instances and Karpenter resources
 	if !karpenterMachinePool.GetDeletionTimestamp().IsZero() {
-		return r.reconcileDelete(ctx, logger, cluster, awsCluster, karpenterMachinePool, roleIdentity, patchHelper)
+		return r.reconcileDelete(ctx, logger, cluster, karpenterMachinePool, roleIdentity, region, patchHelper)
 	}
 
 	// Validate version skew: ensure worker nodes don't use newer Kubernetes versions than control plane
@@ -203,19 +248,22 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	}
 
 	// Create or update Karpenter custom resources in the workload cluster.
-	if err := r.createOrUpdateKarpenterResources(ctx, logger, cluster, awsCluster, karpenterMachinePool, machinePool); err != nil {
+	if err := r.createOrUpdateKarpenterResources(ctx, logger, cluster, karpenterMachinePool, machinePool, additionalTags, amiFamily, userData); err != nil {
 		logger.Error(err, "failed to create or update Karpenter custom resources in the workload cluster")
 		conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, fmt.Sprintf("Failed to create or update Karpenter resources: %v", err))
 		karpenterMachinePool.Status.Ready = false
 		return reconcile.Result{}, err
 	}
 
-	// Reconcile bootstrap data - fetch secret and upload to S3 if changed
-	if err := r.reconcileMachinePoolBootstrapUserData(ctx, logger, awsCluster, karpenterMachinePool, *machinePool.Spec.Template.Spec.Bootstrap.DataSecretName, roleIdentity); err != nil {
-		conditions.MarkBootstrapDataNotReady(karpenterMachinePool, conditions.BootstrapDataUploadFailedReason, fmt.Sprintf("Failed to reconcile bootstrap data: %v", err))
-		conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, fmt.Sprintf("Failed to reconcile bootstrap data: %v", err))
-		karpenterMachinePool.Status.Ready = false
-		return reconcile.Result{}, err
+	// Reconcile bootstrap data - fetch secret and upload to S3 if changed. On EKS the nodes bootstrap
+	// through nodeadm with userdata Karpenter renders itself, so there is nothing to upload.
+	if !isEKS {
+		if err := r.reconcileMachinePoolBootstrapUserData(ctx, logger, karpenterMachinePool, *machinePool.Spec.Template.Spec.Bootstrap.DataSecretName, roleIdentity, region, s3BucketName); err != nil {
+			conditions.MarkBootstrapDataNotReady(karpenterMachinePool, conditions.BootstrapDataUploadFailedReason, fmt.Sprintf("Failed to reconcile bootstrap data: %v", err))
+			conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, fmt.Sprintf("Failed to reconcile bootstrap data: %v", err))
+			karpenterMachinePool.Status.Ready = false
+			return reconcile.Result{}, err
+		}
 	}
 	conditions.MarkBootstrapDataReady(karpenterMachinePool)
 
@@ -263,7 +311,7 @@ func (r *KarpenterMachinePoolReconciler) saveKarpenterInstancesToStatus(ctx cont
 // reconcileMachinePoolBootstrapUserData handles the bootstrap user data reconciliation process.
 // It fetches the bootstrap secret, checks if the data has changed, and uploads it to S3 if needed.
 // It also updates the hash annotation to track the current bootstrap data version.
-func (r *KarpenterMachinePoolReconciler) reconcileMachinePoolBootstrapUserData(ctx context.Context, logger logr.Logger, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, dataSecretName string, roleIdentity *capa.AWSClusterRoleIdentity) error {
+func (r *KarpenterMachinePoolReconciler) reconcileMachinePoolBootstrapUserData(ctx context.Context, logger logr.Logger, karpenterMachinePool *v1alpha1.KarpenterMachinePool, dataSecretName string, roleIdentity *capa.AWSClusterRoleIdentity, region, s3BucketName string) error {
 	// Get the bootstrap secret containing userdata for node initialization
 	bootstrapSecret := &v1.Secret{}
 	if err := r.client.Get(ctx, client.ObjectKey{Namespace: karpenterMachinePool.Namespace, Name: dataSecretName}, bootstrapSecret); err != nil {
@@ -285,15 +333,15 @@ func (r *KarpenterMachinePoolReconciler) reconcileMachinePoolBootstrapUserData(c
 	bootstrapUserDataHash := fmt.Sprintf("%x", sha256.Sum256(bootstrapSecretValue))
 	previousHash, annotationHashExists := karpenterMachinePool.Annotations[BootstrapDataHashAnnotation]
 	if !annotationHashExists || previousHash != bootstrapUserDataHash {
-		s3Client, err := r.awsClients.NewS3Client(awsCluster.Spec.Region, roleIdentity.Spec.RoleArn)
+		s3Client, err := r.awsClients.NewS3Client(region, roleIdentity.Spec.RoleArn)
 		if err != nil {
 			return err
 		}
 
 		key := path.Join(S3ObjectPrefix, karpenterMachinePool.Name)
 
-		logger.Info("Writing userdata to S3", "bucket", awsCluster.Spec.S3Bucket.Name, "key", key)
-		if err = s3Client.Put(ctx, awsCluster.Spec.S3Bucket.Name, key, bootstrapSecretValue); err != nil {
+		logger.Info("Writing userdata to S3", "bucket", s3BucketName, "key", key)
+		if err = s3Client.Put(ctx, s3BucketName, key, bootstrapSecretValue); err != nil {
 			return err
 		}
 
@@ -323,8 +371,8 @@ func (r *KarpenterMachinePoolReconciler) reconcileMachinePoolBootstrapUserData(c
 // disruption and polls until Karpenter has terminated the instances. Once the parent
 // Cluster is being deleted the in-WC Karpenter is going away with it, so the controller
 // terminates the remaining instances directly.
-func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, roleIdentity *capa.AWSClusterRoleIdentity, patchHelper *patch.Helper) (reconcile.Result, error) {
-	ec2Client, err := r.awsClients.NewEC2Client(awsCluster.Spec.Region, roleIdentity.Spec.RoleArn)
+func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, roleIdentity *capa.AWSClusterRoleIdentity, region string, patchHelper *patch.Helper) (reconcile.Result, error) {
+	ec2Client, err := r.awsClients.NewEC2Client(region, roleIdentity.Spec.RoleArn)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to create EC2 client: %w", err)
 	}
@@ -452,14 +500,14 @@ func (r *KarpenterMachinePoolReconciler) getControlPlaneVersion(ctx context.Cont
 }
 
 // createOrUpdateKarpenterResources creates or updates the Karpenter NodePool and EC2NodeClass custom resources in the workload cluster.
-func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, machinePool *capiexp.MachinePool) error {
+func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, machinePool *capiexp.MachinePool, additionalTags capa.Tags, amiFamily, userData *string) error {
 	workloadClusterClient, err := r.clusterClientGetter(ctx, "", r.client, client.ObjectKeyFromObject(cluster))
 	if err != nil {
 		return fmt.Errorf("failed to get workload cluster client: %w", err)
 	}
 
 	// Create or update EC2NodeClass
-	if err := r.createOrUpdateEC2NodeClass(ctx, logger, workloadClusterClient, awsCluster, karpenterMachinePool); err != nil {
+	if err := r.createOrUpdateEC2NodeClass(ctx, logger, workloadClusterClient, karpenterMachinePool, additionalTags, amiFamily, userData); err != nil {
 		conditions.MarkEC2NodeClassNotCreated(karpenterMachinePool, conditions.EC2NodeClassCreationFailedReason, fmt.Sprintf("%v", err))
 		return fmt.Errorf("failed to create or update EC2NodeClass: %w", err)
 	}
@@ -478,26 +526,23 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx co
 // createOrUpdateEC2NodeClass creates or updates the EC2NodeClass resource in the workload cluster
 // EC2NodeClass defines the EC2-specific configuration for nodes that Karpenter will provision,
 // including AMI selection, instance profiles, security groups, and user data.
-func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, awsCluster *capa.AWSCluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool) error {
+func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, karpenterMachinePool *v1alpha1.KarpenterMachinePool, additionalTags capa.Tags, amiFamily, userData *string) error {
 	ec2NodeClass := &karpawsv1.EC2NodeClass{}
 	ec2NodeClass.SetName(karpenterMachinePool.Name)
 	ec2NodeClass.SetNamespace("")
 	ec2NodeClass.SetLabels(map[string]string{"app.kubernetes.io/managed-by": "aws-resolver-rules-operator"})
 
-	// Generate Ignition user data
-	userData := r.generateUserData(awsCluster.Spec.S3Bucket.Name, karpenterMachinePool.Name)
-
 	operation, err := controllerutil.CreateOrUpdate(ctx, workloadClusterClient, ec2NodeClass, func() error {
 		spec := karpawsv1.EC2NodeClassSpec{
-			AMIFamily:                  &karpawsv1.AMIFamilyCustom,
+			AMIFamily:                  amiFamily,
 			AMISelectorTerms:           toKarpenterAMISelectorTerms(karpenterMachinePool.Spec.EC2NodeClass.AMISelectorTerms),
 			BlockDeviceMappings:        toKarpenterBlockDeviceMappings(karpenterMachinePool.Spec.EC2NodeClass.BlockDeviceMappings),
 			InstanceProfile:            karpenterMachinePool.Spec.EC2NodeClass.InstanceProfile,
 			MetadataOptions:            toKarpenterMetadataOptions(karpenterMachinePool.Spec.EC2NodeClass.MetadataOptions),
 			SecurityGroupSelectorTerms: toKarpenterSecurityGroupSelectorTerms(karpenterMachinePool.Spec.EC2NodeClass.SecurityGroupSelectorTerms),
 			SubnetSelectorTerms:        toKarpenterSubnetSelectorTerms(karpenterMachinePool.Spec.EC2NodeClass.SubnetSelectorTerms),
-			UserData:                   &userData,
-			Tags:                       mergeMaps(awsCluster.Spec.AdditionalTags, karpenterMachinePool.Spec.EC2NodeClass.Tags),
+			UserData:                   userData,
+			Tags:                       mergeMaps(additionalTags, karpenterMachinePool.Spec.EC2NodeClass.Tags),
 			Kubelet: &karpawsv1.KubeletConfiguration{
 				SystemReserved: map[string]string{
 					"cpu":    "250m",

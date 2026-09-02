@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Support `KarpenterMachinePool` on EKS clusters. On EKS the cluster is described by an `AWSManagedControlPlane` instead of an `AWSCluster`, there is no `spec.s3Bucket` and no kubeadm bootstrap secret, so Karpenter renders the `nodeadm` node userdata itself from `spec.ec2NodeClass.amiFamily` (defaulting to `AL2023`) rather than getting a hand-built Ignition stub pointing at S3.
+
 ## [0.27.2] - 2026-09-02
 
 ### Fixed
