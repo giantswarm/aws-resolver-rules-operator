@@ -508,6 +508,9 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 					"memory":            "1280Mi",
 					"ephemeral-storage": "1024Mi",
 				},
+				EvictionHard: map[string]string{
+					"memory.available": "200Mi",
+				},
 			},
 		}
 

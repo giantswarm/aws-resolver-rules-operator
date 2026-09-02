@@ -1070,6 +1070,9 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 											"memory":            Equal("1280Mi"),
 											"ephemeral-storage": Equal("1024Mi"),
 										}),
+										"evictionHard": gstruct.MatchAllKeys(gstruct.Keys{
+											"memory.available": Equal("200Mi"),
+										}),
 									}),
 								)
 							})
