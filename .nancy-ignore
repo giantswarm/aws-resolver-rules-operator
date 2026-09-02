@@ -1,11 +1,11 @@
-CVE-2026-39883 until=2026-05-10 # go.opentelemetry.io/otel/sdk@v1.40.0
-
-# Transitive dependencies pulled in only via the cluster-api / cluster-api-provider-aws
-# module graph. None are compiled into this binary, and no patched version is reachable
-# without an upstream bump, so ignore them until the next review.
 CVE-2026-1229 until=2026-10-06 # github.com/cloudflare/circl@v1.6.1
 CVE-2025-63811 until=2026-10-06 # github.com/dvsekhvalnov/jose2go@v1.6.0
 CVE-2025-11065 until=2026-10-06 # github.com/go-viper/mapstructure/v2@v2.3.0
 CVE-2026-32286 until=2026-10-06 # github.com/jackc/pgproto3/v2@v2.3.3
 CVE-2026-41889 until=2026-10-06 # github.com/jackc/pgx/v4@v4.18.3
 CVE-2026-5160 until=2026-10-06 # github.com/yuin/goldmark@v1.4.13
+CVE-2026-37236 until=2026-10-02 # github.com/grpc-ecosystem/grpc-gateway/v2@v2.26.3
+CVE-2026-63209 until=2026-10-02 # github.com/klauspost/compress@v1.18.1
+CVE-2026-56854 until=2026-10-02 # golang.org/x/crypto@v0.53.0
+CVE-2026-56864 until=2026-10-02 # golang.org/x/mod@v0.36.0
+CVE-2026-56865 until=2026-10-02 # golang.org/x/mod@v0.36.0
