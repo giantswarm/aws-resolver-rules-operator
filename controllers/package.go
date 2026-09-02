@@ -118,6 +118,11 @@ func getSubnetIds(subnets capa.Subnets) []string {
 	return subnetIds
 }
 
+func IsEKS(cluster capi.Cluster) bool {
+	return cluster.Spec.ControlPlaneRef != nil &&
+		cluster.Spec.ControlPlaneRef.Kind == "AWSManagedControlPlane"
+}
+
 //counterfeiter:generate . ClusterClient
 type ClusterClient interface {
 	GetAWSCluster(context.Context, types.NamespacedName) (*capa.AWSCluster, error)
