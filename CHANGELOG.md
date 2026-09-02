@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Add kubelet `evictionHard` configuration to `EC2NodeClass` to fix Karpenter miscalculating available RAM
 - Bump `go.opentelemetry.io/otel` and `google.golang.org/grpc` to address CVEs, ignore unfixable vulnerabilities temporarily
 
 ## [0.27.1] - 2026-06-09
