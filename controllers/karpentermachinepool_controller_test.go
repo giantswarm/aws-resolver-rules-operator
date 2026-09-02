@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubectl/pkg/scheme"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
+	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capiexp "sigs.k8s.io/cluster-api/exp/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -496,6 +497,40 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 		})
 		When("the referenced MachinePool exists without MachinePool.spec.template.spec.bootstrap.dataSecretName being set", func() {
 			BeforeEach(func() {
+				cluster := &capi.Cluster{
+					ObjectMeta: ctrl.ObjectMeta{
+						Namespace: namespace,
+						Name:      ClusterName,
+						Labels: map[string]string{
+							capi.ClusterNameLabel: ClusterName,
+						},
+					},
+					Spec: capi.ClusterSpec{
+						InfrastructureRef: &v1.ObjectReference{
+							Kind:       "AWSCluster",
+							Namespace:  namespace,
+							Name:       ClusterName,
+							APIVersion: "infrastructure.cluster.x-k8s.io/v1beta2",
+						},
+					},
+				}
+				Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
+
+				awsCluster := &capa.AWSCluster{
+					ObjectMeta: ctrl.ObjectMeta{
+						Namespace: namespace,
+						Name:      ClusterName,
+					},
+					Spec: capa.AWSClusterSpec{
+						IdentityRef: &capa.AWSIdentityReference{
+							Name: "not-referenced-by-test",
+							Kind: capa.ClusterRoleIdentityKind,
+						},
+						S3Bucket: &capa.S3Bucket{Name: AWSClusterBucketName},
+					},
+				}
+				Expect(k8sClient.Create(ctx, awsCluster)).To(Succeed())
+
 				version := KubernetesVersion
 				machinePool := &capiexp.MachinePool{
 					ObjectMeta: ctrl.ObjectMeta{
@@ -2068,6 +2103,200 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 
 			// Verify that NodePool condition was persisted with error state
 			Expect(updatedKarpenterMachinePool.Status.Conditions).To(HaveCondition("NodePoolCreated", v1.ConditionFalse, "VersionSkewBlocked", "Version skew policy violation: control plane version v1.29.0 is older than node pool version v1.30.0"))
+		})
+	})
+
+	When("the owner Cluster is an EKS cluster", func() {
+		var roleIdentityName string
+
+		BeforeEach(func() {
+			Expect(eks.AddToScheme(scheme.Scheme)).To(Succeed())
+
+			roleIdentityName = fmt.Sprintf("eks-identity-%s", namespace)
+			roleIdentity := &capa.AWSClusterRoleIdentity{
+				ObjectMeta: metav1.ObjectMeta{Name: roleIdentityName},
+				Spec: capa.AWSClusterRoleIdentitySpec{
+					AWSRoleSpec: capa.AWSRoleSpec{
+						RoleArn: "arn:aws:iam::123456789012:role/test-role",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, roleIdentity)).To(Succeed())
+
+			cluster := &capi.Cluster{
+				ObjectMeta: ctrl.ObjectMeta{
+					Namespace: namespace,
+					Name:      ClusterName,
+					Labels: map[string]string{
+						capi.ClusterNameLabel: ClusterName,
+					},
+				},
+				Spec: capi.ClusterSpec{
+					ControlPlaneRef: &v1.ObjectReference{
+						Kind:       "AWSManagedControlPlane",
+						Namespace:  namespace,
+						Name:       ClusterName,
+						APIVersion: "controlplane.cluster.x-k8s.io/v1beta2",
+					},
+					InfrastructureRef: &v1.ObjectReference{
+						Kind:       "AWSManagedCluster",
+						Namespace:  namespace,
+						Name:       ClusterName,
+						APIVersion: "infrastructure.cluster.x-k8s.io/v1beta2",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
+
+			version := KubernetesVersion
+			managedControlPlane := &eks.AWSManagedControlPlane{
+				ObjectMeta: ctrl.ObjectMeta{
+					Namespace: namespace,
+					Name:      ClusterName,
+				},
+				Spec: eks.AWSManagedControlPlaneSpec{
+					EKSClusterName: ClusterName,
+					IdentityRef: &capa.AWSIdentityReference{
+						Name: roleIdentityName,
+						Kind: capa.ClusterRoleIdentityKind,
+					},
+					Region: AWSRegion,
+					AdditionalTags: capa.Tags{
+						"additional-tag-for-all-resources": "custom-tag",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, managedControlPlane)).To(Succeed())
+			managedControlPlane.Status.Version = &version
+			Expect(k8sClient.Status().Update(ctx, managedControlPlane)).To(Succeed())
+
+			// cluster-eks renders an empty dataSecretName because EKS nodes never get a KubeadmConfig
+			emptyDataSecretName := ""
+			machinePool := &capiexp.MachinePool{
+				ObjectMeta: ctrl.ObjectMeta{
+					Namespace: namespace,
+					Name:      KarpenterMachinePoolName,
+					Labels: map[string]string{
+						capi.ClusterNameLabel: ClusterName,
+					},
+				},
+				Spec: capiexp.MachinePoolSpec{
+					ClusterName: ClusterName,
+					Template: capi.MachineTemplateSpec{
+						Spec: capi.MachineSpec{
+							ClusterName: ClusterName,
+							Bootstrap: capi.Bootstrap{
+								DataSecretName: &emptyDataSecretName,
+							},
+							Version: &version,
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, machinePool)).To(Succeed())
+
+			alias := "al2023@latest"
+			karpenterMachinePool := &karpenterinfra.KarpenterMachinePool{
+				ObjectMeta: ctrl.ObjectMeta{
+					Namespace: namespace,
+					Name:      KarpenterMachinePoolName,
+					Labels: map[string]string{
+						capi.ClusterNameLabel: ClusterName,
+					},
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion: "cluster.x-k8s.io/v1beta1",
+							Kind:       "MachinePool",
+							Name:       KarpenterMachinePoolName,
+							UID:        machinePool.GetUID(),
+						},
+					},
+				},
+				Spec: karpenterinfra.KarpenterMachinePoolSpec{
+					EC2NodeClass: &karpenterinfra.EC2NodeClassSpec{
+						AMISelectorTerms: []karpenterinfra.AMISelectorTerm{
+							{Alias: alias},
+						},
+						InstanceProfile: &instanceProfile,
+						SecurityGroupSelectorTerms: []karpenterinfra.SecurityGroupSelectorTerm{
+							{Tags: map[string]string{"aws:eks:cluster-name": ClusterName}},
+						},
+						SubnetSelectorTerms: []karpenterinfra.SubnetSelectorTerm{
+							{Tags: map[string]string{"karpenter.sh/discovery": ClusterName}},
+						},
+					},
+					NodePool: &karpenterinfra.NodePoolSpec{
+						Template: karpenterinfra.NodeClaimTemplate{
+							Spec: karpenterinfra.NodeClaimTemplateSpec{
+								Requirements: []karpenterinfra.NodeSelectorRequirementWithMinValues{
+									{
+										NodeSelectorRequirement: v1.NodeSelectorRequirement{
+											Key:      "kubernetes.io/os",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"linux"},
+										},
+									},
+								},
+								StartupTaints: []v1.Taint{
+									{
+										Key:    "node.cilium.io/agent-not-ready",
+										Value:  "true",
+										Effect: v1.TaintEffectNoExecute,
+									},
+								},
+							},
+						},
+						Disruption: karpenterinfra.Disruption{
+							ConsolidateAfter:    karpenterinfra.MustParseNillableDuration("30s"),
+							ConsolidationPolicy: karpenterinfra.ConsolidationPolicyWhenEmptyOrUnderutilized,
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, karpenterMachinePool)).To(Succeed())
+		})
+
+		AfterEach(func() {
+			roleIdentity := &capa.AWSClusterRoleIdentity{ObjectMeta: metav1.ObjectMeta{Name: roleIdentityName}}
+			_ = k8sClient.Delete(ctx, roleIdentity)
+		})
+
+		It("reconciles without an AWSCluster or an S3 bucket", func() {
+			Expect(reconcileErr).NotTo(HaveOccurred())
+		})
+
+		It("lets karpenter render the node userdata from the AL2023 family", func() {
+			Expect(reconcileErr).NotTo(HaveOccurred())
+
+			ec2nodeclassList := &unstructured.UnstructuredList{}
+			ec2nodeclassList.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   controllers.EC2NodeClassAPIGroup,
+				Kind:    "EC2NodeClassList",
+				Version: "v1",
+			})
+
+			Expect(k8sClient.List(ctx, ec2nodeclassList)).To(Succeed())
+			Expect(ec2nodeclassList.Items).To(HaveLen(1))
+
+			ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "amiFamily").To(Equal("AL2023"))
+			ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "amiSelectorTerms").To(
+				ConsistOf(
+					gstruct.MatchAllKeys(gstruct.Keys{
+						"alias": Equal("al2023@latest"),
+					}),
+				),
+			)
+			ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "tags").
+				To(HaveKeyWithValue("additional-tag-for-all-resources", "custom-tag"))
+
+			_, found, err := unstructured.NestedString(ec2nodeclassList.Items[0].Object, "spec", "userData")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(found).To(BeFalse())
+		})
+
+		It("does not write any bootstrap data to S3", func() {
+			Expect(reconcileErr).NotTo(HaveOccurred())
+			Expect(s3Client.PutCallCount()).To(BeZero())
 		})
 	})
 })
