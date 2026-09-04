@@ -9,3 +9,6 @@ CVE-2026-63209 until=2026-10-02 # github.com/klauspost/compress@v1.18.1
 CVE-2026-56854 until=2026-10-02 # golang.org/x/crypto@v0.53.0
 CVE-2026-56864 until=2026-10-02 # golang.org/x/mod@v0.36.0
 CVE-2026-56865 until=2026-10-02 # golang.org/x/mod@v0.36.0
+CVE-2026-81870 until=2026-10-04 # go.opentelemetry.io/otel/exporters/otlp/otlptrace@v1.34.0
+CVE-2026-84303 until=2026-10-04 # google.golang.org/grpc@v1.82.0
+CVE-2026-84304 until=2026-10-04 # google.golang.org/grpc@v1.82.0
