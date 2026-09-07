@@ -149,10 +149,18 @@ $(DOCKER_COMPOSE): ## Download docker-compose locally if necessary.
 	curl -fsSL "https://github.com/docker/compose/releases/download/$(LATEST_RELEASE)/docker-compose-$(shell go env GOOS)-$(shell go env GOARCH | sed 's/amd64/x86_64/; s/arm64/aarch64/')" -o $(DOCKER_COMPOSE)
 	chmod +x $(DOCKER_COMPOSE)
 
-CLUSTERCTL = $(shell pwd)/bin/clusterctl
+# Keep this in sync with the `sigs.k8s.io/cluster-api` version in `go.mod`
+CLUSTERCTL_VERSION ?= v1.10.2
+
+CLUSTERCTL = $(shell pwd)/bin/clusterctl-$(CLUSTERCTL_VERSION)
+
 .PHONY: clusterctl
-clusterctl: ## Download clusterctl locally if necessary.
-	$(call go-get-tool,$(CLUSTERCTL),sigs.k8s.io/cluster-api/cmd/clusterctl@latest)
+clusterctl: $(CLUSTERCTL) ## Download clusterctl locally if necessary.
+
+$(CLUSTERCTL):
+	mkdir -p $(dir $(CLUSTERCTL))
+	curl -fsSL "https://github.com/kubernetes-sigs/cluster-api/releases/download/$(CLUSTERCTL_VERSION)/clusterctl-$(shell go env GOOS)-$(shell go env GOARCH)" -o $(CLUSTERCTL)
+	chmod +x $(CLUSTERCTL)
 
 KIND = $(shell pwd)/bin/kind
 .PHONY: kind
