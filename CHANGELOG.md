@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Carry `spec.ec2NodeClass.instanceStorePolicy` of the `KarpenterMachinePool` to the `EC2NodeClass`, so Karpenter counts the instance store as the node's ephemeral storage.
+
 ## [0.27.2] - 2026-09-02
 
 ### Fixed
