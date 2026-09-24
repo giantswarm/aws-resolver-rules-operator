@@ -493,6 +493,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 			AMISelectorTerms:           toKarpenterAMISelectorTerms(karpenterMachinePool.Spec.EC2NodeClass.AMISelectorTerms),
 			BlockDeviceMappings:        toKarpenterBlockDeviceMappings(karpenterMachinePool.Spec.EC2NodeClass.BlockDeviceMappings),
 			InstanceProfile:            karpenterMachinePool.Spec.EC2NodeClass.InstanceProfile,
+			InstanceStorePolicy:        toKarpenterInstanceStorePolicy(karpenterMachinePool.Spec.EC2NodeClass.InstanceStorePolicy),
 			MetadataOptions:            toKarpenterMetadataOptions(karpenterMachinePool.Spec.EC2NodeClass.MetadataOptions),
 			SecurityGroupSelectorTerms: toKarpenterSecurityGroupSelectorTerms(karpenterMachinePool.Spec.EC2NodeClass.SecurityGroupSelectorTerms),
 			SubnetSelectorTerms:        toKarpenterSubnetSelectorTerms(karpenterMachinePool.Spec.EC2NodeClass.SubnetSelectorTerms),
@@ -731,6 +732,15 @@ func toKarpenterBlockDevice(src *v1alpha1.BlockDevice) *karpawsv1.BlockDevice {
 		VolumeSize:               src.VolumeSize,
 		VolumeType:               src.VolumeType,
 	}
+}
+
+func toKarpenterInstanceStorePolicy(src *v1alpha1.InstanceStorePolicy) *karpawsv1.InstanceStorePolicy {
+	if src == nil {
+		return nil
+	}
+
+	policy := karpawsv1.InstanceStorePolicy(*src)
+	return &policy
 }
 
 func toKarpenterMetadataOptions(src *v1alpha1.MetadataOptions) *karpawsv1.MetadataOptions {
