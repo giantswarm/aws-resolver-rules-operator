@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
+	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
@@ -310,6 +312,10 @@ var _ = Describe("Dns Zone reconciler", func() {
 							Expect(route53Client.AddDnsRecordsToHostedZoneCallCount()).To(Equal(0))
 						})
 
+						It("does not delete the wildcard DNS record", func() {
+							Expect(route53Client.DeleteDnsRecordCallCount()).To(Equal(0))
+						})
+
 						When("the k8s API endpoint of the CAPA workload cluster is set", func() {
 							BeforeEach(func() {
 								clusterClient.GetClusterReturns(cluster, nil)
@@ -335,7 +341,10 @@ var _ = Describe("Dns Zone reconciler", func() {
 						BeforeEach(func() {
 							awsCluster.Spec.Region = "cn-north-1"
 							awsCluster.Spec.ControlPlaneEndpoint.Host = ControlPlaneEndpointHost
-							route53Client.DnsRecordExistsReturns(false, nil)
+							// No irsa record, but the wildcard's target exists.
+							route53Client.DnsRecordExistsCalls(func(_ context.Context, _ logr.Logger, _, recordName string) (bool, error) {
+								return strings.HasPrefix(recordName, "ingress."), nil
+							})
 							route53Client.GetHostedZoneIdByNameReturns("parent-hosted-zone-id", nil)
 							route53Client.CreateHostedZoneReturns("hosted-zone-id", nil)
 						})
@@ -401,6 +410,77 @@ var _ = Describe("Dns Zone reconciler", func() {
 									Name:   fmt.Sprintf("*.%s.%s", ClusterName, WorkloadClusterBaseDomain),
 									Values: []string{fmt.Sprintf("custom-ingress.%s.%s", ClusterName, WorkloadClusterBaseDomain)},
 								}))
+							})
+
+							It("checks that the annotated target exists", func() {
+								_, _, _, recordName := route53Client.DnsRecordExistsArgsForCall(1)
+								Expect(recordName).To(Equal(fmt.Sprintf("custom-ingress.%s.%s", ClusterName, WorkloadClusterBaseDomain)))
+							})
+						})
+
+						When("the wildcard CNAME target has no DNS record", func() {
+							BeforeEach(func() {
+								clusterClient.GetClusterReturns(cluster, nil)
+								awsCluster.Spec.ControlPlaneEndpoint.Host = ControlPlaneEndpointHost
+								// The irsa record exists, the ingress record is gone.
+								route53Client.DnsRecordExistsCalls(func(_ context.Context, _ logr.Logger, _, recordName string) (bool, error) {
+									return strings.HasPrefix(recordName, "irsa."), nil
+								})
+							})
+
+							It("does not create the wildcard DNS record", func() {
+								_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+								Expect(dnsRecords).ToNot(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+									"Name": ContainSubstring("*."),
+								})))
+								Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
+									Kind:   resolver.DnsRecordTypeAlias,
+									Name:   fmt.Sprintf("api.%s.%s", ClusterName, WorkloadClusterBaseDomain),
+									Values: []string{ControlPlaneEndpointHost},
+									Region: awsCluster.Spec.Region,
+								}))
+							})
+
+							It("deletes the wildcard DNS record", func() {
+								Expect(route53Client.DeleteDnsRecordCallCount()).To(Equal(1))
+								_, _, hostedZoneId, dnsRecord := route53Client.DeleteDnsRecordArgsForCall(0)
+								Expect(hostedZoneId).To(Equal("hosted-zone-id"))
+								Expect(dnsRecord).To(Equal(resolver.DNSRecord{
+									Kind: resolver.DnsRecordTypeCname,
+									Name: fmt.Sprintf("*.%s.%s", ClusterName, WorkloadClusterBaseDomain),
+								}))
+								Expect(reconcileErr).NotTo(HaveOccurred())
+							})
+
+							When("deleting the wildcard DNS record fails", func() {
+								BeforeEach(func() {
+									route53Client.DeleteDnsRecordReturns(errors.New("failed to delete the record"))
+								})
+
+								It("returns the error", func() {
+									Expect(reconcileErr).To(MatchError(ContainSubstring("failed to delete the record")))
+								})
+							})
+
+							When("the wildcard CNAME target annotation names a target that exists", func() {
+								BeforeEach(func() {
+									awsCluster.Annotations = map[string]string{
+										gsannotations.NetworkWildcardCNAMETarget: "gateway",
+									}
+									route53Client.DnsRecordExistsCalls(func(_ context.Context, _ logr.Logger, _, recordName string) (bool, error) {
+										return strings.HasPrefix(recordName, "irsa.") || strings.HasPrefix(recordName, "gateway."), nil
+									})
+								})
+
+								It("points the wildcard DNS record at the annotated target", func() {
+									_, _, _, dnsRecords := route53Client.AddDnsRecordsToHostedZoneArgsForCall(0)
+									Expect(dnsRecords).To(ContainElements(resolver.DNSRecord{
+										Kind:   resolver.DnsRecordTypeCname,
+										Name:   fmt.Sprintf("*.%s.%s", ClusterName, WorkloadClusterBaseDomain),
+										Values: []string{fmt.Sprintf("gateway.%s.%s", ClusterName, WorkloadClusterBaseDomain)},
+									}))
+									Expect(route53Client.DeleteDnsRecordCallCount()).To(Equal(0))
+								})
 							})
 						})
 
