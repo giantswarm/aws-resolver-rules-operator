@@ -518,6 +518,72 @@ var _ = Describe("Route53 Resolver client", func() {
 			})
 		})
 	})
+	When("deleting a dns record", func() {
+		var hostedZoneToFind *route53.CreateHostedZoneOutput
+
+		BeforeEach(func() {
+			now := time.Now()
+
+			hostedZoneToFind, err = rawRoute53Client.CreateHostedZone(ctx, &route53.CreateHostedZoneInput{
+				CallerReference: awssdk.String(fmt.Sprintf("1%d", now.UnixNano())),
+				Name:            awssdk.String("dnsrecordtodelete.example.com"),
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			dnsRecordsToCreate := []resolver.DNSRecord{
+				{
+					Kind:   resolver.DnsRecordTypeCname,
+					Name:   "*.dnsrecordtodelete.example.com",
+					Values: []string{"ingress.dnsrecordtodelete.example.com"},
+				},
+				{
+					Kind:   resolver.DnsRecordTypeCname,
+					Name:   "a.dnsrecordtodelete.example.com",
+					Values: []string{"something"},
+				},
+			}
+			err = route53Client.AddDnsRecordsToHostedZone(ctx, logger, *hostedZoneToFind.HostedZone.Id, dnsRecordsToCreate)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			err = route53Client.DeleteDnsRecordsFromHostedZone(ctx, logger, *hostedZoneToFind.HostedZone.Id)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = rawRoute53Client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{Id: hostedZoneToFind.HostedZone.Id})
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("removes only the wildcard record", func() {
+			err = route53Client.DeleteDnsRecord(ctx, logger, *hostedZoneToFind.HostedZone.Id, resolver.DNSRecord{
+				Kind: resolver.DnsRecordTypeCname,
+				Name: "*.dnsrecordtodelete.example.com",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			foundDnsRecordsResponse, err := rawRoute53Client.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{
+				HostedZoneId: hostedZoneToFind.HostedZone.Id,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			var cnameNames []string
+			for _, recordSet := range foundDnsRecordsResponse.ResourceRecordSets {
+				if recordSet.Type == route53types.RRTypeCname {
+					cnameNames = append(cnameNames, *recordSet.Name)
+				}
+			}
+			Expect(cnameNames).To(ConsistOf("a.dnsrecordtodelete.example.com."))
+
+			By("deleting the record again, it doesn't fail", func() {
+				err = route53Client.DeleteDnsRecord(ctx, logger, *hostedZoneToFind.HostedZone.Id, resolver.DNSRecord{
+					Kind: resolver.DnsRecordTypeCname,
+					Name: "*.dnsrecordtodelete.example.com",
+				})
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+	})
+
 	When("deleting all dns records from hosted zone", func() {
 		var hostedZoneToFind *route53.CreateHostedZoneOutput
 

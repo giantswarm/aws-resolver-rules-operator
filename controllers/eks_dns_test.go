@@ -256,6 +256,8 @@ var _ = Describe("Dns Zone reconciler", func() {
 			When("the cluster has an identity set", func() {
 				BeforeEach(func() {
 					clusterClient.GetIdentityReturns(awsClusterRoleIdentity, nil)
+					// The wildcard's target exists.
+					route53Client.DnsRecordExistsReturns(true, nil)
 				})
 
 				When("the cluster is being deleted", func() {

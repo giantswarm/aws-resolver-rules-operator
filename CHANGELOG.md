@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Write the wildcard CNAME record of a workload cluster zone only while its target has a DNS record, and delete it once the target is gone. A wildcard whose target has no record resolves to itself, so every name without a record of its own answered SERVFAIL, e.g. after the ingress controller was removed and no `network.giantswarm.io/wildcard-cname-target` was set.
+
 ## [0.27.2] - 2026-09-02
 
 ### Fixed
