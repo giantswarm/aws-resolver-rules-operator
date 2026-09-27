@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.3] - 2026-09-27
+
 ### Fixed
 
 - Carry `spec.ec2NodeClass.instanceStorePolicy` of the `KarpenterMachinePool` to the `EC2NodeClass`, so Karpenter counts the instance store as the node's ephemeral storage.
@@ -394,7 +396,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
 
-[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.2...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.3...HEAD
+[0.27.3]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.2...v0.27.3
 [0.27.2]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.1...v0.27.2
 [0.27.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.0...v0.27.1
 [0.27.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.26.2...v0.27.0
