@@ -74,7 +74,7 @@ func (d *Zoner) CreateHostedZone(ctx context.Context, logger logr.Logger, cluste
 	}
 	logger = logger.WithValues("hostedZoneId", hostedZoneId)
 
-	err = d.createDnsRecords(ctx, logger, cluster, hostedZoneId)
+	err = d.reconcileDnsRecords(ctx, logger, cluster, hostedZoneId)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -170,15 +170,22 @@ func (d *Zoner) DeleteHostedZone(ctx context.Context, logger logr.Logger, cluste
 	return nil
 }
 
-func (d *Zoner) createDnsRecords(ctx context.Context, logger logr.Logger, cluster Cluster, hostedZoneId string) error {
+func (d *Zoner) reconcileDnsRecords(ctx context.Context, logger logr.Logger, cluster Cluster, hostedZoneId string) error {
 	route53Client, err := d.getCachedOrNewRoute53Client(cluster.Region, cluster.IAMRoleARN, logger)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	dnsRecordsToCreate, err := d.getWorkloadClusterDnsRecords(ctx, logger, route53Client, d.getHostedZoneName(cluster), cluster, hostedZoneId)
+	dnsRecordsToCreate, dnsRecordsToDelete, err := d.getWorkloadClusterDnsRecords(ctx, logger, route53Client, d.getHostedZoneName(cluster), cluster, hostedZoneId)
 	if err != nil {
 		return errors.WithStack(err)
+	}
+
+	for _, dnsRecord := range dnsRecordsToDelete {
+		err = route53Client.DeleteDnsRecord(ctx, logger, hostedZoneId, dnsRecord)
+		if err != nil {
+			return errors.WithStack(err)
+		}
 	}
 
 	if len(dnsRecordsToCreate) == 0 {
@@ -243,8 +250,10 @@ func (d *Zoner) getTagsForHostedZone(cluster Cluster) map[string]string {
 	return tags
 }
 
-func (d *Zoner) getWorkloadClusterDnsRecords(ctx context.Context, logger logr.Logger, route53Client Route53Client, workloadClusterHostedZoneName string, cluster Cluster, hostedZoneId string) ([]DNSRecord, error) {
+// getWorkloadClusterDnsRecords returns the records the workload cluster zone must have, and the ones it must not have.
+func (d *Zoner) getWorkloadClusterDnsRecords(ctx context.Context, logger logr.Logger, route53Client Route53Client, workloadClusterHostedZoneName string, cluster Cluster, hostedZoneId string) ([]DNSRecord, []DNSRecord, error) {
 	var dnsRecords []DNSRecord
+	var dnsRecordsToDelete []DNSRecord
 	var createWildcardRecord bool
 
 	if !cluster.IsEKS && !isAWSChinaRegion(cluster.Region) {
@@ -252,7 +261,7 @@ func (d *Zoner) getWorkloadClusterDnsRecords(ctx context.Context, logger logr.Lo
 		var err error
 		createWildcardRecord, err = route53Client.DnsRecordExists(ctx, logger, hostedZoneId, irsaRecordName)
 		if err != nil {
-			return nil, errors.WithStack(err)
+			return nil, nil, errors.WithStack(err)
 		}
 	} else {
 		// For EKS clusters and AWS China regions we can create the wildcard record immediately.
@@ -267,11 +276,29 @@ func (d *Zoner) getWorkloadClusterDnsRecords(ctx context.Context, logger logr.Lo
 			wildcardCNAMETarget = fmt.Sprintf("%s.%s", cluster.WildcardCNAMETarget, workloadClusterHostedZoneName)
 		}
 
-		dnsRecords = append(dnsRecords, DNSRecord{
-			Kind:   DnsRecordTypeCname,
-			Name:   fmt.Sprintf("*.%s", workloadClusterHostedZoneName),
-			Values: []string{wildcardCNAMETarget},
-		})
+		// A target without a record of its own falls into the wildcard, which then
+		// points at itself: every name without a record of its own answers SERVFAIL.
+		// So the wildcard exists only while its target does, e.g. not after the
+		// ingress controller was removed and no other target was configured.
+		targetExists, err := route53Client.DnsRecordExists(ctx, logger, hostedZoneId, wildcardCNAMETarget)
+		if err != nil {
+			return nil, nil, errors.WithStack(err)
+		}
+
+		wildcardRecordName := fmt.Sprintf("*.%s", workloadClusterHostedZoneName)
+		if targetExists {
+			dnsRecords = append(dnsRecords, DNSRecord{
+				Kind:   DnsRecordTypeCname,
+				Name:   wildcardRecordName,
+				Values: []string{wildcardCNAMETarget},
+			})
+		} else {
+			logger.Info("Wildcard CNAME target has no DNS record, the wildcard record must not exist", "wildcardCNAMETarget", wildcardCNAMETarget)
+			dnsRecordsToDelete = append(dnsRecordsToDelete, DNSRecord{
+				Kind: DnsRecordTypeCname,
+				Name: wildcardRecordName,
+			})
+		}
 	}
 
 	if cluster.ControlPlaneEndpoint != "" {
@@ -292,7 +319,7 @@ func (d *Zoner) getWorkloadClusterDnsRecords(ctx context.Context, logger logr.Lo
 		}
 	}
 
-	return dnsRecords, nil
+	return dnsRecords, dnsRecordsToDelete, nil
 }
 
 // isAWSChinaRegion returns true for AWS China partition regions (cn-north-1, cn-northwest-1).
