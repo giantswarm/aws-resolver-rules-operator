@@ -1000,6 +1000,9 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 
 								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "userData").To(Equal(fmt.Sprintf("{\"ignition\":{\"config\":{\"merge\":[{\"source\":\"s3://%s/karpenter-machine-pool/%s\",\"verification\":{}}],\"replace\":{\"verification\":{}}},\"proxy\":{},\"security\":{\"tls\":{}},\"timeouts\":{},\"version\":\"3.4.0\"},\"kernelArguments\":{},\"passwd\":{},\"storage\":{},\"systemd\":{}}", AWSClusterBucketName, KarpenterMachinePoolName)))
 								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "instanceProfile").To(Equal(KarpenterNodesInstanceProfile))
+								_, found, err := unstructured.NestedFieldNoCopy(ec2nodeclassList.Items[0].Object, "spec", "instanceStorePolicy")
+								Expect(err).NotTo(HaveOccurred())
+								Expect(found).To(BeFalse(), "expected no instanceStorePolicy when the KarpenterMachinePool does not set one")
 								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "tags").
 									To(HaveKeyWithValue("additional-tag-for-all-resources", "custom-tag"))
 								ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "tags").
@@ -1075,6 +1078,32 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 										}),
 									}),
 								)
+							})
+							When("the KarpenterMachinePool sets an instance store policy", func() {
+								BeforeEach(func() {
+									karpenterMachinePool := &karpenterinfra.KarpenterMachinePool{}
+									err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: KarpenterMachinePoolName}, karpenterMachinePool)
+									Expect(err).NotTo(HaveOccurred())
+
+									instanceStorePolicy := karpenterinfra.InstanceStorePolicyRAID0
+									karpenterMachinePool.Spec.EC2NodeClass.InstanceStorePolicy = &instanceStorePolicy
+									err = k8sClient.Update(ctx, karpenterMachinePool)
+									Expect(err).NotTo(HaveOccurred())
+								})
+								It("sets the instance store policy on the EC2NodeClass", func() {
+									Expect(reconcileErr).NotTo(HaveOccurred())
+
+									ec2NodeClass := &unstructured.Unstructured{}
+									ec2NodeClass.SetGroupVersionKind(schema.GroupVersionKind{
+										Group:   controllers.EC2NodeClassAPIGroup,
+										Kind:    "EC2NodeClass",
+										Version: "v1",
+									})
+									err := k8sClient.Get(ctx, types.NamespacedName{Name: KarpenterMachinePoolName}, ec2NodeClass)
+									Expect(err).NotTo(HaveOccurred())
+
+									ExpectUnstructured(*ec2NodeClass, "spec", "instanceStorePolicy").To(Equal("RAID0"))
+								})
 							})
 							It("creates karpenter NodePool object in workload cluster", func() {
 								nodepoolList := &unstructured.UnstructuredList{}
