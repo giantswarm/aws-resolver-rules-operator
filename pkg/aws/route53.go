@@ -3,7 +3,6 @@ package aws
 import (
 	"context"
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 
@@ -539,76 +538,38 @@ func getAWSSdkChangesFromDnsRecords(logger logr.Logger, dnsRecords []resolver.DN
 	return changes
 }
 
-// DeleteDelegationFromParentZone deletes the NS record set delegating to the zone from the parent zone.
-// A missing delegation is not an error, but one pointing to other name servers is.
 func (r *Route53) DeleteDelegationFromParentZone(ctx context.Context, logger logr.Logger, parentZoneId string, resourceRecord *resolver.DNSRecord) error {
-	logger = logger.WithValues("dnsRecordName", resourceRecord.Name, "parentZoneId", parentZoneId)
-
-	listResponse, err := r.client.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{
-		HostedZoneId:    awssdk.String(parentZoneId),
-		MaxItems:        awssdk.Int32(1),
-		StartRecordName: awssdk.String(resourceRecord.Name),
-		StartRecordType: route53types.RRTypeNs,
-	})
-	if err != nil {
-		return errors.WithStack(err)
+	var awsResourceRecords []route53types.ResourceRecord
+	for _, value := range resourceRecord.Values {
+		awsResourceRecords = append(awsResourceRecords, route53types.ResourceRecord{
+			Value: awssdk.String(value),
+		})
 	}
 
-	wantedName := normalizeDnsName(resourceRecord.Name)
-	for _, recordSet := range listResponse.ResourceRecordSets {
-		if normalizeDnsName(awssdk.ToString(recordSet.Name)) != wantedName || recordSet.Type != route53types.RRTypeNs {
-			continue
-		}
-
-		var nameServers []string
-		for _, record := range recordSet.ResourceRecords {
-			nameServers = append(nameServers, awssdk.ToString(record.Value))
-		}
-		if !haveSameDnsNames(nameServers, resourceRecord.Values) {
-			return fmt.Errorf("NS record set %q in parent zone %q delegates to name servers %q instead of %q, not deleting it", resourceRecord.Name, parentZoneId, nameServers, resourceRecord.Values)
-		}
-
-		// Delete the record set as returned by AWS since a deletion must match its TTL
-		_, err = r.client.ChangeResourceRecordSets(ctx, &route53.ChangeResourceRecordSetsInput{
-			HostedZoneId: awssdk.String(parentZoneId),
-			ChangeBatch: &route53types.ChangeBatch{
-				Changes: []route53types.Change{
-					{
-						Action:            route53types.ChangeActionDelete,
-						ResourceRecordSet: &recordSet,
+	_, err := r.client.ChangeResourceRecordSets(ctx, &route53.ChangeResourceRecordSetsInput{
+		HostedZoneId: awssdk.String(parentZoneId),
+		ChangeBatch: &route53types.ChangeBatch{
+			Changes: []route53types.Change{
+				{
+					Action: route53types.ChangeActionDelete,
+					ResourceRecordSet: &route53types.ResourceRecordSet{
+						Name:            awssdk.String(resourceRecord.Name),
+						Type:            route53types.RRTypeNs,
+						TTL:             awssdk.Int64(300),
+						ResourceRecords: awsResourceRecords,
 					},
 				},
 			},
-		})
-		if err != nil {
-			return errors.WithStack(err)
+		},
+	})
+	if err != nil {
+		if errors.Is(err, &route53types.InvalidChangeBatch{}) {
+			return nil
 		}
-
-		logger.Info("Deleted delegation from parent hosted zone")
-
-		return nil
+		return errors.WithStack(err)
 	}
-
-	logger.Info("Delegation not found in parent hosted zone, skipping deletion")
 
 	return nil
-}
-
-func haveSameDnsNames(names []string, otherNames []string) bool {
-	normalize := func(dnsNames []string) []string {
-		var ret []string
-		for _, dnsName := range dnsNames {
-			ret = append(ret, normalizeDnsName(dnsName))
-		}
-		slices.Sort(ret)
-		return ret
-	}
-
-	return slices.Equal(normalize(names), normalize(otherNames))
-}
-
-func normalizeDnsName(name string) string {
-	return strings.ToLower(strings.TrimSuffix(name, ".")) + "."
 }
 
 // sanitizeZoneId cleans up the ID of a Hosted Zone as returned by the AWS API,
