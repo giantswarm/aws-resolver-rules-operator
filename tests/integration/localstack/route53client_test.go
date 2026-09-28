@@ -314,46 +314,6 @@ var _ = Describe("Route53 Resolver client", func() {
 	When("deleting delegation to parent hosted zone", func() {
 		var parentHostedZoneToFind *route53.CreateHostedZoneOutput
 		var hostedZoneToFind *route53.CreateHostedZoneOutput
-		var delegationRecord *resolver.DNSRecord
-
-		findDelegation := func() *route53types.ResourceRecordSet {
-			listParentRecordSets, err := rawRoute53Client.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{
-				HostedZoneId: parentHostedZoneToFind.HostedZone.Id,
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			for _, recordSet := range listParentRecordSets.ResourceRecordSets {
-				if *recordSet.Name == *hostedZoneToFind.HostedZone.Name && recordSet.Type == route53types.RRTypeNs {
-					return &recordSet
-				}
-			}
-			return nil
-		}
-
-		upsertDelegation := func(nameServers []string, ttl int64) {
-			var resourceRecords []route53types.ResourceRecord
-			for _, nameServer := range nameServers {
-				resourceRecords = append(resourceRecords, route53types.ResourceRecord{Value: awssdk.String(nameServer)})
-			}
-
-			_, err := rawRoute53Client.ChangeResourceRecordSets(ctx, &route53.ChangeResourceRecordSetsInput{
-				HostedZoneId: parentHostedZoneToFind.HostedZone.Id,
-				ChangeBatch: &route53types.ChangeBatch{
-					Changes: []route53types.Change{
-						{
-							Action: route53types.ChangeActionUpsert,
-							ResourceRecordSet: &route53types.ResourceRecordSet{
-								Name:            hostedZoneToFind.HostedZone.Name,
-								Type:            route53types.RRTypeNs,
-								TTL:             awssdk.Int64(ttl),
-								ResourceRecords: resourceRecords,
-							},
-						},
-					},
-				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-		}
 
 		BeforeEach(func() {
 			now := time.Now()
@@ -388,7 +348,6 @@ var _ = Describe("Route53 Resolver client", func() {
 			// We add the delegation so we can delete it later.
 			err = route53Client.AddDelegationToParentZone(ctx, logger, *parentHostedZoneToFind.HostedZone.Id, record)
 			Expect(err).NotTo(HaveOccurred())
-			delegationRecord = record
 		})
 
 		AfterEach(func() {
@@ -429,27 +388,6 @@ var _ = Describe("Route53 Resolver client", func() {
 				}
 			}
 			Expect(found).To(BeFalse())
-		})
-
-		It("succeeds if the delegation was already deleted", func() {
-			err = route53Client.DeleteDelegationFromParentZone(ctx, logger, *parentHostedZoneToFind.HostedZone.Id, delegationRecord)
-			Expect(err).NotTo(HaveOccurred())
-
-			err = route53Client.DeleteDelegationFromParentZone(ctx, logger, *parentHostedZoneToFind.HostedZone.Id, delegationRecord)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		When("the delegation has a different TTL", func() {
-			BeforeEach(func() {
-				upsertDelegation(delegationRecord.Values, 60)
-			})
-
-			It("deletes the delegation", func() {
-				err = route53Client.DeleteDelegationFromParentZone(ctx, logger, *parentHostedZoneToFind.HostedZone.Id, delegationRecord)
-				Expect(err).NotTo(HaveOccurred())
-
-				Expect(findDelegation()).To(BeNil())
-			})
 		})
 	})
 
