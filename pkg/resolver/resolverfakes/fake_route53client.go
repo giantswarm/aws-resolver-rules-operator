@@ -67,6 +67,20 @@ type FakeRoute53Client struct {
 	deleteDelegationFromParentZoneReturnsOnCall map[int]struct {
 		result1 error
 	}
+	DeleteDnsRecordStub        func(context.Context, logr.Logger, string, resolver.DNSRecord) error
+	deleteDnsRecordMutex       sync.RWMutex
+	deleteDnsRecordArgsForCall []struct {
+		arg1 context.Context
+		arg2 logr.Logger
+		arg3 string
+		arg4 resolver.DNSRecord
+	}
+	deleteDnsRecordReturns struct {
+		result1 error
+	}
+	deleteDnsRecordReturnsOnCall map[int]struct {
+		result1 error
+	}
 	DeleteDnsRecordsFromHostedZoneStub        func(context.Context, logr.Logger, string) error
 	deleteDnsRecordsFromHostedZoneMutex       sync.RWMutex
 	deleteDnsRecordsFromHostedZoneArgsForCall []struct {
@@ -403,6 +417,70 @@ func (fake *FakeRoute53Client) DeleteDelegationFromParentZoneReturnsOnCall(i int
 		})
 	}
 	fake.deleteDelegationFromParentZoneReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeRoute53Client) DeleteDnsRecord(arg1 context.Context, arg2 logr.Logger, arg3 string, arg4 resolver.DNSRecord) error {
+	fake.deleteDnsRecordMutex.Lock()
+	ret, specificReturn := fake.deleteDnsRecordReturnsOnCall[len(fake.deleteDnsRecordArgsForCall)]
+	fake.deleteDnsRecordArgsForCall = append(fake.deleteDnsRecordArgsForCall, struct {
+		arg1 context.Context
+		arg2 logr.Logger
+		arg3 string
+		arg4 resolver.DNSRecord
+	}{arg1, arg2, arg3, arg4})
+	stub := fake.DeleteDnsRecordStub
+	fakeReturns := fake.deleteDnsRecordReturns
+	fake.recordInvocation("DeleteDnsRecord", []interface{}{arg1, arg2, arg3, arg4})
+	fake.deleteDnsRecordMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3, arg4)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeRoute53Client) DeleteDnsRecordCallCount() int {
+	fake.deleteDnsRecordMutex.RLock()
+	defer fake.deleteDnsRecordMutex.RUnlock()
+	return len(fake.deleteDnsRecordArgsForCall)
+}
+
+func (fake *FakeRoute53Client) DeleteDnsRecordCalls(stub func(context.Context, logr.Logger, string, resolver.DNSRecord) error) {
+	fake.deleteDnsRecordMutex.Lock()
+	defer fake.deleteDnsRecordMutex.Unlock()
+	fake.DeleteDnsRecordStub = stub
+}
+
+func (fake *FakeRoute53Client) DeleteDnsRecordArgsForCall(i int) (context.Context, logr.Logger, string, resolver.DNSRecord) {
+	fake.deleteDnsRecordMutex.RLock()
+	defer fake.deleteDnsRecordMutex.RUnlock()
+	argsForCall := fake.deleteDnsRecordArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+}
+
+func (fake *FakeRoute53Client) DeleteDnsRecordReturns(result1 error) {
+	fake.deleteDnsRecordMutex.Lock()
+	defer fake.deleteDnsRecordMutex.Unlock()
+	fake.DeleteDnsRecordStub = nil
+	fake.deleteDnsRecordReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeRoute53Client) DeleteDnsRecordReturnsOnCall(i int, result1 error) {
+	fake.deleteDnsRecordMutex.Lock()
+	defer fake.deleteDnsRecordMutex.Unlock()
+	fake.DeleteDnsRecordStub = nil
+	if fake.deleteDnsRecordReturnsOnCall == nil {
+		fake.deleteDnsRecordReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.deleteDnsRecordReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }

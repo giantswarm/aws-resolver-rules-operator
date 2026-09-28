@@ -404,6 +404,65 @@ func (r *Route53) AddDnsRecordsToHostedZone(ctx context.Context, logger logr.Log
 	return nil
 }
 
+// DeleteDnsRecord deletes the record set of the record's name and kind from the zone, whatever its values.
+// A record set that does not exist is not an error.
+func (r *Route53) DeleteDnsRecord(ctx context.Context, logger logr.Logger, hostedZoneId string, dnsRecord resolver.DNSRecord) error {
+	logger = logger.WithValues("dnsRecordName", dnsRecord.Name, "dnsRecordKind", dnsRecord.Kind, "zoneId", hostedZoneId)
+
+	recordType := route53types.RRType(dnsRecord.Kind)
+	if dnsRecord.Kind == resolver.DnsRecordTypeAlias {
+		recordType = route53types.RRTypeA
+	}
+
+	listResponse, err := r.client.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{
+		HostedZoneId:    awssdk.String(hostedZoneId),
+		MaxItems:        awssdk.Int32(1),
+		StartRecordName: awssdk.String(dnsRecord.Name),
+		StartRecordType: recordType,
+	})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	wantedName := strings.TrimSuffix(dnsRecord.Name, ".") + "."
+	for _, recordSet := range listResponse.ResourceRecordSets {
+		// Route53 returns the asterisk of a wildcard record escaped.
+		name := strings.ReplaceAll(awssdk.ToString(recordSet.Name), `\052`, "*")
+		if name != wantedName || recordSet.Type != recordType {
+			continue
+		}
+
+		logger.Info("Deleting DNS record")
+
+		_, err = r.client.ChangeResourceRecordSets(ctx, &route53.ChangeResourceRecordSetsInput{
+			ChangeBatch: &route53types.ChangeBatch{
+				Changes: []route53types.Change{
+					{
+						Action:            route53types.ChangeActionDelete,
+						ResourceRecordSet: &recordSet,
+					},
+				},
+			},
+			HostedZoneId: awssdk.String(hostedZoneId),
+		})
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		// A recent upsert of the zone's records may have included the deleted one: the next upsert must not be skipped.
+		zoneCacheKeyPrefix := fmt.Sprintf("zoneId=%q/", hostedZoneId)
+		for cacheKey := range r.upsertCache.Items() {
+			if strings.HasPrefix(cacheKey, zoneCacheKeyPrefix) {
+				r.upsertCache.Delete(cacheKey)
+			}
+		}
+
+		logger.Info("Deleted DNS record")
+	}
+
+	return nil
+}
+
 // DeleteDnsRecordsFromHostedZone will delete all dns records from the zone, except for SOA and NS records.
 func (r *Route53) DeleteDnsRecordsFromHostedZone(ctx context.Context, logger logr.Logger, hostedZoneId string) error {
 	logger.Info("Deleting dns records from hosted zone")
