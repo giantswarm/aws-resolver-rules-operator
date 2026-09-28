@@ -530,7 +530,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 	ec2NodeClass := &karpawsv1.EC2NodeClass{}
 	ec2NodeClass.SetName(karpenterMachinePool.Name)
 	ec2NodeClass.SetNamespace("")
-	ec2NodeClass.SetLabels(map[string]string{"app.kubernetes.io/managed-by": "aws-resolver-rules-operator"})
+	ec2NodeClass.SetLabels(map[string]string{"app.kubernetes.io/managed-by": "aws-resolver-rules-operator"}) //nolint:goconst
 
 	operation, err := controllerutil.CreateOrUpdate(ctx, workloadClusterClient, ec2NodeClass, func() error {
 		spec := karpawsv1.EC2NodeClassSpec{
@@ -603,7 +603,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 			Template: karpv1.NodeClaimTemplate{
 				Spec: karpv1.NodeClaimTemplateSpec{
 					StartupTaints: []v1.Taint{
-						{Effect: v1.TaintEffectNoExecute, Key: "node.cilium.io/agent-not-ready", Value: "true"},
+						{Effect: v1.TaintEffectNoExecute, Key: "node.cilium.io/agent-not-ready", Value: "true"}, //nolint:goconst
 						{Effect: v1.TaintEffectNoExecute, Key: "node.cluster.x-k8s.io/uninitialized", Value: "true"},
 					},
 					NodeClassRef: &karpv1.NodeClassReference{
@@ -855,7 +855,7 @@ func (r *KarpenterMachinePoolReconciler) generateUserData(s3bucketName, karpente
 			"config": map[string]interface{}{
 				"merge": []map[string]interface{}{
 					{
-						"source":       fmt.Sprintf("s3://%s/%s/%s", s3bucketName, S3ObjectPrefix, karpenterMachinePoolName),
+						"source":       fmt.Sprintf("s3://%s/%s/%s", s3bucketName, S3ObjectPrefix, karpenterMachinePoolName), //nolint:goconst
 						"verification": map[string]interface{}{},
 					},
 				},

@@ -88,7 +88,7 @@ func MarkIDNotProvided(cluster *capi.Cluster, id string) {
 func MarkNodePoolCreated(setter capiconditions.Setter) {
 	capiconditions.Set(setter, &capi.Condition{
 		Type:   NodePoolCreatedCondition,
-		Status: "True",
+		Status: "True", //nolint:goconst
 		Reason: NodePoolCreationSucceededReason,
 	})
 }
