@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.4] - 2026-09-29
+
 ### Fixed
 
 - Gracefully handle already-deleted DNS delegation
@@ -401,7 +403,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
 
-[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.3...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.4...HEAD
+[0.27.4]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.3...v0.27.4
 [0.27.3]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.2...v0.27.3
 [0.27.2]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.1...v0.27.2
 [0.27.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.0...v0.27.1
