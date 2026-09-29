@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-09-29
+
 ### Added
 
 - Support `KarpenterMachinePool` on EKS clusters. On EKS the cluster is described by an `AWSManagedControlPlane` instead of an `AWSCluster`, there is no `spec.s3Bucket` and no kubeadm bootstrap secret, so Karpenter renders the `nodeadm` node userdata itself from `spec.ec2NodeClass.amiFamily` (defaulting to `AL2023`) rather than getting a hand-built Ignition stub pointing at S3.
@@ -407,7 +409,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
 
-[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.4...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.28.0...HEAD
+[0.28.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.4...v0.28.0
 [0.27.4]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.3...v0.27.4
 [0.27.3]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.2...v0.27.3
 [0.27.2]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.1...v0.27.2
