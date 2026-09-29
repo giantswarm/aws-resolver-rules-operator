@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Gracefully handle already-deleted DNS delegation
+- Fix panic on error evaluation
+
 ## [0.27.3] - 2026-09-27
 
 ### Fixed
