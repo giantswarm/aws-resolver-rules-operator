@@ -176,11 +176,6 @@ func (r *CrossplaneClusterConfigReconciler) Reconcile(ctx context.Context, req c
 	return r.reconcileNormal(ctx, clusterInfo)
 }
 
-func IsEKS(cluster capi.Cluster) bool {
-	return cluster.Spec.ControlPlaneRef != nil &&
-		cluster.Spec.ControlPlaneRef.Kind == "AWSManagedControlPlane"
-}
-
 func getEKSId(urlString string) (string, error) {
 	u, err := url.Parse(urlString)
 	if err != nil {
