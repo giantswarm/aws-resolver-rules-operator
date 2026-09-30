@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"path"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -331,6 +332,8 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 					_, _, terminatedIDs := ec2Client.TerminateInstancesArgsForCall(0)
 					Expect(terminatedIDs).To(ConsistOf("i-abc123", "i-def456"))
 					Expect(reconcileResult.RequeueAfter).To(Equal(30 * time.Second))
+					// The user data stays in S3 while instances may still boot from it.
+					Expect(s3Client.DeleteCallCount()).To(Equal(0))
 
 					karpenterMachinePoolList := &karpenterinfra.KarpenterMachinePoolList{}
 					err := k8sClient.List(ctx, karpenterMachinePoolList, client.InNamespace(namespace))
@@ -351,6 +354,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 					Expect(ec2Client.GetNonTerminatedInstancesByTagsCallCount()).To(Equal(2))
 					// TerminateInstances was not called again because the list was empty.
 					Expect(ec2Client.TerminateInstancesCallCount()).To(Equal(1))
+					Expect(s3Client.DeleteCallCount()).To(Equal(1))
 
 					karpenterMachinePoolList = &karpenterinfra.KarpenterMachinePoolList{}
 					err = k8sClient.List(ctx, karpenterMachinePoolList, client.InNamespace(namespace))
@@ -401,6 +405,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 					// Cluster is alive: we must not terminate behind in-WC Karpenter's back.
 					Expect(ec2Client.TerminateInstancesCallCount()).To(Equal(0))
 					Expect(reconcileResult.RequeueAfter).To(Equal(30 * time.Second))
+					Expect(s3Client.DeleteCallCount()).To(Equal(0))
 
 					karpenterMachinePoolList := &karpenterinfra.KarpenterMachinePoolList{}
 					err := k8sClient.List(ctx, karpenterMachinePoolList, client.InNamespace(namespace))
@@ -424,6 +429,28 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 					err := k8sClient.List(ctx, karpenterMachinePoolList, client.InNamespace(namespace))
 					Expect(err).NotTo(HaveOccurred())
 					Expect(karpenterMachinePoolList.Items).To(HaveLen(0))
+				})
+
+				It("deletes the user data from S3", func() {
+					Expect(s3Client.DeleteCallCount()).To(Equal(1))
+					_, bucket, key := s3Client.DeleteArgsForCall(0)
+					Expect(bucket).To(Equal(AWSClusterBucketName))
+					Expect(key).To(Equal(path.Join(controllers.S3ObjectPrefix, KarpenterMachinePoolName)))
+				})
+
+				When("the S3 API returns an error", func() {
+					BeforeEach(func() {
+						s3Client.DeleteReturns(errors.New("access denied"))
+					})
+
+					It("keeps the finalizer and returns the error", func() {
+						Expect(reconcileErr).To(MatchError(ContainSubstring("access denied")))
+
+						karpenterMachinePoolList := &karpenterinfra.KarpenterMachinePoolList{}
+						err := k8sClient.List(ctx, karpenterMachinePoolList, client.InNamespace(namespace))
+						Expect(err).NotTo(HaveOccurred())
+						Expect(karpenterMachinePoolList.Items).To(HaveLen(1))
+					})
 				})
 			})
 		})
