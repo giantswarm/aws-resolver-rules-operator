@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Deleting a `KarpenterMachinePool` removes its bootstrap user data `karpenter-machine-pool/<name>` from the cluster's S3 bucket once its instances are gone, so a later pool of the same name never boots from stale data.
+
 ## [0.28.0] - 2026-09-29
 
 ### Added

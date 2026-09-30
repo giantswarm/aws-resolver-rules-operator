@@ -214,7 +214,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 
 	// Handle deletion: cleanup EC2 instances and Karpenter resources
 	if !karpenterMachinePool.GetDeletionTimestamp().IsZero() {
-		return r.reconcileDelete(ctx, logger, cluster, karpenterMachinePool, roleIdentity, region, patchHelper)
+		return r.reconcileDelete(ctx, logger, cluster, karpenterMachinePool, roleIdentity, region, s3BucketName)
 	}
 
 	// Validate version skew: ensure worker nodes don't use newer Kubernetes versions than control plane
@@ -371,7 +371,11 @@ func (r *KarpenterMachinePoolReconciler) reconcileMachinePoolBootstrapUserData(c
 // disruption and polls until Karpenter has terminated the instances. Once the parent
 // Cluster is being deleted the in-WC Karpenter is going away with it, so the controller
 // terminates the remaining instances directly.
-func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, roleIdentity *capa.AWSClusterRoleIdentity, region string, patchHelper *patch.Helper) (reconcile.Result, error) {
+//
+// Once no instance is left, the pool's bootstrap user data is removed from the cluster's S3
+// bucket (none exists on EKS, where s3BucketName is empty), so a later pool of the same name
+// never boots from it.
+func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, roleIdentity *capa.AWSClusterRoleIdentity, region, s3BucketName string) (reconcile.Result, error) {
 	ec2Client, err := r.awsClients.NewEC2Client(region, roleIdentity.Spec.RoleArn)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to create EC2 client: %w", err)
@@ -410,6 +414,19 @@ func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, lo
 			logger.Info("Cluster is still alive; waiting for Karpenter to terminate EC2 instances", "count", len(instanceIDs), "instances", instanceIDs)
 		}
 		return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
+	if s3BucketName != "" {
+		s3Client, err := r.awsClients.NewS3Client(region, roleIdentity.Spec.RoleArn)
+		if err != nil {
+			return reconcile.Result{}, fmt.Errorf("failed to create S3 client: %w", err)
+		}
+
+		key := path.Join(S3ObjectPrefix, karpenterMachinePool.Name)
+		logger.Info("Deleting userdata from S3", "bucket", s3BucketName, "key", key)
+		if err := s3Client.Delete(ctx, s3BucketName, key); err != nil {
+			return reconcile.Result{}, fmt.Errorf("failed to delete userdata from S3: %w", err)
+		}
 	}
 
 	logger.Info("Removing finalizer", "finalizer", KarpenterFinalizer)

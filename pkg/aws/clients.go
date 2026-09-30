@@ -268,6 +268,9 @@ func (c *Clients) newS3Client(region, roleArn, externalId string) (*s3.Client, e
 		)
 		o.AppID = appID
 		o.MeterProvider = smithyotelmetrics.Adapt(metricProvider)
+		// A custom endpoint (LocalStack in the integration tests) serves buckets by path, not
+		// by virtual host.
+		o.UsePathStyle = c.endpoint != ""
 	})
 
 	return s3Client, nil
