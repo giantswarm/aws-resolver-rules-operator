@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.1] - 2026-09-30
+
 ### Fixed
 
 - Deleting a `KarpenterMachinePool` removes its bootstrap user data `karpenter-machine-pool/<name>` from the cluster's S3 bucket once its instances are gone, so a later pool of the same name never boots from stale data.
@@ -413,7 +415,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
 
-[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.28.0...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.28.1...HEAD
+[0.28.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.28.0...v0.28.1
 [0.28.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.4...v0.28.0
 [0.27.4]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.3...v0.27.4
 [0.27.3]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.2...v0.27.3
