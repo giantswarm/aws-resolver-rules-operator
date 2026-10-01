@@ -1180,6 +1180,12 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 									nodePool.SetName(KarpenterMachinePoolName)
 									err = k8sClient.Delete(ctx, nodePool)
 									Expect(client.IgnoreNotFound(err)).NotTo(HaveOccurred())
+
+									// Likewise, later specs can't turn the static NodePool back into a dynamic one
+									DeferCleanup(func() {
+										err := k8sClient.Delete(ctx, nodePool)
+										Expect(client.IgnoreNotFound(err)).NotTo(HaveOccurred())
+									})
 								})
 								It("sets replicas and node limit on the NodePool", func() {
 									Expect(reconcileErr).NotTo(HaveOccurred())
