@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add `spec.nodePool.replicas` to `KarpenterMachinePool` and carry it to the Karpenter `NodePool`, so a node pool can be static with a fixed number of nodes. This needs the alpha `StaticCapacity` feature gate in Karpenter.
+- Allow the `Balanced` consolidation policy in `KarpenterMachinePool`.
+
 ## [0.28.1] - 2026-09-30
 
 ### Fixed
