@@ -11,8 +11,9 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
 	"github.com/aws-resolver-rules-operator/controllers"
 	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
@@ -87,6 +88,13 @@ var _ = Describe("AWSClusterClient", func() {
 					Name:      "test-cluster",
 					Namespace: namespace,
 				},
+				Spec: capi.ClusterSpec{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
+						APIGroup: capa.GroupVersion.Group,
+						Kind:     "AWSCluster",
+						Name:     "test-cluster",
+					},
+				},
 			}
 			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
 		})
@@ -140,6 +148,13 @@ var _ = Describe("AWSClusterClient", func() {
 					Name:      "test-cluster",
 					Namespace: namespace,
 					UID:       clusterUUID,
+				},
+				Spec: capi.ClusterSpec{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
+						APIGroup: capa.GroupVersion.Group,
+						Kind:     "AWSCluster",
+						Name:     "test-cluster",
+					},
 				},
 			}
 			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
@@ -453,7 +468,7 @@ var _ = Describe("AWSClusterClient", func() {
 					UID:       clusterUUID,
 				},
 				Spec: capi.ClusterSpec{
-					Paused: true,
+					Paused: ptr.To(true),
 				},
 			}
 			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
@@ -483,7 +498,7 @@ var _ = Describe("AWSClusterClient", func() {
 			actualCluster := &capi.Cluster{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, actualCluster)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(actualCluster.Spec.Paused).To(BeFalse())
+			Expect(actualCluster.Spec.Paused).To(HaveValue(BeFalse()))
 
 			actualAwsCluster := &capa.AWSCluster{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: awsCluster.Name, Namespace: awsCluster.Namespace}, actualAwsCluster)

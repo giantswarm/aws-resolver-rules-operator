@@ -12,7 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/aws-resolver-rules-operator/controllers"
@@ -197,7 +197,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 
 					When("the Subnet condition is not marked as ready", func() {
 						BeforeEach(func() {
-							awsCluster.Status.Conditions = []capi.Condition{
+							awsCluster.Status.Conditions = []capiv1beta1.Condition{
 								{
 									Type:   capa.VpcReadyCondition,
 									Status: v1.ConditionTrue,
@@ -214,7 +214,7 @@ var _ = Describe("Resolver rules reconciler", func() {
 
 					When("VpcReady and SubnetReady conditions are marked as true", func() {
 						BeforeEach(func() {
-							awsCluster.Status.Conditions = []capi.Condition{
+							awsCluster.Status.Conditions = []capiv1beta1.Condition{
 								{
 									Type:   capa.VpcReadyCondition,
 									Status: v1.ConditionTrue,

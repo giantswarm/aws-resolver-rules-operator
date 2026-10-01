@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/aws-resolver-rules-operator/controllers"
@@ -106,7 +106,7 @@ var _ = Describe("Unpause reconciler", func() {
 
 				When("VPC and Subnets conditions are Ready", func() {
 					BeforeEach(func() {
-						awsCluster.Status.Conditions = []capi.Condition{
+						awsCluster.Status.Conditions = []capiv1beta1.Condition{
 							{
 								Type:   capa.VpcReadyCondition,
 								Status: v1.ConditionTrue,
@@ -135,7 +135,7 @@ var _ = Describe("Unpause reconciler", func() {
 
 				When("VPC Ready condition is not Ready yet", func() {
 					BeforeEach(func() {
-						awsCluster.Status.Conditions = []capi.Condition{
+						awsCluster.Status.Conditions = []capiv1beta1.Condition{
 							{
 								Type:   capa.SubnetsReadyCondition,
 								Status: v1.ConditionTrue,
@@ -150,7 +150,7 @@ var _ = Describe("Unpause reconciler", func() {
 
 				When("Subnet Ready condition is not Ready yet", func() {
 					BeforeEach(func() {
-						awsCluster.Status.Conditions = []capi.Condition{
+						awsCluster.Status.Conditions = []capiv1beta1.Condition{
 							{
 								Type:   capa.VpcReadyCondition,
 								Status: v1.ConditionTrue,
@@ -170,7 +170,7 @@ var _ = Describe("Unpause reconciler", func() {
 
 					When("VPC, Subnets and ResolverRules conditions are Ready", func() {
 						BeforeEach(func() {
-							awsCluster.Status.Conditions = []capi.Condition{
+							awsCluster.Status.Conditions = []capiv1beta1.Condition{
 								{
 									Type:   capa.VpcReadyCondition,
 									Status: v1.ConditionTrue,
@@ -193,7 +193,7 @@ var _ = Describe("Unpause reconciler", func() {
 
 					When("ResolverRules Ready condition is not Ready yet", func() {
 						BeforeEach(func() {
-							awsCluster.Status.Conditions = []capi.Condition{
+							awsCluster.Status.Conditions = []capiv1beta1.Condition{
 								{
 									Type:   capa.VpcReadyCondition,
 									Status: v1.ConditionTrue,

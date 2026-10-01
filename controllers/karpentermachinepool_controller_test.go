@@ -19,10 +19,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/utils/ptr"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
-	capiexp "sigs.k8s.io/cluster-api/exp/api/v1beta1"
+	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -69,7 +70,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 		err := capi.AddToScheme(scheme.Scheme)
 		Expect(err).NotTo(HaveOccurred())
 
-		err = capiexp.AddToScheme(scheme.Scheme)
+		err = capi.AddToScheme(scheme.Scheme)
 		Expect(err).NotTo(HaveOccurred())
 
 		err = capa.AddToScheme(scheme.Scheme)
@@ -130,7 +131,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 		BeforeEach(func() {
 			dataSecretName = DataSecretName
 			version := KubernetesVersion
-			machinePool := &capiexp.MachinePool{
+			machinePool := &capi.MachinePool{
 				ObjectMeta: ctrl.ObjectMeta{
 					Namespace: namespace,
 					Name:      KarpenterMachinePoolName,
@@ -138,28 +139,26 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 						capi.ClusterNameLabel: ClusterName,
 					},
 				},
-				Spec: capiexp.MachinePoolSpec{
+				Spec: capi.MachinePoolSpec{
 					ClusterName: ClusterName,
 					Template: capi.MachineTemplateSpec{
 						ObjectMeta: capi.ObjectMeta{},
 						Spec: capi.MachineSpec{
 							ClusterName: ClusterName,
 							Bootstrap: capi.Bootstrap{
-								ConfigRef: &v1.ObjectReference{
-									Kind:       "KubeadmConfig",
-									Namespace:  namespace,
-									Name:       fmt.Sprintf("%s-1a2b3c", KarpenterMachinePoolName),
-									APIVersion: "bootstrap.cluster.x-k8s.io/v1beta1",
+								ConfigRef: capi.ContractVersionedObjectReference{
+									APIGroup: "bootstrap.cluster.x-k8s.io",
+									Kind:     "KubeadmConfig",
+									Name:     fmt.Sprintf("%s-1a2b3c", KarpenterMachinePoolName),
 								},
 								DataSecretName: &dataSecretName,
 							},
-							InfrastructureRef: v1.ObjectReference{
-								Kind:       "KarpenterMachinePool",
-								Namespace:  namespace,
-								Name:       KarpenterMachinePoolName,
-								APIVersion: "infrastructure.cluster.x-k8s.io/v1alpha1",
+							InfrastructureRef: capi.ContractVersionedObjectReference{
+								APIGroup: "infrastructure.cluster.x-k8s.io",
+								Kind:     "KarpenterMachinePool",
+								Name:     KarpenterMachinePoolName,
 							},
-							Version: &version,
+							Version: version,
 						},
 					},
 				},
@@ -288,19 +287,16 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 						Finalizers: []string{"giantswarm.io/something-to-keep-it-around-when-deleting"},
 					},
 					Spec: capi.ClusterSpec{
-						ControlPlaneRef: &v1.ObjectReference{
-							Kind:       "KubeadmControlPlane",
-							Namespace:  namespace,
-							Name:       ClusterName,
-							APIVersion: "controlplane.cluster.x-k8s.io/v1beta1",
+						ControlPlaneRef: capi.ContractVersionedObjectReference{
+							APIGroup: "controlplane.cluster.x-k8s.io",
+							Kind:     "KubeadmControlPlane",
+							Name:     ClusterName,
 						},
-						InfrastructureRef: &v1.ObjectReference{
-							Kind:       "AWSCluster",
-							Namespace:  namespace,
-							Name:       ClusterName,
-							APIVersion: "infrastructure.cluster.x-k8s.io/v1beta2",
+						InfrastructureRef: capi.ContractVersionedObjectReference{
+							APIGroup: "infrastructure.cluster.x-k8s.io",
+							Kind:     "AWSCluster",
+							Name:     ClusterName,
 						},
-						Topology: nil,
 					},
 				}
 				err = k8sClient.Create(ctx, cluster)
@@ -382,11 +378,10 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 						},
 					},
 					Spec: capi.ClusterSpec{
-						InfrastructureRef: &v1.ObjectReference{
-							Kind:       "AWSCluster",
-							Namespace:  namespace,
-							Name:       ClusterName,
-							APIVersion: "infrastructure.cluster.x-k8s.io/v1beta2",
+						InfrastructureRef: capi.ContractVersionedObjectReference{
+							APIGroup: "infrastructure.cluster.x-k8s.io",
+							Kind:     "AWSCluster",
+							Name:     ClusterName,
 						},
 					},
 				}
@@ -533,11 +528,10 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 						},
 					},
 					Spec: capi.ClusterSpec{
-						InfrastructureRef: &v1.ObjectReference{
-							Kind:       "AWSCluster",
-							Namespace:  namespace,
-							Name:       ClusterName,
-							APIVersion: "infrastructure.cluster.x-k8s.io/v1beta2",
+						InfrastructureRef: capi.ContractVersionedObjectReference{
+							APIGroup: "infrastructure.cluster.x-k8s.io",
+							Kind:     "AWSCluster",
+							Name:     ClusterName,
 						},
 					},
 				}
@@ -559,7 +553,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 				Expect(k8sClient.Create(ctx, awsCluster)).To(Succeed())
 
 				version := KubernetesVersion
-				machinePool := &capiexp.MachinePool{
+				machinePool := &capi.MachinePool{
 					ObjectMeta: ctrl.ObjectMeta{
 						Namespace: namespace,
 						Name:      KarpenterMachinePoolName,
@@ -567,27 +561,25 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 							capi.ClusterNameLabel: ClusterName,
 						},
 					},
-					Spec: capiexp.MachinePoolSpec{
+					Spec: capi.MachinePoolSpec{
 						ClusterName: ClusterName,
 						Template: capi.MachineTemplateSpec{
 							ObjectMeta: capi.ObjectMeta{},
 							Spec: capi.MachineSpec{
 								ClusterName: ClusterName,
 								Bootstrap: capi.Bootstrap{
-									ConfigRef: &v1.ObjectReference{
-										Kind:       "KubeadmConfig",
-										Namespace:  namespace,
-										Name:       fmt.Sprintf("%s-1a2b3c", KarpenterMachinePoolName),
-										APIVersion: "bootstrap.cluster.x-k8s.io/v1beta1",
+									ConfigRef: capi.ContractVersionedObjectReference{
+										APIGroup: "bootstrap.cluster.x-k8s.io",
+										Kind:     "KubeadmConfig",
+										Name:     fmt.Sprintf("%s-1a2b3c", KarpenterMachinePoolName),
 									},
 								},
-								InfrastructureRef: v1.ObjectReference{
-									Kind:       "KarpenterMachinePool",
-									Namespace:  namespace,
-									Name:       KarpenterMachinePoolName,
-									APIVersion: "infrastructure.cluster.x-k8s.io/v1alpha1",
+								InfrastructureRef: capi.ContractVersionedObjectReference{
+									APIGroup: "infrastructure.cluster.x-k8s.io",
+									Kind:     "KarpenterMachinePool",
+									Name:     KarpenterMachinePoolName,
 								},
-								Version: &version,
+								Version: version,
 							},
 						},
 					},
@@ -651,7 +643,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 			BeforeEach(func() {
 				dataSecretName = DataSecretName
 				version := KubernetesVersion
-				machinePool := &capiexp.MachinePool{
+				machinePool := &capi.MachinePool{
 					ObjectMeta: ctrl.ObjectMeta{
 						Namespace: namespace,
 						Name:      KarpenterMachinePoolName,
@@ -659,7 +651,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 							capi.ClusterNameLabel: ClusterName,
 						},
 					},
-					Spec: capiexp.MachinePoolSpec{
+					Spec: capi.MachinePoolSpec{
 						ClusterName: ClusterName,
 						// Replicas:    nil,
 						Template: capi.MachineTemplateSpec{
@@ -667,21 +659,19 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 							Spec: capi.MachineSpec{
 								ClusterName: ClusterName,
 								Bootstrap: capi.Bootstrap{
-									ConfigRef: &v1.ObjectReference{
-										Kind:       "KubeadmConfig",
-										Namespace:  namespace,
-										Name:       fmt.Sprintf("%s-1a2b3c", KarpenterMachinePoolName),
-										APIVersion: "bootstrap.cluster.x-k8s.io/v1beta1",
+									ConfigRef: capi.ContractVersionedObjectReference{
+										APIGroup: "bootstrap.cluster.x-k8s.io",
+										Kind:     "KubeadmConfig",
+										Name:     fmt.Sprintf("%s-1a2b3c", KarpenterMachinePoolName),
 									},
 									DataSecretName: &dataSecretName,
 								},
-								InfrastructureRef: v1.ObjectReference{
-									Kind:       "KarpenterMachinePool",
-									Namespace:  namespace,
-									Name:       KarpenterMachinePoolName,
-									APIVersion: "infrastructure.cluster.x-k8s.io/v1alpha1",
+								InfrastructureRef: capi.ContractVersionedObjectReference{
+									APIGroup: "infrastructure.cluster.x-k8s.io",
+									Kind:     "KarpenterMachinePool",
+									Name:     KarpenterMachinePoolName,
 								},
-								Version: &version,
+								Version: version,
 							},
 						},
 					},
@@ -814,18 +804,16 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 							},
 						},
 						Spec: capi.ClusterSpec{
-							Paused: true,
-							ControlPlaneRef: &v1.ObjectReference{
-								Kind:       "KubeadmControlPlane",
-								Namespace:  namespace,
-								Name:       ClusterName,
-								APIVersion: "controlplane.cluster.x-k8s.io/v1beta1",
+							Paused: ptr.To(true),
+							ControlPlaneRef: capi.ContractVersionedObjectReference{
+								APIGroup: "controlplane.cluster.x-k8s.io",
+								Kind:     "KubeadmControlPlane",
+								Name:     ClusterName,
 							},
-							InfrastructureRef: &v1.ObjectReference{
-								Kind:       "AWSCluster",
-								Namespace:  namespace,
-								Name:       ClusterName,
-								APIVersion: "infrastructure.cluster.x-k8s.io/v1beta2",
+							InfrastructureRef: capi.ContractVersionedObjectReference{
+								APIGroup: "infrastructure.cluster.x-k8s.io",
+								Kind:     "AWSCluster",
+								Name:     ClusterName,
 							},
 						},
 					}
@@ -883,17 +871,15 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 							},
 						},
 						Spec: capi.ClusterSpec{
-							ControlPlaneRef: &v1.ObjectReference{
-								Kind:       "KubeadmControlPlane",
-								Namespace:  namespace,
-								Name:       ClusterName,
-								APIVersion: "controlplane.cluster.x-k8s.io/v1beta1",
+							ControlPlaneRef: capi.ContractVersionedObjectReference{
+								APIGroup: "controlplane.cluster.x-k8s.io",
+								Kind:     "KubeadmControlPlane",
+								Name:     ClusterName,
 							},
-							InfrastructureRef: &v1.ObjectReference{
-								Kind:       "AWSCluster",
-								Namespace:  namespace,
-								Name:       ClusterName,
-								APIVersion: "infrastructure.cluster.x-k8s.io/v1beta2",
+							InfrastructureRef: capi.ContractVersionedObjectReference{
+								APIGroup: "infrastructure.cluster.x-k8s.io",
+								Kind:     "AWSCluster",
+								Name:     ClusterName,
 							},
 						},
 					}
@@ -1588,7 +1574,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 		BeforeEach(func() {
 			dataSecretName := DataSecretName
 			kubernetesVersion := KubernetesVersion
-			machinePool := &capiexp.MachinePool{
+			machinePool := &capi.MachinePool{
 				ObjectMeta: ctrl.ObjectMeta{
 					Namespace: namespace,
 					Name:      KarpenterMachinePoolName,
@@ -1596,28 +1582,26 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 						capi.ClusterNameLabel: ClusterName,
 					},
 				},
-				Spec: capiexp.MachinePoolSpec{
+				Spec: capi.MachinePoolSpec{
 					ClusterName: ClusterName,
 					Template: capi.MachineTemplateSpec{
 						ObjectMeta: capi.ObjectMeta{},
 						Spec: capi.MachineSpec{
 							ClusterName: ClusterName,
 							Bootstrap: capi.Bootstrap{
-								ConfigRef: &v1.ObjectReference{
-									Kind:       "KubeadmConfig",
-									Namespace:  namespace,
-									Name:       fmt.Sprintf("%s-1a2b3c", KarpenterMachinePoolName),
-									APIVersion: "bootstrap.cluster.x-k8s.io/v1beta1",
+								ConfigRef: capi.ContractVersionedObjectReference{
+									APIGroup: "bootstrap.cluster.x-k8s.io",
+									Kind:     "KubeadmConfig",
+									Name:     fmt.Sprintf("%s-1a2b3c", KarpenterMachinePoolName),
 								},
 								DataSecretName: &dataSecretName,
 							},
-							InfrastructureRef: v1.ObjectReference{
-								Kind:       "KarpenterMachinePool",
-								Namespace:  namespace,
-								Name:       KarpenterMachinePoolName,
-								APIVersion: "infrastructure.cluster.x-k8s.io/v1alpha1",
+							InfrastructureRef: capi.ContractVersionedObjectReference{
+								APIGroup: "infrastructure.cluster.x-k8s.io",
+								Kind:     "KarpenterMachinePool",
+								Name:     KarpenterMachinePoolName,
 							},
-							Version: &kubernetesVersion,
+							Version: kubernetesVersion,
 						},
 					},
 				},
@@ -1725,17 +1709,15 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 					},
 				},
 				Spec: capi.ClusterSpec{
-					ControlPlaneRef: &v1.ObjectReference{
-						Kind:       "KubeadmControlPlane",
-						Namespace:  namespace,
-						Name:       ClusterName,
-						APIVersion: "controlplane.cluster.x-k8s.io/v1beta1",
+					ControlPlaneRef: capi.ContractVersionedObjectReference{
+						APIGroup: "controlplane.cluster.x-k8s.io",
+						Kind:     "KubeadmControlPlane",
+						Name:     ClusterName,
 					},
-					InfrastructureRef: &v1.ObjectReference{
-						Kind:       "AWSCluster",
-						Namespace:  namespace,
-						Name:       ClusterName,
-						APIVersion: "infrastructure.cluster.x-k8s.io/v1beta2",
+					InfrastructureRef: capi.ContractVersionedObjectReference{
+						APIGroup: "infrastructure.cluster.x-k8s.io",
+						Kind:     "AWSCluster",
+						Name:     ClusterName,
 					},
 				},
 			}
@@ -1803,7 +1785,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 		BeforeEach(func() {
 			dataSecretName = DataSecretName
 			kubernetesVersion := KubernetesVersion
-			machinePool := &capiexp.MachinePool{
+			machinePool := &capi.MachinePool{
 				ObjectMeta: ctrl.ObjectMeta{
 					Namespace: namespace,
 					Name:      KarpenterMachinePoolName,
@@ -1811,12 +1793,17 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 						capi.ClusterNameLabel: ClusterName,
 					},
 				},
-				Spec: capiexp.MachinePoolSpec{
+				Spec: capi.MachinePoolSpec{
 					ClusterName: ClusterName,
 					Template: capi.MachineTemplateSpec{
 						Spec: capi.MachineSpec{
 							ClusterName: ClusterName,
-							Version:     &kubernetesVersion,
+							InfrastructureRef: capi.ContractVersionedObjectReference{
+								APIGroup: "infrastructure.cluster.x-k8s.io",
+								Kind:     "KarpenterMachinePool",
+								Name:     KarpenterMachinePoolName,
+							},
+							Version: kubernetesVersion,
 							Bootstrap: capi.Bootstrap{
 								DataSecretName: &dataSecretName,
 							},
@@ -1898,17 +1885,15 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 					},
 				},
 				Spec: capi.ClusterSpec{
-					ControlPlaneRef: &v1.ObjectReference{
-						Kind:       "KubeadmControlPlane",
-						Namespace:  namespace,
-						Name:       ClusterName,
-						APIVersion: "controlplane.cluster.x-k8s.io/v1beta1",
+					ControlPlaneRef: capi.ContractVersionedObjectReference{
+						APIGroup: "controlplane.cluster.x-k8s.io",
+						Kind:     "KubeadmControlPlane",
+						Name:     ClusterName,
 					},
-					InfrastructureRef: &v1.ObjectReference{
-						Kind:       "AWSCluster",
-						Namespace:  namespace,
-						Name:       ClusterName,
-						APIVersion: "infrastructure.cluster.x-k8s.io/v1beta2",
+					InfrastructureRef: capi.ContractVersionedObjectReference{
+						APIGroup: "infrastructure.cluster.x-k8s.io",
+						Kind:     "AWSCluster",
+						Name:     ClusterName,
 					},
 				},
 			}
@@ -2025,7 +2010,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 
 		BeforeEach(func() {
 			dataSecretName = DataSecretName
-			machinePool := &capiexp.MachinePool{
+			machinePool := &capi.MachinePool{
 				ObjectMeta: ctrl.ObjectMeta{
 					Namespace: namespace,
 					Name:      KarpenterMachinePoolName,
@@ -2033,28 +2018,26 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 						capi.ClusterNameLabel: ClusterName,
 					},
 				},
-				Spec: capiexp.MachinePoolSpec{
+				Spec: capi.MachinePoolSpec{
 					ClusterName: ClusterName,
 					Template: capi.MachineTemplateSpec{
 						ObjectMeta: capi.ObjectMeta{},
 						Spec: capi.MachineSpec{
 							ClusterName: ClusterName,
 							Bootstrap: capi.Bootstrap{
-								ConfigRef: &v1.ObjectReference{
-									Kind:       "KubeadmConfig",
-									Namespace:  namespace,
-									Name:       fmt.Sprintf("%s-1a2b3c", KarpenterMachinePoolName),
-									APIVersion: "bootstrap.cluster.x-k8s.io/v1beta1",
+								ConfigRef: capi.ContractVersionedObjectReference{
+									APIGroup: "bootstrap.cluster.x-k8s.io",
+									Kind:     "KubeadmConfig",
+									Name:     fmt.Sprintf("%s-1a2b3c", KarpenterMachinePoolName),
 								},
 								DataSecretName: &dataSecretName,
 							},
-							InfrastructureRef: v1.ObjectReference{
-								Kind:       "KarpenterMachinePool",
-								Namespace:  namespace,
-								Name:       KarpenterMachinePoolName,
-								APIVersion: "infrastructure.cluster.x-k8s.io/v1alpha1",
+							InfrastructureRef: capi.ContractVersionedObjectReference{
+								APIGroup: "infrastructure.cluster.x-k8s.io",
+								Kind:     "KarpenterMachinePool",
+								Name:     KarpenterMachinePoolName,
 							},
-							Version: &nodePoolVersion, // Newer version than control plane
+							Version: nodePoolVersion, // Newer version than control plane
 						},
 					},
 				},
@@ -2071,17 +2054,15 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 					},
 				},
 				Spec: capi.ClusterSpec{
-					ControlPlaneRef: &v1.ObjectReference{
-						Kind:       "KubeadmControlPlane",
-						Namespace:  namespace,
-						Name:       ClusterName,
-						APIVersion: "controlplane.cluster.x-k8s.io/v1beta1",
+					ControlPlaneRef: capi.ContractVersionedObjectReference{
+						APIGroup: "controlplane.cluster.x-k8s.io",
+						Kind:     "KubeadmControlPlane",
+						Name:     ClusterName,
 					},
-					InfrastructureRef: &v1.ObjectReference{
-						Kind:       "AWSCluster",
-						Namespace:  namespace,
-						Name:       ClusterName,
-						APIVersion: "infrastructure.cluster.x-k8s.io/v1beta2",
+					InfrastructureRef: capi.ContractVersionedObjectReference{
+						APIGroup: "infrastructure.cluster.x-k8s.io",
+						Kind:     "AWSCluster",
+						Name:     ClusterName,
 					},
 				},
 			}
@@ -2239,17 +2220,15 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 					},
 				},
 				Spec: capi.ClusterSpec{
-					ControlPlaneRef: &v1.ObjectReference{
-						Kind:       "AWSManagedControlPlane",
-						Namespace:  namespace,
-						Name:       ClusterName,
-						APIVersion: "controlplane.cluster.x-k8s.io/v1beta2",
+					ControlPlaneRef: capi.ContractVersionedObjectReference{
+						APIGroup: "controlplane.cluster.x-k8s.io",
+						Kind:     "AWSManagedControlPlane",
+						Name:     ClusterName,
 					},
-					InfrastructureRef: &v1.ObjectReference{
-						Kind:       "AWSManagedCluster",
-						Namespace:  namespace,
-						Name:       ClusterName,
-						APIVersion: "infrastructure.cluster.x-k8s.io/v1beta2",
+					InfrastructureRef: capi.ContractVersionedObjectReference{
+						APIGroup: "infrastructure.cluster.x-k8s.io",
+						Kind:     "AWSManagedCluster",
+						Name:     ClusterName,
 					},
 				},
 			}
@@ -2279,7 +2258,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 
 			// cluster-eks renders an empty dataSecretName because EKS nodes never get a KubeadmConfig
 			emptyDataSecretName := ""
-			machinePool := &capiexp.MachinePool{
+			machinePool := &capi.MachinePool{
 				ObjectMeta: ctrl.ObjectMeta{
 					Namespace: namespace,
 					Name:      KarpenterMachinePoolName,
@@ -2287,15 +2266,20 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 						capi.ClusterNameLabel: ClusterName,
 					},
 				},
-				Spec: capiexp.MachinePoolSpec{
+				Spec: capi.MachinePoolSpec{
 					ClusterName: ClusterName,
 					Template: capi.MachineTemplateSpec{
 						Spec: capi.MachineSpec{
 							ClusterName: ClusterName,
+							InfrastructureRef: capi.ContractVersionedObjectReference{
+								APIGroup: "infrastructure.cluster.x-k8s.io",
+								Kind:     "KarpenterMachinePool",
+								Name:     KarpenterMachinePoolName,
+							},
 							Bootstrap: capi.Bootstrap{
 								DataSecretName: &emptyDataSecretName,
 							},
-							Version: &version,
+							Version: version,
 						},
 					},
 				},
@@ -2418,8 +2402,8 @@ func ExpectUnstructured(u unstructured.Unstructured, fields ...string) Assertion
 }
 
 // HaveCondition checks for a Condition with the given Type, Status, and Reason.
-func HaveCondition(condType capi.ConditionType, status v1.ConditionStatus, reason, message string) gomegatypes.GomegaMatcher {
-	return WithTransform(func(conditions capi.Conditions) *capi.Condition {
+func HaveCondition(condType capiv1beta1.ConditionType, status v1.ConditionStatus, reason, message string) gomegatypes.GomegaMatcher {
+	return WithTransform(func(conditions capiv1beta1.Conditions) *capiv1beta1.Condition {
 		for i := range conditions {
 			if conditions[i].Type == condType {
 				return &conditions[i]
@@ -2428,13 +2412,13 @@ func HaveCondition(condType capi.ConditionType, status v1.ConditionStatus, reaso
 		return nil
 	}, And(
 		Not(BeNil()),
-		WithTransform(func(c *capi.Condition) v1.ConditionStatus {
+		WithTransform(func(c *capiv1beta1.Condition) v1.ConditionStatus {
 			return c.Status
 		}, Equal(status)),
-		WithTransform(func(c *capi.Condition) string {
+		WithTransform(func(c *capiv1beta1.Condition) string {
 			return c.Reason
 		}, Equal(reason)),
-		WithTransform(func(c *capi.Condition) string {
+		WithTransform(func(c *capiv1beta1.Condition) string {
 			return c.Message
 		}, ContainSubstring(message)),
 	))

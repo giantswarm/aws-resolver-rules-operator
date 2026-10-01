@@ -11,11 +11,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/aws-resolver-rules-operator/controllers"
@@ -103,7 +103,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 				Namespace: ClusterNamespace,
 			},
 			Spec: capi.ClusterSpec{
-				InfrastructureRef: &v1.ObjectReference{
+				InfrastructureRef: capi.ContractVersionedObjectReference{
 					Kind: "AWSCluster",
 				},
 			},
@@ -146,7 +146,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 
 			When("the cluster is paused", func() {
 				BeforeEach(func() {
-					cluster.Spec.Paused = true
+					cluster.Spec.Paused = ptr.To(true)
 					clusterClient.GetClusterReturns(cluster, nil)
 				})
 

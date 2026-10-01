@@ -38,7 +38,8 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -250,6 +251,13 @@ func newCapiCluster(name string, annotationsKeyValues ...string) *capi.Cluster {
 			Namespace:   namespace,
 			Annotations: annotations,
 		},
+		Spec: capi.ClusterSpec{
+			InfrastructureRef: capi.ContractVersionedObjectReference{
+				APIGroup: capa.GroupVersion.Group,
+				Kind:     "AWSCluster",
+				Name:     name,
+			},
+		},
 	}
 
 	return awsCluster
@@ -309,7 +317,7 @@ func newEksCluster(name string, annotationsKeyValues ...string) *eks.AWSManagedC
 		},
 		Spec: eks.AWSManagedControlPlaneSpec{
 			Region: "the-region",
-			ControlPlaneEndpoint: capi.APIEndpoint{
+			ControlPlaneEndpoint: capiv1beta1.APIEndpoint{
 				Host: "https://eks123clusterID.sk1.eu-west-2.eks.amazonaws.com",
 				Port: 443,
 			},
@@ -362,11 +370,15 @@ func createRandomAwsManagedControlplaneWithIdentity(annotationsKeyValues ...stri
 	capiCluster := newCapiCluster(name, annotationsKeyValues...)
 	identity := newRoleIdentity()
 
-	capiCluster.Spec.InfrastructureRef = &corev1.ObjectReference{
-		Kind: "AWSManagedCluster",
+	capiCluster.Spec.InfrastructureRef = capi.ContractVersionedObjectReference{
+		APIGroup: capa.GroupVersion.Group,
+		Kind:     "AWSManagedCluster",
+		Name:     name,
 	}
-	capiCluster.Spec.ControlPlaneRef = &corev1.ObjectReference{
-		Kind: "AWSManagedControlPlane",
+	capiCluster.Spec.ControlPlaneRef = capi.ContractVersionedObjectReference{
+		APIGroup: eks.GroupVersion.Group,
+		Kind:     "AWSManagedControlPlane",
+		Name:     name,
 	}
 
 	eksCluster.Spec.IdentityRef = &capa.AWSIdentityReference{

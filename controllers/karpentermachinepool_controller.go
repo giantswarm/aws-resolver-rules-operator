@@ -19,13 +19,12 @@ import (
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
 	capalogger "sigs.k8s.io/cluster-api-provider-aws/v2/pkg/logger"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/controllers/remote"
-	capiexp "sigs.k8s.io/cluster-api/exp/api/v1beta1"
-	capiutilexp "sigs.k8s.io/cluster-api/exp/util"
 	capiutil "sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
-	"sigs.k8s.io/cluster-api/util/patch"
+	"sigs.k8s.io/cluster-api/util/deprecated/v1beta1/patch"
 	"sigs.k8s.io/cluster-api/util/predicates"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -90,7 +89,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	}
 	defer func() {
 		if err := patchHelper.Patch(ctx, karpenterMachinePool, patch.WithOwnedConditions{
-			Conditions: []capi.ConditionType{
+			Conditions: []capiv1beta1.ConditionType{
 				conditions.ReadyCondition,
 				conditions.NodePoolCreatedCondition,
 				conditions.EC2NodeClassCreatedCondition,
@@ -102,7 +101,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 		}
 	}()
 
-	machinePool, err := capiutilexp.GetOwnerMachinePool(ctx, r.client, karpenterMachinePool.ObjectMeta)
+	machinePool, err := capiutil.GetOwnerMachinePool(ctx, r.client, karpenterMachinePool.ObjectMeta)
 	if err != nil {
 		conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, fmt.Sprintf("Failed to get MachinePool owning the KarpenterMachinePool: %v", err))
 		karpenterMachinePool.Status.Ready = false
@@ -140,7 +139,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	isEKS := IsEKS(*cluster)
 	if isEKS {
 		awsManagedControlPlane := &eks.AWSManagedControlPlane{}
-		if err := r.client.Get(ctx, client.ObjectKey{Namespace: cluster.Spec.ControlPlaneRef.Namespace, Name: cluster.Spec.ControlPlaneRef.Name}, awsManagedControlPlane); err != nil {
+		if err := r.client.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Spec.ControlPlaneRef.Name}, awsManagedControlPlane); err != nil {
 			conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, fmt.Sprintf("Failed to get AWSManagedControlPlane: %v", err))
 			karpenterMachinePool.Status.Ready = false
 			return reconcile.Result{}, fmt.Errorf("failed to get AWSManagedControlPlane referenced in Cluster.spec.controlPlaneRef: %w", err)
@@ -163,7 +162,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 		}
 	} else {
 		awsCluster := &capa.AWSCluster{}
-		if err := r.client.Get(ctx, client.ObjectKey{Namespace: cluster.Spec.InfrastructureRef.Namespace, Name: cluster.Spec.InfrastructureRef.Name}, awsCluster); err != nil {
+		if err := r.client.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Spec.InfrastructureRef.Name}, awsCluster); err != nil {
 			conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, fmt.Sprintf("Failed to get AWSCluster: %v", err))
 			karpenterMachinePool.Status.Ready = false
 			return reconcile.Result{}, fmt.Errorf("failed to get AWSCluster referenced in Cluster.spec.infrastructureRef: %w", err)
@@ -284,7 +283,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 
 // saveKarpenterInstancesToStatus updates the KarpenterMachinePool and parent MachinePool with current node information
 // from the workload cluster, including replica counts and provider ID lists.
-func (r *KarpenterMachinePoolReconciler) saveKarpenterInstancesToStatus(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, machinePool *capiexp.MachinePool) error {
+func (r *KarpenterMachinePoolReconciler) saveKarpenterInstancesToStatus(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, machinePool *capi.MachinePool) error {
 	providerIDList, numberOfNodeClaims, err := r.computeProviderIDListFromNodeClaimsInWorkloadCluster(ctx, logger, cluster, karpenterMachinePool.Name)
 	if err != nil {
 		return err
@@ -487,21 +486,21 @@ func (r *KarpenterMachinePoolReconciler) computeProviderIDListFromNodeClaimsInWo
 // This is used for version skew validation to ensure workers don't run newer versions
 // than the control plane, as defined in the version skew policy https://kubernetes.io/releases/version-skew-policy/.
 func (r *KarpenterMachinePoolReconciler) getControlPlaneVersion(ctx context.Context, cluster *capi.Cluster) (string, error) {
-	if cluster.Spec.ControlPlaneRef == nil {
+	if !cluster.Spec.ControlPlaneRef.IsDefined() {
 		return "", fmt.Errorf("cluster has no control plane reference")
 	}
 
-	groupVersionKind := schema.GroupVersionKind{
-		Group:   cluster.Spec.ControlPlaneRef.GroupVersionKind().Group,
-		Version: cluster.Spec.ControlPlaneRef.GroupVersionKind().Version,
-		Kind:    cluster.Spec.ControlPlaneRef.GroupVersionKind().Kind,
+	// The v1beta2 reference has no API version, so use the version that the API server prefers
+	mapping, err := r.client.RESTMapper().RESTMapping(cluster.Spec.ControlPlaneRef.GroupKind())
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve API version of control plane %s: %w", cluster.Spec.ControlPlaneRef.Kind, err)
 	}
 	controlPlane := &unstructured.Unstructured{}
-	controlPlane.SetGroupVersionKind(groupVersionKind)
+	controlPlane.SetGroupVersionKind(mapping.GroupVersionKind)
 	controlPlane.SetName(cluster.Spec.ControlPlaneRef.Name)
-	controlPlane.SetNamespace(cluster.Spec.ControlPlaneRef.Namespace)
+	controlPlane.SetNamespace(cluster.Namespace)
 
-	if err := r.client.Get(ctx, client.ObjectKey{Name: cluster.Spec.ControlPlaneRef.Name, Namespace: cluster.Spec.ControlPlaneRef.Namespace}, controlPlane); err != nil {
+	if err := r.client.Get(ctx, client.ObjectKey{Name: cluster.Spec.ControlPlaneRef.Name, Namespace: cluster.Namespace}, controlPlane); err != nil {
 		return "", fmt.Errorf("failed to get control plane %s: %w", cluster.Spec.ControlPlaneRef.Kind, err)
 	}
 
@@ -517,7 +516,7 @@ func (r *KarpenterMachinePoolReconciler) getControlPlaneVersion(ctx context.Cont
 }
 
 // createOrUpdateKarpenterResources creates or updates the Karpenter NodePool and EC2NodeClass custom resources in the workload cluster.
-func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, machinePool *capiexp.MachinePool, additionalTags capa.Tags, amiFamily, userData *string) error {
+func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, machinePool *capi.MachinePool, additionalTags capa.Tags, amiFamily, userData *string) error {
 	workloadClusterClient, err := r.clusterClientGetter(ctx, "", r.client, client.ObjectKeyFromObject(cluster))
 	if err != nil {
 		return fmt.Errorf("failed to get workload cluster client: %w", err)
@@ -916,16 +915,16 @@ func (r *KarpenterMachinePoolReconciler) SetupWithManager(ctx context.Context, m
 // The workers can't use a newer k8s version than the one used by the control plane.
 //
 // This implements Kubernetes version skew policy https://kubernetes.io/releases/version-skew-policy/
-func (r *KarpenterMachinePoolReconciler) IsVersionSkewAllowed(ctx context.Context, cluster *capi.Cluster, machinePool *capiexp.MachinePool) (bool, string, string, error) {
+func (r *KarpenterMachinePoolReconciler) IsVersionSkewAllowed(ctx context.Context, cluster *capi.Cluster, machinePool *capi.MachinePool) (bool, string, string, error) {
 	controlPlaneVersion, err := r.getControlPlaneVersion(ctx, cluster)
 	if err != nil {
 		return true, "", "", fmt.Errorf("failed to get current Control Plane k8s version: %w", err)
 	}
 
-	allowed, err := versionskew.IsSkewAllowed(controlPlaneVersion, *machinePool.Spec.Template.Spec.Version)
+	allowed, err := versionskew.IsSkewAllowed(controlPlaneVersion, machinePool.Spec.Template.Spec.Version)
 	if err != nil {
-		return true, controlPlaneVersion, *machinePool.Spec.Template.Spec.Version, fmt.Errorf("failed to validate version skew: %w", err)
+		return true, controlPlaneVersion, machinePool.Spec.Template.Spec.Version, fmt.Errorf("failed to validate version skew: %w", err)
 	}
 
-	return allowed, controlPlaneVersion, *machinePool.Spec.Template.Spec.Version, nil
+	return allowed, controlPlaneVersion, machinePool.Spec.Template.Spec.Version, nil
 }
