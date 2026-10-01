@@ -1,18 +1,18 @@
 module github.com/aws-resolver-rules-operator
 
-go 1.26.3
+go 1.26.6
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.47.1
-	github.com/aws/aws-sdk-go-v2/config v1.32.15
-	github.com/aws/aws-sdk-go-v2/credentials v1.19.14
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.297.0
+	github.com/aws/aws-sdk-go-v2/config v1.32.27
+	github.com/aws/aws-sdk-go-v2/credentials v1.19.26
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.311.0
 	github.com/aws/aws-sdk-go-v2/service/ram v1.36.3
 	github.com/aws/aws-sdk-go-v2/service/route53 v1.62.5
 	github.com/aws/aws-sdk-go-v2/service/route53resolver v1.42.5
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.97.3
-	github.com/aws/aws-sdk-go-v2/service/sts v1.41.10
-	github.com/aws/karpenter-provider-aws v1.12.1
+	github.com/aws/aws-sdk-go-v2/service/sts v1.43.5
+	github.com/aws/karpenter-provider-aws v1.14.1
 	github.com/aws/smithy-go v1.28.2
 	github.com/aws/smithy-go/metrics/smithyotelmetrics v1.0.30
 	github.com/blang/semver/v4 v4.0.0
@@ -28,7 +28,7 @@ require (
 	github.com/samber/lo v1.53.0
 	go.opentelemetry.io/otel/exporters/prometheus v0.61.0
 	go.opentelemetry.io/otel/sdk/metric v1.44.0
-	go.uber.org/zap v1.27.1
+	go.uber.org/zap v1.28.0
 	golang.org/x/tools v0.48.0
 	k8s.io/api v0.35.4
 	k8s.io/apimachinery v0.35.4
@@ -38,26 +38,26 @@ require (
 	sigs.k8s.io/cluster-api v1.13.6
 	sigs.k8s.io/cluster-api-provider-aws/v2 v2.13.1
 	sigs.k8s.io/controller-runtime v0.23.3
-	sigs.k8s.io/karpenter v1.12.1
+	sigs.k8s.io/karpenter v1.14.1
 	sigs.k8s.io/yaml v1.6.0
 )
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.20 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.21 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.30 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.4 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.4 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/eks v1.80.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/eks v1.88.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.19 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.11.5 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/signin v1.0.9 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.30.15 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.19 // indirect
-	github.com/awslabs/operatorpkg v0.0.0-20251222193911-34e9a1898737 // indirect
+	github.com/aws/aws-sdk-go-v2/service/signin v1.2.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.31.5 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.36.8 // indirect
+	github.com/awslabs/operatorpkg v0.0.0-20260708223819-4da4c353c5fa // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
