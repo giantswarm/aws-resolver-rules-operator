@@ -2,8 +2,10 @@ package conditions
 
 import (
 	gsannotation "github.com/giantswarm/k8smetadata/pkg/annotation"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
-	capiconditions "sigs.k8s.io/cluster-api/util/conditions"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	clusterv1conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
+	capiconditions "sigs.k8s.io/cluster-api/util/deprecated/v1beta1/conditions" //nolint:staticcheck
 
 	"github.com/aws-resolver-rules-operator/pkg/util/annotations"
 )
@@ -61,26 +63,26 @@ func MarkReady(setter capiconditions.Setter, condition capi.ConditionType) {
 	capiconditions.MarkTrue(setter, condition)
 }
 
-func MarkModeNotSupported(cluster *capi.Cluster) {
-	capiconditions.MarkFalse(cluster, NetworkTopologyCondition,
-		"ModeNotSupported", capi.ConditionSeverityInfo,
+func MarkModeNotSupported(cluster *clusterv1.Cluster) {
+	clusterv1conditions.MarkFalse(cluster, clusterv1.ConditionType(NetworkTopologyCondition), //nolint:staticcheck
+		"ModeNotSupported", clusterv1.ConditionSeverityInfo,
 		"The provided mode '%s' is not supported",
 		annotations.GetAnnotation(cluster, gsannotation.NetworkTopologyModeAnnotation),
 	)
 }
 
-func MarkVPCNotReady(cluster *capi.Cluster) {
-	capiconditions.MarkFalse(cluster, NetworkTopologyCondition,
+func MarkVPCNotReady(cluster *clusterv1.Cluster) {
+	clusterv1conditions.MarkFalse(cluster, clusterv1.ConditionType(NetworkTopologyCondition), //nolint:staticcheck
 		"VPCNotReady",
-		capi.ConditionSeverityInfo,
+		clusterv1.ConditionSeverityInfo,
 		"The cluster's VPC is not yet ready",
 	)
 }
 
-func MarkIDNotProvided(cluster *capi.Cluster, id string) {
-	capiconditions.MarkFalse(cluster, NetworkTopologyCondition,
+func MarkIDNotProvided(cluster *clusterv1.Cluster, id string) {
+	clusterv1conditions.MarkFalse(cluster, clusterv1.ConditionType(NetworkTopologyCondition), //nolint:staticcheck
 		"RequiredIDMissing",
-		capi.ConditionSeverityError,
+		clusterv1.ConditionSeverityError,
 		"The %s ID is missing from the annotations", id,
 	)
 }

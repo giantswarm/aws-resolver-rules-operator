@@ -11,9 +11,10 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
 	"github.com/aws-resolver-rules-operator/controllers"
 	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
@@ -37,6 +38,13 @@ var _ = Describe("ClusterClient", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster2",
 					Namespace: namespace,
+				},
+				Spec: capi.ClusterSpec{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
+						APIGroup: capa.GroupVersion.Group,
+						Kind:     "AWSCluster",
+						Name:     "test-cluster2",
+					},
 				},
 			}
 			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
@@ -95,6 +103,13 @@ var _ = Describe("ClusterClient", func() {
 					Name:      "test-cluster3",
 					Namespace: namespace,
 				},
+				Spec: capi.ClusterSpec{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
+						APIGroup: capa.GroupVersion.Group,
+						Kind:     "AWSCluster",
+						Name:     "test-cluster3",
+					},
+				},
 			}
 			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
 			awsManagedControlPlane := &eks.AWSManagedControlPlane{
@@ -151,6 +166,13 @@ var _ = Describe("ClusterClient", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster2",
 					Namespace: namespace,
+				},
+				Spec: capi.ClusterSpec{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
+						APIGroup: capa.GroupVersion.Group,
+						Kind:     "AWSCluster",
+						Name:     "test-cluster2",
+					},
 				},
 			}
 			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
@@ -267,6 +289,13 @@ var _ = Describe("ClusterClient", func() {
 					Name:      "test-cluster2",
 					Namespace: namespace,
 				},
+				Spec: capi.ClusterSpec{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
+						APIGroup: capa.GroupVersion.Group,
+						Kind:     "AWSCluster",
+						Name:     "test-cluster2",
+					},
+				},
 			}
 			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
 		})
@@ -288,6 +317,13 @@ var _ = Describe("ClusterClient", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "does-not-exist",
 						Namespace: namespace,
+					},
+					Spec: capi.ClusterSpec{
+						InfrastructureRef: capi.ContractVersionedObjectReference{
+							APIGroup: capa.GroupVersion.Group,
+							Kind:     "AWSCluster",
+							Name:     "does-not-exist",
+						},
 					},
 				}
 				err := clusterClient.AddClusterFinalizer(ctx, nonExistingCluster, controllers.RouteFinalizer)
@@ -384,6 +420,13 @@ var _ = Describe("ClusterClient", func() {
 					Name:      "test-cluster2",
 					Namespace: namespace,
 				},
+				Spec: capi.ClusterSpec{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
+						APIGroup: capa.GroupVersion.Group,
+						Kind:     "AWSCluster",
+						Name:     "test-cluster2",
+					},
+				},
 			}
 			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
 		})
@@ -417,6 +460,13 @@ var _ = Describe("ClusterClient", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "does-not-exist",
 						Namespace: namespace,
+					},
+					Spec: capi.ClusterSpec{
+						InfrastructureRef: capi.ContractVersionedObjectReference{
+							APIGroup: capa.GroupVersion.Group,
+							Kind:     "AWSCluster",
+							Name:     "does-not-exist",
+						},
 					},
 				}
 				err := clusterClient.RemoveClusterFinalizer(ctx, cluster, controllers.RouteFinalizer)
@@ -486,6 +536,13 @@ var _ = Describe("ClusterClient", func() {
 					Name:      "test-cluster2",
 					Namespace: namespace,
 				},
+				Spec: capi.ClusterSpec{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
+						APIGroup: capa.GroupVersion.Group,
+						Kind:     "AWSCluster",
+						Name:     "test-cluster2",
+					},
+				},
 			}
 			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
 		})
@@ -498,8 +555,8 @@ var _ = Describe("ClusterClient", func() {
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, actualCluster)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(actualCluster.Status.Conditions).To(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-				"Type":   Equal(controllers.ResolverRulesAssociatedCondition),
+			Expect(actualCluster.GetV1Beta1Conditions()).To(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+				"Type":   Equal(capi.ConditionType(controllers.ResolverRulesAssociatedCondition)), //nolint:staticcheck
 				"Status": Equal(v1.ConditionTrue),
 			})))
 		})
@@ -518,7 +575,7 @@ var _ = Describe("ClusterClient", func() {
 					UID:       clusterUUID,
 				},
 				Spec: capi.ClusterSpec{
-					Paused: true,
+					Paused: ptr.To(true),
 				},
 			}
 			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
@@ -548,7 +605,7 @@ var _ = Describe("ClusterClient", func() {
 			actualCluster := &capi.Cluster{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, actualCluster)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(actualCluster.Spec.Paused).To(BeFalse())
+			Expect(actualCluster.Spec.Paused).To(HaveValue(BeFalse()))
 
 			actualAwsCluster := &capa.AWSCluster{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, actualAwsCluster)

@@ -5,10 +5,12 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
-	"sigs.k8s.io/cluster-api/util/conditions"
+	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -113,15 +115,15 @@ func (a *ClusterClient) GetIdentity(ctx context.Context, identityRef *capa.AWSId
 	return roleIdentity, nil
 }
 
-func (a *ClusterClient) MarkConditionTrue(ctx context.Context, cluster *capi.Cluster, condition capi.ConditionType) error {
+func (a *ClusterClient) MarkConditionTrue(ctx context.Context, cluster *capi.Cluster, condition capiv1beta1.ConditionType) error {
 	originalCluster := cluster.DeepCopy()
-	conditions.MarkTrue(cluster, condition)
+	conditions.MarkTrue(cluster, capi.ConditionType(condition)) //nolint:staticcheck
 	return a.client.Status().Patch(ctx, cluster, client.MergeFrom(originalCluster))
 }
 
 func (a *ClusterClient) Unpause(ctx context.Context, awsCluster *capa.AWSCluster, cluster *capi.Cluster) error {
 	originalCluster := cluster.DeepCopy()
-	cluster.Spec.Paused = false
+	cluster.Spec.Paused = ptr.To(false)
 	delete(cluster.Annotations, capi.PausedAnnotation)
 	err := a.client.Patch(ctx, cluster, client.MergeFrom(originalCluster))
 	if err != nil {

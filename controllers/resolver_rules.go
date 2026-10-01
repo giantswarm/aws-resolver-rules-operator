@@ -23,8 +23,9 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
-	"sigs.k8s.io/cluster-api/util/conditions"
+	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	conditions "sigs.k8s.io/cluster-api/util/deprecated/v1beta1/conditions" //nolint:staticcheck
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -36,8 +37,8 @@ import (
 )
 
 const (
-	ResolverRulesFinalizer                              = "capa-operator.finalizers.giantswarm.io/resolver-rules-controller"
-	ResolverRulesAssociatedCondition capi.ConditionType = "ResolverRulesAssociated"
+	ResolverRulesFinalizer                                     = "capa-operator.finalizers.giantswarm.io/resolver-rules-controller"
+	ResolverRulesAssociatedCondition capiv1beta1.ConditionType = "ResolverRulesAssociated"
 )
 
 //counterfeiter:generate . AWSClusterClient
@@ -49,7 +50,7 @@ type AWSClusterClient interface {
 	Unpause(context.Context, *capa.AWSCluster, *capi.Cluster) error
 	RemoveFinalizer(context.Context, *capa.AWSCluster, string) error
 	GetIdentity(context.Context, *capa.AWSCluster) (*capa.AWSClusterRoleIdentity, error)
-	MarkConditionTrue(context.Context, *capa.AWSCluster, capi.ConditionType) error
+	MarkConditionTrue(context.Context, *capa.AWSCluster, capiv1beta1.ConditionType) error
 	PatchCluster(context.Context, *capa.AWSCluster, client.Patch) (*capa.AWSCluster, error)
 	UpdateStatus(context.Context, client.Object) error
 }

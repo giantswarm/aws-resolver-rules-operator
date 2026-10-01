@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add `spec.nodePool.replicas` to `KarpenterMachinePool` and carry it to the Karpenter `NodePool`, so a node pool can be static with a fixed number of nodes. This needs the alpha `StaticCapacity` feature gate in Karpenter.
+- Allow the `Balanced` consolidation policy in `KarpenterMachinePool`.
+
+### Changed
+
+- Update CAPA to v2.13.1, CAPI to v1.13.6, and controller-runtime to v0.23.3. The operator now reads `Cluster` and `MachinePool` through the CAPI `v1beta2` API, so the management cluster needs CAPI v1.11 or newer.
+- Update the Karpenter Go modules to v1.14.1.
+
 ## [0.28.1] - 2026-09-30
 
 ### Fixed

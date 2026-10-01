@@ -5,10 +5,12 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util"
-	"sigs.k8s.io/cluster-api/util/conditions"
+	conditions "sigs.k8s.io/cluster-api/util/deprecated/v1beta1/conditions" //nolint:staticcheck
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -78,7 +80,7 @@ func (a *AWSClusterClient) GetIdentity(ctx context.Context, awsCluster *capa.AWS
 	return roleIdentity, nil
 }
 
-func (a *AWSClusterClient) MarkConditionTrue(ctx context.Context, awsCluster *capa.AWSCluster, condition capi.ConditionType) error {
+func (a *AWSClusterClient) MarkConditionTrue(ctx context.Context, awsCluster *capa.AWSCluster, condition capiv1beta1.ConditionType) error {
 	originalCluster := awsCluster.DeepCopy()
 	conditions.MarkTrue(awsCluster, condition)
 	return a.client.Status().Patch(ctx, awsCluster, client.MergeFrom(originalCluster))
@@ -86,7 +88,7 @@ func (a *AWSClusterClient) MarkConditionTrue(ctx context.Context, awsCluster *ca
 
 func (a *AWSClusterClient) Unpause(ctx context.Context, awsCluster *capa.AWSCluster, cluster *capi.Cluster) error {
 	originalCluster := cluster.DeepCopy()
-	cluster.Spec.Paused = false
+	cluster.Spec.Paused = ptr.To(false)
 	delete(cluster.Annotations, capi.PausedAnnotation)
 	err := a.client.Patch(ctx, cluster, client.MergeFrom(originalCluster))
 	if err != nil {

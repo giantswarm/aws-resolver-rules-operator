@@ -32,6 +32,13 @@ type NodePoolSpec struct {
 	// +kubebuilder:validation:Maximum:=100
 	// +optional
 	Weight *int32 `json:"weight,omitempty"`
+
+	// Replicas makes the NodePool static: Karpenter keeps exactly this number of nodes instead of
+	// scaling with pod demand. Requires the alpha `StaticCapacity` feature gate in Karpenter. Only
+	// `limits.nodes` and no `weight` are allowed with it, and it cannot be added or removed after creation.
+	// +kubebuilder:validation:Minimum:=0
+	// +optional
+	Replicas *int64 `json:"replicas,omitempty"`
 }
 
 type NodeClaimTemplate struct {
@@ -138,6 +145,7 @@ type Limits v1.ResourceList
 type ConsolidationPolicy string
 
 const (
+	ConsolidationPolicyBalanced                 ConsolidationPolicy = "Balanced"
 	ConsolidationPolicyWhenEmpty                ConsolidationPolicy = "WhenEmpty"
 	ConsolidationPolicyWhenEmptyOrUnderutilized ConsolidationPolicy = "WhenEmptyOrUnderutilized"
 )
@@ -195,7 +203,7 @@ type Disruption struct {
 	// ConsolidationPolicy describes which nodes Karpenter can disrupt through its consolidation
 	// algorithm. This policy defaults to "WhenEmptyOrUnderutilized" if not specified
 	// +kubebuilder:default:="WhenEmptyOrUnderutilized"
-	// +kubebuilder:validation:Enum:={WhenEmpty,WhenEmptyOrUnderutilized}
+	// +kubebuilder:validation:Enum:={WhenEmpty,WhenEmptyOrUnderutilized,Balanced}
 	// +optional
 	ConsolidationPolicy ConsolidationPolicy `json:"consolidationPolicy,omitempty"`
 	// Budgets is a list of Budgets.

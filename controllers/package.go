@@ -9,7 +9,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
@@ -119,7 +120,7 @@ func getSubnetIds(subnets capa.Subnets) []string {
 }
 
 func IsEKS(cluster capi.Cluster) bool {
-	return cluster.Spec.ControlPlaneRef != nil &&
+	return cluster.Spec.ControlPlaneRef.IsDefined() &&
 		cluster.Spec.ControlPlaneRef.Kind == "AWSManagedControlPlane"
 }
 
@@ -136,7 +137,7 @@ type ClusterClient interface {
 	RemoveAWSManagedControlPlaneFinalizer(ctx context.Context, awsManagedControlPlane *eks.AWSManagedControlPlane, finalizer string) error
 	RemoveClusterFinalizer(context.Context, *capi.Cluster, string) error
 	GetIdentity(context.Context, *capa.AWSIdentityReference) (*capa.AWSClusterRoleIdentity, error)
-	MarkConditionTrue(context.Context, *capi.Cluster, capi.ConditionType) error
+	MarkConditionTrue(context.Context, *capi.Cluster, capiv1beta1.ConditionType) error
 }
 
 // predicateToFilterAWSClusterResourceVersionChanges is a function to avoid reconciling if the event triggering the reconciliation
