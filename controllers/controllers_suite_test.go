@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
-	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
+	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"

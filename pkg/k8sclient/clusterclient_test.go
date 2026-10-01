@@ -556,7 +556,7 @@ var _ = Describe("ClusterClient", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(actualCluster.GetV1Beta1Conditions()).To(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-				"Type":   Equal(capi.ConditionType(controllers.ResolverRulesAssociatedCondition)),
+				"Type":   Equal(capi.ConditionType(controllers.ResolverRulesAssociatedCondition)), //nolint:staticcheck
 				"Status": Equal(v1.ConditionTrue),
 			})))
 		})

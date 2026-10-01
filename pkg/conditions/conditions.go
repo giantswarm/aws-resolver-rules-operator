@@ -2,10 +2,10 @@ package conditions
 
 import (
 	gsannotation "github.com/giantswarm/k8smetadata/pkg/annotation"
-	capi "sigs.k8s.io/cluster-api/api/core/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	clusterv1conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
-	capiconditions "sigs.k8s.io/cluster-api/util/deprecated/v1beta1/conditions"
+	capiconditions "sigs.k8s.io/cluster-api/util/deprecated/v1beta1/conditions" //nolint:staticcheck
 
 	"github.com/aws-resolver-rules-operator/pkg/util/annotations"
 )
@@ -64,7 +64,7 @@ func MarkReady(setter capiconditions.Setter, condition capi.ConditionType) {
 }
 
 func MarkModeNotSupported(cluster *clusterv1.Cluster) {
-	clusterv1conditions.MarkFalse(cluster, clusterv1.ConditionType(NetworkTopologyCondition),
+	clusterv1conditions.MarkFalse(cluster, clusterv1.ConditionType(NetworkTopologyCondition), //nolint:staticcheck
 		"ModeNotSupported", clusterv1.ConditionSeverityInfo,
 		"The provided mode '%s' is not supported",
 		annotations.GetAnnotation(cluster, gsannotation.NetworkTopologyModeAnnotation),
@@ -72,7 +72,7 @@ func MarkModeNotSupported(cluster *clusterv1.Cluster) {
 }
 
 func MarkVPCNotReady(cluster *clusterv1.Cluster) {
-	clusterv1conditions.MarkFalse(cluster, clusterv1.ConditionType(NetworkTopologyCondition),
+	clusterv1conditions.MarkFalse(cluster, clusterv1.ConditionType(NetworkTopologyCondition), //nolint:staticcheck
 		"VPCNotReady",
 		clusterv1.ConditionSeverityInfo,
 		"The cluster's VPC is not yet ready",
@@ -80,7 +80,7 @@ func MarkVPCNotReady(cluster *clusterv1.Cluster) {
 }
 
 func MarkIDNotProvided(cluster *clusterv1.Cluster, id string) {
-	clusterv1conditions.MarkFalse(cluster, clusterv1.ConditionType(NetworkTopologyCondition),
+	clusterv1conditions.MarkFalse(cluster, clusterv1.ConditionType(NetworkTopologyCondition), //nolint:staticcheck
 		"RequiredIDMissing",
 		clusterv1.ConditionSeverityError,
 		"The %s ID is missing from the annotations", id,

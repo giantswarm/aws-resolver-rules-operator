@@ -8,9 +8,9 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/core/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
-	capiconditions "sigs.k8s.io/cluster-api/util/deprecated/v1beta1/conditions"
+	capiconditions "sigs.k8s.io/cluster-api/util/deprecated/v1beta1/conditions" //nolint:staticcheck
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"

@@ -9,10 +9,6 @@ linters:
     - path: tests/
       # ST1001: should not use dot imports  # gomega is designed to be dot-imported.
       text: ST1001
-    # CAPA objects and `KarpenterMachinePool` still use CAPI v1beta1 conditions
-    - linters:
-      - staticcheck
-      text: "SA1019: .*support for v1beta1 will be dropped"
 # v1 config, remove when golangci-lint v2 is active
 issues:
   exclude-rules:
