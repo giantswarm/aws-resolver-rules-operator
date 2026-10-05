@@ -8,7 +8,7 @@ import (
 	"k8s.io/utils/ptr"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
-	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
+	clusterv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -115,7 +115,7 @@ func (a *ClusterClient) GetIdentity(ctx context.Context, identityRef *capa.AWSId
 	return roleIdentity, nil
 }
 
-func (a *ClusterClient) MarkConditionTrue(ctx context.Context, cluster *clusterv1.Cluster, condition capiv1beta1.ConditionType) error {
+func (a *ClusterClient) MarkConditionTrue(ctx context.Context, cluster *clusterv1.Cluster, condition clusterv1beta1.ConditionType) error {
 	originalCluster := cluster.DeepCopy()
 	conditions.MarkTrue(cluster, clusterv1.ConditionType(condition)) //nolint:staticcheck
 	return a.client.Status().Patch(ctx, cluster, client.MergeFrom(originalCluster))

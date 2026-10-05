@@ -2,7 +2,7 @@ package conditions
 
 import (
 	gsannotation "github.com/giantswarm/k8smetadata/pkg/annotation"
-	capi "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
+	clusterv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	clusterv1conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
 	capiconditions "sigs.k8s.io/cluster-api/util/deprecated/v1beta1/conditions" //nolint:staticcheck
@@ -11,32 +11,32 @@ import (
 )
 
 const (
-	NetworkTopologyCondition capi.ConditionType = "NetworkTopologyReady"
-	TransitGatewayCreated    capi.ConditionType = "TransitGatewayCreated"
-	TransitGatewayAttached   capi.ConditionType = "TransitGatewayAttached"
-	PrefixListEntriesReady   capi.ConditionType = "PrefixListEntriesReady"
+	NetworkTopologyCondition clusterv1beta1.ConditionType = "NetworkTopologyReady"
+	TransitGatewayCreated    clusterv1beta1.ConditionType = "TransitGatewayCreated"
+	TransitGatewayAttached   clusterv1beta1.ConditionType = "TransitGatewayAttached"
+	PrefixListEntriesReady   clusterv1beta1.ConditionType = "PrefixListEntriesReady"
 
 	// NodePoolCreatedCondition indicates whether the NodePool resource has been successfully
 	// created or updated in the workload cluster. This doesn't mean the NodePool is ready
 	// to provision nodes, just that the resource exists.
-	NodePoolCreatedCondition capi.ConditionType = "NodePoolCreated"
+	NodePoolCreatedCondition clusterv1beta1.ConditionType = "NodePoolCreated"
 
 	// EC2NodeClassCreatedCondition indicates whether the EC2NodeClass resource has been
 	// successfully created or updated in the workload cluster. This doesn't mean the
 	// EC2NodeClass is ready for use, just that the resource exists.
-	EC2NodeClassCreatedCondition capi.ConditionType = "EC2NodeClassCreated"
+	EC2NodeClassCreatedCondition clusterv1beta1.ConditionType = "EC2NodeClassCreated"
 
 	// BootstrapDataReadyCondition indicates whether the bootstrap user data has been
 	// successfully uploaded to S3 and is ready for use by Karpenter nodes.
-	BootstrapDataReadyCondition capi.ConditionType = "BootstrapDataReady"
+	BootstrapDataReadyCondition clusterv1beta1.ConditionType = "BootstrapDataReady"
 
 	// VersionSkewPolicySatisfiedCondition indicates whether the Kubernetes version skew policy
 	// is satisfied (worker nodes don't use newer versions than control plane).
-	VersionSkewPolicySatisfiedCondition capi.ConditionType = "VersionSkewPolicySatisfied"
+	VersionSkewPolicySatisfiedCondition clusterv1beta1.ConditionType = "VersionSkewPolicySatisfied"
 
 	// ReadyCondition indicates the overall readiness of the KarpenterMachinePool.
 	// This is True when all necessary Karpenter resources are created and configured.
-	ReadyCondition capi.ConditionType = "Ready"
+	ReadyCondition clusterv1beta1.ConditionType = "Ready"
 )
 
 // Condition reasons used by various controllers
@@ -59,7 +59,7 @@ const (
 	VersionSkewValidReason                    = "VersionSkewValid"
 )
 
-func MarkReady(setter capiconditions.Setter, condition capi.ConditionType) {
+func MarkReady(setter capiconditions.Setter, condition clusterv1beta1.ConditionType) {
 	capiconditions.MarkTrue(setter, condition)
 }
 
@@ -88,7 +88,7 @@ func MarkIDNotProvided(cluster *clusterv1.Cluster, id string) {
 }
 
 func MarkNodePoolCreated(setter capiconditions.Setter) {
-	capiconditions.Set(setter, &capi.Condition{
+	capiconditions.Set(setter, &clusterv1beta1.Condition{
 		Type:   NodePoolCreatedCondition,
 		Status: "True", //nolint:goconst
 		Reason: NodePoolCreationSucceededReason,
@@ -96,11 +96,11 @@ func MarkNodePoolCreated(setter capiconditions.Setter) {
 }
 
 func MarkNodePoolNotCreated(setter capiconditions.Setter, reason, message string) {
-	capiconditions.MarkFalse(setter, NodePoolCreatedCondition, reason, capi.ConditionSeverityError, "%s", message)
+	capiconditions.MarkFalse(setter, NodePoolCreatedCondition, reason, clusterv1beta1.ConditionSeverityError, "%s", message)
 }
 
 func MarkEC2NodeClassCreated(setter capiconditions.Setter) {
-	capiconditions.Set(setter, &capi.Condition{
+	capiconditions.Set(setter, &clusterv1beta1.Condition{
 		Type:   EC2NodeClassCreatedCondition,
 		Status: "True",
 		Reason: EC2NodeClassCreationSucceededReason,
@@ -108,11 +108,11 @@ func MarkEC2NodeClassCreated(setter capiconditions.Setter) {
 }
 
 func MarkEC2NodeClassNotCreated(setter capiconditions.Setter, reason, message string) {
-	capiconditions.MarkFalse(setter, EC2NodeClassCreatedCondition, reason, capi.ConditionSeverityError, "%s", message)
+	capiconditions.MarkFalse(setter, EC2NodeClassCreatedCondition, reason, clusterv1beta1.ConditionSeverityError, "%s", message)
 }
 
 func MarkBootstrapDataReady(setter capiconditions.Setter) {
-	capiconditions.Set(setter, &capi.Condition{
+	capiconditions.Set(setter, &clusterv1beta1.Condition{
 		Type:   BootstrapDataReadyCondition,
 		Status: "True",
 		Reason: ReadyReason,
@@ -120,11 +120,11 @@ func MarkBootstrapDataReady(setter capiconditions.Setter) {
 }
 
 func MarkBootstrapDataNotReady(setter capiconditions.Setter, reason, message string) {
-	capiconditions.MarkFalse(setter, BootstrapDataReadyCondition, reason, capi.ConditionSeverityError, "%s", message)
+	capiconditions.MarkFalse(setter, BootstrapDataReadyCondition, reason, clusterv1beta1.ConditionSeverityError, "%s", message)
 }
 
 func MarkVersionSkewPolicySatisfied(setter capiconditions.Setter) {
-	capiconditions.Set(setter, &capi.Condition{
+	capiconditions.Set(setter, &clusterv1beta1.Condition{
 		Type:   VersionSkewPolicySatisfiedCondition,
 		Status: "True",
 		Reason: VersionSkewValidReason,
@@ -132,11 +132,11 @@ func MarkVersionSkewPolicySatisfied(setter capiconditions.Setter) {
 }
 
 func MarkVersionSkewInvalid(setter capiconditions.Setter, reason, message string) {
-	capiconditions.MarkFalse(setter, VersionSkewPolicySatisfiedCondition, reason, capi.ConditionSeverityError, "%s", message)
+	capiconditions.MarkFalse(setter, VersionSkewPolicySatisfiedCondition, reason, clusterv1beta1.ConditionSeverityError, "%s", message)
 }
 
 func MarkKarpenterMachinePoolReady(setter capiconditions.Setter) {
-	capiconditions.Set(setter, &capi.Condition{
+	capiconditions.Set(setter, &clusterv1beta1.Condition{
 		Type:   ReadyCondition,
 		Status: "True",
 		Reason: ReadyReason,
@@ -144,5 +144,5 @@ func MarkKarpenterMachinePoolReady(setter capiconditions.Setter) {
 }
 
 func MarkKarpenterMachinePoolNotReady(setter capiconditions.Setter, reason, message string) {
-	capiconditions.MarkFalse(setter, ReadyCondition, reason, capi.ConditionSeverityError, "%s", message)
+	capiconditions.MarkFalse(setter, ReadyCondition, reason, clusterv1beta1.ConditionSeverityError, "%s", message)
 }

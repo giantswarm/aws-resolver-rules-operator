@@ -19,7 +19,7 @@ import (
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
 	capalogger "sigs.k8s.io/cluster-api-provider-aws/v2/pkg/logger"
-	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
+	clusterv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/controllers/remote"
 	capiutil "sigs.k8s.io/cluster-api/util"
@@ -89,7 +89,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	}
 	defer func() {
 		if err := patchHelper.Patch(ctx, karpenterMachinePool, patch.WithOwnedConditions{
-			Conditions: []capiv1beta1.ConditionType{
+			Conditions: []clusterv1beta1.ConditionType{
 				conditions.ReadyCondition,
 				conditions.NodePoolCreatedCondition,
 				conditions.EC2NodeClassCreatedCondition,

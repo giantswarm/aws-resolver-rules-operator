@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
+	clusterv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 	capiconditions "sigs.k8s.io/cluster-api/util/deprecated/v1beta1/conditions" //nolint:staticcheck
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -116,7 +116,7 @@ func (r *ManagementClusterNetworkReconciler) Reconcile(ctx context.Context, req 
 			cluster,
 			conditions.NetworkTopologyCondition,
 			"InProgress",
-			capi.ConditionSeverityInfo, "")
+			clusterv1beta1.ConditionSeverityInfo, "")
 	}
 
 	scope := networkReconcileScope{

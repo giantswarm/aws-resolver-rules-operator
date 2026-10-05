@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
-	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
+	clusterv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
@@ -18,6 +18,7 @@ import (
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
+//go:generate go run ../hack/importalias -alias sigs.k8s.io/cluster-api/api/core/v1beta1=clusterv1beta1 -alias sigs.k8s.io/cluster-api/api/core/v1beta2=clusterv1 ./controllersfakes
 
 const (
 	DnsFinalizer = "capa-operator.finalizers.giantswarm.io/dns-controller"
@@ -137,7 +138,7 @@ type ClusterClient interface {
 	RemoveAWSManagedControlPlaneFinalizer(ctx context.Context, awsManagedControlPlane *eks.AWSManagedControlPlane, finalizer string) error
 	RemoveClusterFinalizer(context.Context, *clusterv1.Cluster, string) error
 	GetIdentity(context.Context, *capa.AWSIdentityReference) (*capa.AWSClusterRoleIdentity, error)
-	MarkConditionTrue(context.Context, *clusterv1.Cluster, capiv1beta1.ConditionType) error
+	MarkConditionTrue(context.Context, *clusterv1.Cluster, clusterv1beta1.ConditionType) error
 }
 
 // predicateToFilterAWSClusterResourceVersionChanges is a function to avoid reconciling if the event triggering the reconciliation

@@ -22,7 +22,7 @@ import (
 	"k8s.io/utils/ptr"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
-	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
+	clusterv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -2408,8 +2408,8 @@ func ExpectUnstructured(u unstructured.Unstructured, fields ...string) Assertion
 }
 
 // HaveCondition checks for a Condition with the given Type, Status, and Reason.
-func HaveCondition(condType capiv1beta1.ConditionType, status v1.ConditionStatus, reason, message string) gomegatypes.GomegaMatcher {
-	return WithTransform(func(conditions capiv1beta1.Conditions) *capiv1beta1.Condition {
+func HaveCondition(condType clusterv1beta1.ConditionType, status v1.ConditionStatus, reason, message string) gomegatypes.GomegaMatcher {
+	return WithTransform(func(conditions clusterv1beta1.Conditions) *clusterv1beta1.Condition {
 		for i := range conditions {
 			if conditions[i].Type == condType {
 				return &conditions[i]
@@ -2418,13 +2418,13 @@ func HaveCondition(condType capiv1beta1.ConditionType, status v1.ConditionStatus
 		return nil
 	}, And(
 		Not(BeNil()),
-		WithTransform(func(c *capiv1beta1.Condition) v1.ConditionStatus {
+		WithTransform(func(c *clusterv1beta1.Condition) v1.ConditionStatus {
 			return c.Status
 		}, Equal(status)),
-		WithTransform(func(c *capiv1beta1.Condition) string {
+		WithTransform(func(c *clusterv1beta1.Condition) string {
 			return c.Reason
 		}, Equal(reason)),
-		WithTransform(func(c *capiv1beta1.Condition) string {
+		WithTransform(func(c *clusterv1beta1.Condition) string {
 			return c.Message
 		}, ContainSubstring(message)),
 	))
