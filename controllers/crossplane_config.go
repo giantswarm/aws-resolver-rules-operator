@@ -37,7 +37,7 @@ import (
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
 	capalogger "sigs.k8s.io/cluster-api-provider-aws/v2/pkg/logger"
-	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util/predicates"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -77,7 +77,7 @@ func (r *CrossplaneClusterConfigReconciler) SetupWithManager(ctx context.Context
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("crossplane-cluster-config").
-		For(&capi.Cluster{}).
+		For(&clusterv1.Cluster{}).
 		WithEventFilter(predicates.ResourceNotPaused(mgr.GetScheme(), logger)).
 		Complete(r)
 }
@@ -87,7 +87,7 @@ func (r *CrossplaneClusterConfigReconciler) Reconcile(ctx context.Context, req c
 
 	clusterInfo := &ClusterInfo{}
 
-	cluster := &capi.Cluster{}
+	cluster := &clusterv1.Cluster{}
 	err := r.Client.Get(ctx, req.NamespacedName, cluster)
 
 	if err != nil {
@@ -246,7 +246,7 @@ func (r *CrossplaneClusterConfigReconciler) reconcileNormal(ctx context.Context,
 	logger.Info("Reconciling")
 	defer logger.Info("Done reconciling")
 
-	capiCluster := &capi.Cluster{}
+	capiCluster := &clusterv1.Cluster{}
 	err := r.Client.Get(ctx, types.NamespacedName{
 		Name:      clusterInfo.Name,
 		Namespace: clusterInfo.Namespace,
@@ -349,7 +349,7 @@ func (r *CrossplaneClusterConfigReconciler) reconcileProviderConfig(ctx context.
 	return r.updateProviderConfig(ctx, providerConfig, clusterInfo)
 }
 
-func (r *CrossplaneClusterConfigReconciler) reconcileDelete(ctx context.Context, cluster *capi.Cluster) (ctrl.Result, error) {
+func (r *CrossplaneClusterConfigReconciler) reconcileDelete(ctx context.Context, cluster *clusterv1.Cluster) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	logger.Info("Reconcile delete")
 	defer logger.Info("Done deleting")
@@ -389,13 +389,13 @@ func (r *CrossplaneClusterConfigReconciler) reconcileDelete(ctx context.Context,
 	return ctrl.Result{}, nil
 }
 
-func (r *CrossplaneClusterConfigReconciler) AddFinalizer(ctx context.Context, cluster *capi.Cluster) error {
+func (r *CrossplaneClusterConfigReconciler) AddFinalizer(ctx context.Context, cluster *clusterv1.Cluster) error {
 	originalCluster := cluster.DeepCopy()
 	controllerutil.AddFinalizer(cluster, Finalizer)
 	return r.Client.Patch(ctx, cluster, client.MergeFrom(originalCluster))
 }
 
-func (r *CrossplaneClusterConfigReconciler) RemoveFinalizer(ctx context.Context, cluster *capi.Cluster) error {
+func (r *CrossplaneClusterConfigReconciler) RemoveFinalizer(ctx context.Context, cluster *clusterv1.Cluster) error {
 
 	// Check if there is an AWSCluster with the same name and namespace, and remove the finalizer. This enables the migration of the finalizer from `AWSCluster` to `Cluster`.
 	awsCluster := &capa.AWSCluster{}

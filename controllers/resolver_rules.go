@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
-	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	conditions "sigs.k8s.io/cluster-api/util/deprecated/v1beta1/conditions" //nolint:staticcheck
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -44,10 +44,10 @@ const (
 //counterfeiter:generate . AWSClusterClient
 type AWSClusterClient interface {
 	GetAWSCluster(context.Context, types.NamespacedName) (*capa.AWSCluster, error)
-	GetCluster(ctx context.Context, namespacedName types.NamespacedName) (*capi.Cluster, error)
-	GetOwner(context.Context, *capa.AWSCluster) (*capi.Cluster, error)
+	GetCluster(ctx context.Context, namespacedName types.NamespacedName) (*clusterv1.Cluster, error)
+	GetOwner(context.Context, *capa.AWSCluster) (*clusterv1.Cluster, error)
 	AddFinalizer(context.Context, *capa.AWSCluster, string) error
-	Unpause(context.Context, *capa.AWSCluster, *capi.Cluster) error
+	Unpause(context.Context, *capa.AWSCluster, *clusterv1.Cluster) error
 	RemoveFinalizer(context.Context, *capa.AWSCluster, string) error
 	GetIdentity(context.Context, *capa.AWSCluster) (*capa.AWSClusterRoleIdentity, error)
 	MarkConditionTrue(context.Context, *capa.AWSCluster, capiv1beta1.ConditionType) error

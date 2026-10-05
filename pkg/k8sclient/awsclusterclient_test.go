@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
 	"github.com/aws-resolver-rules-operator/controllers"
 	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
@@ -83,13 +83,13 @@ var _ = Describe("AWSClusterClient", func() {
 
 	Describe("GetCluster", func() {
 		BeforeEach(func() {
-			cluster := &capi.Cluster{
+			cluster := &clusterv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster",
 					Namespace: namespace,
 				},
-				Spec: capi.ClusterSpec{
-					InfrastructureRef: capi.ContractVersionedObjectReference{
+				Spec: clusterv1.ClusterSpec{
+					InfrastructureRef: clusterv1.ContractVersionedObjectReference{
 						APIGroup: capa.GroupVersion.Group,
 						Kind:     "AWSCluster",
 						Name:     "test-cluster",
@@ -143,14 +143,14 @@ var _ = Describe("AWSClusterClient", func() {
 
 		BeforeEach(func() {
 			clusterUUID := types.UID(uuid.NewString())
-			cluster := &capi.Cluster{
+			cluster := &clusterv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster",
 					Namespace: namespace,
 					UID:       clusterUUID,
 				},
-				Spec: capi.ClusterSpec{
-					InfrastructureRef: capi.ContractVersionedObjectReference{
+				Spec: clusterv1.ClusterSpec{
+					InfrastructureRef: clusterv1.ContractVersionedObjectReference{
 						APIGroup: capa.GroupVersion.Group,
 						Kind:     "AWSCluster",
 						Name:     "test-cluster",
@@ -165,7 +165,7 @@ var _ = Describe("AWSClusterClient", func() {
 					Namespace: namespace,
 					OwnerReferences: []metav1.OwnerReference{
 						{
-							APIVersion: capi.GroupVersion.String(),
+							APIVersion: clusterv1.GroupVersion.String(),
 							Kind:       "Cluster",
 							Name:       "test-cluster",
 							UID:        clusterUUID,
@@ -210,7 +210,7 @@ var _ = Describe("AWSClusterClient", func() {
 						Namespace: namespace,
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: capi.GroupVersion.String(),
+								APIVersion: clusterv1.GroupVersion.String(),
 								Kind:       "Cluster",
 								Name:       "does-not-exist",
 								UID:        types.UID(uuid.NewString()),
@@ -457,17 +457,17 @@ var _ = Describe("AWSClusterClient", func() {
 
 	Describe("Unpause", func() {
 		var awsCluster *capa.AWSCluster
-		var cluster *capi.Cluster
+		var cluster *clusterv1.Cluster
 
 		BeforeEach(func() {
 			clusterUUID := types.UID(uuid.NewString())
-			cluster = &capi.Cluster{
+			cluster = &clusterv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster",
 					Namespace: namespace,
 					UID:       clusterUUID,
 				},
-				Spec: capi.ClusterSpec{
+				Spec: clusterv1.ClusterSpec{
 					Paused: ptr.To(true),
 				},
 			}
@@ -477,10 +477,10 @@ var _ = Describe("AWSClusterClient", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "test-cluster",
 					Namespace:   namespace,
-					Annotations: map[string]string{capi.PausedAnnotation: "true"},
+					Annotations: map[string]string{clusterv1.PausedAnnotation: "true"},
 					OwnerReferences: []metav1.OwnerReference{
 						{
-							APIVersion: capi.GroupVersion.String(),
+							APIVersion: clusterv1.GroupVersion.String(),
 							Kind:       "Cluster",
 							Name:       "test-cluster",
 							UID:        clusterUUID,
@@ -495,7 +495,7 @@ var _ = Describe("AWSClusterClient", func() {
 			err := awsClusterClient.Unpause(ctx, awsCluster, cluster)
 			Expect(err).NotTo(HaveOccurred())
 
-			actualCluster := &capi.Cluster{}
+			actualCluster := &clusterv1.Cluster{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, actualCluster)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(actualCluster.Spec.Paused).To(HaveValue(BeFalse()))
@@ -503,7 +503,7 @@ var _ = Describe("AWSClusterClient", func() {
 			actualAwsCluster := &capa.AWSCluster{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: awsCluster.Name, Namespace: awsCluster.Namespace}, actualAwsCluster)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(capi.PausedAnnotation).ShouldNot(BeKeyOf(actualAwsCluster.Annotations))
+			Expect(clusterv1.PausedAnnotation).ShouldNot(BeKeyOf(actualAwsCluster.Annotations))
 		})
 	})
 })

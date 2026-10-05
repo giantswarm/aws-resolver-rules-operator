@@ -20,7 +20,7 @@ import (
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
 	capalogger "sigs.k8s.io/cluster-api-provider-aws/v2/pkg/logger"
 	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
-	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/controllers/remote"
 	capiutil "sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
@@ -283,7 +283,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 
 // saveKarpenterInstancesToStatus updates the KarpenterMachinePool and parent MachinePool with current node information
 // from the workload cluster, including replica counts and provider ID lists.
-func (r *KarpenterMachinePoolReconciler) saveKarpenterInstancesToStatus(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, machinePool *capi.MachinePool) error {
+func (r *KarpenterMachinePoolReconciler) saveKarpenterInstancesToStatus(ctx context.Context, logger logr.Logger, cluster *clusterv1.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, machinePool *clusterv1.MachinePool) error {
 	providerIDList, numberOfNodeClaims, err := r.computeProviderIDListFromNodeClaimsInWorkloadCluster(ctx, logger, cluster, karpenterMachinePool.Name)
 	if err != nil {
 		return err
@@ -374,7 +374,7 @@ func (r *KarpenterMachinePoolReconciler) reconcileMachinePoolBootstrapUserData(c
 // Once no instance is left, the pool's bootstrap user data is removed from the cluster's S3
 // bucket (none exists on EKS, where s3BucketName is empty), so a later pool of the same name
 // never boots from it.
-func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, roleIdentity *capa.AWSClusterRoleIdentity, region, s3BucketName string) (reconcile.Result, error) {
+func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, logger logr.Logger, cluster *clusterv1.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, roleIdentity *capa.AWSClusterRoleIdentity, region, s3BucketName string) (reconcile.Result, error) {
 	ec2Client, err := r.awsClients.NewEC2Client(region, roleIdentity.Spec.RoleArn)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to create EC2 client: %w", err)
@@ -437,7 +437,7 @@ func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, lo
 // getWorkloadClusterNodeClaims retrieves NodeClaim resources from the workload cluster
 // that belong to the specified NodePool.
 // NodeClaims represent actual compute resources provisioned by Karpenter.
-func (r *KarpenterMachinePoolReconciler) getWorkloadClusterNodeClaims(ctx context.Context, cluster *capi.Cluster, nodePoolName string) (*unstructured.UnstructuredList, error) {
+func (r *KarpenterMachinePoolReconciler) getWorkloadClusterNodeClaims(ctx context.Context, cluster *clusterv1.Cluster, nodePoolName string) (*unstructured.UnstructuredList, error) {
 	nodeClaimList := &unstructured.UnstructuredList{}
 	workloadClusterClient, err := r.clusterClientGetter(ctx, "", r.client, client.ObjectKeyFromObject(cluster))
 	if err != nil {
@@ -458,7 +458,7 @@ func (r *KarpenterMachinePoolReconciler) getWorkloadClusterNodeClaims(ctx contex
 // computeProviderIDListFromNodeClaimsInWorkloadCluster extracts provider IDs from NodeClaims
 // belonging to the specified NodePool and returns both the list of provider IDs and the total count.
 // Provider IDs are AWS-specific identifiers like "aws:///us-west-2a/i-1234567890abcdef0"
-func (r *KarpenterMachinePoolReconciler) computeProviderIDListFromNodeClaimsInWorkloadCluster(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, nodePoolName string) ([]string, int32, error) {
+func (r *KarpenterMachinePoolReconciler) computeProviderIDListFromNodeClaimsInWorkloadCluster(ctx context.Context, logger logr.Logger, cluster *clusterv1.Cluster, nodePoolName string) ([]string, int32, error) {
 	var providerIDList []string
 
 	nodeClaimList, err := r.getWorkloadClusterNodeClaims(ctx, cluster, nodePoolName)
@@ -485,7 +485,7 @@ func (r *KarpenterMachinePoolReconciler) computeProviderIDListFromNodeClaimsInWo
 // getControlPlaneVersion retrieves the current Kubernetes version from the control plane.
 // This is used for version skew validation to ensure workers don't run newer versions
 // than the control plane, as defined in the version skew policy https://kubernetes.io/releases/version-skew-policy/.
-func (r *KarpenterMachinePoolReconciler) getControlPlaneVersion(ctx context.Context, cluster *capi.Cluster) (string, error) {
+func (r *KarpenterMachinePoolReconciler) getControlPlaneVersion(ctx context.Context, cluster *clusterv1.Cluster) (string, error) {
 	if !cluster.Spec.ControlPlaneRef.IsDefined() {
 		return "", fmt.Errorf("cluster has no control plane reference")
 	}
@@ -516,7 +516,7 @@ func (r *KarpenterMachinePoolReconciler) getControlPlaneVersion(ctx context.Cont
 }
 
 // createOrUpdateKarpenterResources creates or updates the Karpenter NodePool and EC2NodeClass custom resources in the workload cluster.
-func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, machinePool *capi.MachinePool, additionalTags capa.Tags, amiFamily, userData *string) error {
+func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx context.Context, logger logr.Logger, cluster *clusterv1.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, machinePool *clusterv1.MachinePool, additionalTags capa.Tags, amiFamily, userData *string) error {
 	workloadClusterClient, err := r.clusterClientGetter(ctx, "", r.client, client.ObjectKeyFromObject(cluster))
 	if err != nil {
 		return fmt.Errorf("failed to get workload cluster client: %w", err)
@@ -608,7 +608,7 @@ func mergeMaps[A comparable, B any](maps ...map[A]B) map[A]B {
 // createOrUpdateNodePool creates or updates the NodePool resource in the workload cluster.
 // NodePool defines the desired state and constraints for nodes that Karpenter should provision,
 // including resource limits, disruption policies, and node requirements.
-func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool) error {
+func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, cluster *clusterv1.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool) error {
 	nodePool := &karpv1.NodePool{}
 	nodePool.SetName(karpenterMachinePool.Name)
 	nodePool.SetNamespace("")
@@ -839,7 +839,7 @@ func toKarpenterRequirements(src []v1alpha1.NodeSelectorRequirementWithMinValues
 }
 
 // deleteKarpenterResources deletes the Karpenter NodePool and EC2NodeClass resources from the workload cluster.
-func (r *KarpenterMachinePoolReconciler) deleteKarpenterResources(ctx context.Context, logger logr.Logger, cluster *capi.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool) error {
+func (r *KarpenterMachinePoolReconciler) deleteKarpenterResources(ctx context.Context, logger logr.Logger, cluster *clusterv1.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool) error {
 	workloadClusterClient, err := r.clusterClientGetter(ctx, "", r.client, client.ObjectKeyFromObject(cluster))
 	if err != nil {
 		return fmt.Errorf("failed to get workload cluster client: %w", err)
@@ -915,7 +915,7 @@ func (r *KarpenterMachinePoolReconciler) SetupWithManager(ctx context.Context, m
 // The workers can't use a newer k8s version than the one used by the control plane.
 //
 // This implements Kubernetes version skew policy https://kubernetes.io/releases/version-skew-policy/
-func (r *KarpenterMachinePoolReconciler) IsVersionSkewAllowed(ctx context.Context, cluster *capi.Cluster, machinePool *capi.MachinePool) (bool, string, string, error) {
+func (r *KarpenterMachinePoolReconciler) IsVersionSkewAllowed(ctx context.Context, cluster *clusterv1.Cluster, machinePool *clusterv1.MachinePool) (bool, string, string, error) {
 	controlPlaneVersion, err := r.getControlPlaneVersion(ctx, cluster)
 	if err != nil {
 		return true, "", "", fmt.Errorf("failed to get current Control Plane k8s version: %w", err)

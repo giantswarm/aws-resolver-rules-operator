@@ -14,7 +14,7 @@ import (
 	"k8s.io/utils/ptr"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
 	"github.com/aws-resolver-rules-operator/controllers"
 	"github.com/aws-resolver-rules-operator/pkg/k8sclient"
@@ -34,13 +34,13 @@ var _ = Describe("ClusterClient", func() {
 
 	Describe("GetAWSCluster", func() {
 		BeforeEach(func() {
-			cluster := &capi.Cluster{
+			cluster := &clusterv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster2",
 					Namespace: namespace,
 				},
-				Spec: capi.ClusterSpec{
-					InfrastructureRef: capi.ContractVersionedObjectReference{
+				Spec: clusterv1.ClusterSpec{
+					InfrastructureRef: clusterv1.ContractVersionedObjectReference{
 						APIGroup: capa.GroupVersion.Group,
 						Kind:     "AWSCluster",
 						Name:     "test-cluster2",
@@ -98,13 +98,13 @@ var _ = Describe("ClusterClient", func() {
 
 	Describe("GetAWSManagedControlPlane", func() {
 		BeforeEach(func() {
-			cluster := &capi.Cluster{
+			cluster := &clusterv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster3",
 					Namespace: namespace,
 				},
-				Spec: capi.ClusterSpec{
-					InfrastructureRef: capi.ContractVersionedObjectReference{
+				Spec: clusterv1.ClusterSpec{
+					InfrastructureRef: clusterv1.ContractVersionedObjectReference{
 						APIGroup: capa.GroupVersion.Group,
 						Kind:     "AWSCluster",
 						Name:     "test-cluster3",
@@ -162,13 +162,13 @@ var _ = Describe("ClusterClient", func() {
 
 	Describe("GetCluster", func() {
 		BeforeEach(func() {
-			cluster := &capi.Cluster{
+			cluster := &clusterv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster2",
 					Namespace: namespace,
 				},
-				Spec: capi.ClusterSpec{
-					InfrastructureRef: capi.ContractVersionedObjectReference{
+				Spec: clusterv1.ClusterSpec{
+					InfrastructureRef: clusterv1.ContractVersionedObjectReference{
 						APIGroup: capa.GroupVersion.Group,
 						Kind:     "AWSCluster",
 						Name:     "test-cluster2",
@@ -281,16 +281,16 @@ var _ = Describe("ClusterClient", func() {
 	})
 
 	Describe("AddClusterFinalizer", func() {
-		var cluster *capi.Cluster
+		var cluster *clusterv1.Cluster
 
 		BeforeEach(func() {
-			cluster = &capi.Cluster{
+			cluster = &clusterv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster2",
 					Namespace: namespace,
 				},
-				Spec: capi.ClusterSpec{
-					InfrastructureRef: capi.ContractVersionedObjectReference{
+				Spec: clusterv1.ClusterSpec{
+					InfrastructureRef: clusterv1.ContractVersionedObjectReference{
 						APIGroup: capa.GroupVersion.Group,
 						Kind:     "AWSCluster",
 						Name:     "test-cluster2",
@@ -304,7 +304,7 @@ var _ = Describe("ClusterClient", func() {
 			err := clusterClient.AddClusterFinalizer(ctx, cluster, controllers.ResolverRulesFinalizer)
 			Expect(err).NotTo(HaveOccurred())
 
-			actualCluster := &capi.Cluster{}
+			actualCluster := &clusterv1.Cluster{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, actualCluster)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -313,13 +313,13 @@ var _ = Describe("ClusterClient", func() {
 
 		When("the cluster does not exist", func() {
 			It("returns an error", func() {
-				nonExistingCluster := &capi.Cluster{
+				nonExistingCluster := &clusterv1.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "does-not-exist",
 						Namespace: namespace,
 					},
-					Spec: capi.ClusterSpec{
-						InfrastructureRef: capi.ContractVersionedObjectReference{
+					Spec: clusterv1.ClusterSpec{
+						InfrastructureRef: clusterv1.ContractVersionedObjectReference{
 							APIGroup: capa.GroupVersion.Group,
 							Kind:     "AWSCluster",
 							Name:     "does-not-exist",
@@ -412,16 +412,16 @@ var _ = Describe("ClusterClient", func() {
 	})
 
 	Describe("RemoveClusterFinalizer", func() {
-		var cluster *capi.Cluster
+		var cluster *clusterv1.Cluster
 
 		BeforeEach(func() {
-			cluster = &capi.Cluster{
+			cluster = &clusterv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster2",
 					Namespace: namespace,
 				},
-				Spec: capi.ClusterSpec{
-					InfrastructureRef: capi.ContractVersionedObjectReference{
+				Spec: clusterv1.ClusterSpec{
+					InfrastructureRef: clusterv1.ContractVersionedObjectReference{
 						APIGroup: capa.GroupVersion.Group,
 						Kind:     "AWSCluster",
 						Name:     "test-cluster2",
@@ -435,7 +435,7 @@ var _ = Describe("ClusterClient", func() {
 			err := clusterClient.RemoveClusterFinalizer(ctx, cluster, controllers.RouteFinalizer)
 			Expect(err).NotTo(HaveOccurred())
 
-			actualCluster := &capi.Cluster{}
+			actualCluster := &clusterv1.Cluster{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, actualCluster)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -456,13 +456,13 @@ var _ = Describe("ClusterClient", func() {
 
 		When("the cluster does not exist", func() {
 			It("returns an error", func() {
-				cluster = &capi.Cluster{
+				cluster = &clusterv1.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "does-not-exist",
 						Namespace: namespace,
 					},
-					Spec: capi.ClusterSpec{
-						InfrastructureRef: capi.ContractVersionedObjectReference{
+					Spec: clusterv1.ClusterSpec{
+						InfrastructureRef: clusterv1.ContractVersionedObjectReference{
 							APIGroup: capa.GroupVersion.Group,
 							Kind:     "AWSCluster",
 							Name:     "does-not-exist",
@@ -528,16 +528,16 @@ var _ = Describe("ClusterClient", func() {
 	})
 
 	Describe("MarkConditionTrue", func() {
-		var cluster *capi.Cluster
+		var cluster *clusterv1.Cluster
 
 		BeforeEach(func() {
-			cluster = &capi.Cluster{
+			cluster = &clusterv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster2",
 					Namespace: namespace,
 				},
-				Spec: capi.ClusterSpec{
-					InfrastructureRef: capi.ContractVersionedObjectReference{
+				Spec: clusterv1.ClusterSpec{
+					InfrastructureRef: clusterv1.ContractVersionedObjectReference{
 						APIGroup: capa.GroupVersion.Group,
 						Kind:     "AWSCluster",
 						Name:     "test-cluster2",
@@ -551,12 +551,12 @@ var _ = Describe("ClusterClient", func() {
 			err := clusterClient.MarkConditionTrue(ctx, cluster, controllers.ResolverRulesAssociatedCondition)
 			Expect(err).NotTo(HaveOccurred())
 
-			actualCluster := &capi.Cluster{}
+			actualCluster := &clusterv1.Cluster{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, actualCluster)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(actualCluster.GetV1Beta1Conditions()).To(ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-				"Type":   Equal(capi.ConditionType(controllers.ResolverRulesAssociatedCondition)), //nolint:staticcheck
+				"Type":   Equal(clusterv1.ConditionType(controllers.ResolverRulesAssociatedCondition)), //nolint:staticcheck
 				"Status": Equal(v1.ConditionTrue),
 			})))
 		})
@@ -564,17 +564,17 @@ var _ = Describe("ClusterClient", func() {
 
 	Describe("Unpause", func() {
 		var awsCluster *capa.AWSCluster
-		var cluster *capi.Cluster
+		var cluster *clusterv1.Cluster
 
 		BeforeEach(func() {
 			clusterUUID := types.UID(uuid.NewString())
-			cluster = &capi.Cluster{
+			cluster = &clusterv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster2",
 					Namespace: namespace,
 					UID:       clusterUUID,
 				},
-				Spec: capi.ClusterSpec{
+				Spec: clusterv1.ClusterSpec{
 					Paused: ptr.To(true),
 				},
 			}
@@ -584,10 +584,10 @@ var _ = Describe("ClusterClient", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "test-cluster2",
 					Namespace:   namespace,
-					Annotations: map[string]string{capi.PausedAnnotation: "true"},
+					Annotations: map[string]string{clusterv1.PausedAnnotation: "true"},
 					OwnerReferences: []metav1.OwnerReference{
 						{
-							APIVersion: capi.GroupVersion.String(),
+							APIVersion: clusterv1.GroupVersion.String(),
 							Kind:       "Cluster",
 							Name:       "test-cluster2",
 							UID:        clusterUUID,
@@ -602,7 +602,7 @@ var _ = Describe("ClusterClient", func() {
 			err := clusterClient.Unpause(ctx, awsCluster, cluster)
 			Expect(err).NotTo(HaveOccurred())
 
-			actualCluster := &capi.Cluster{}
+			actualCluster := &clusterv1.Cluster{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, actualCluster)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(actualCluster.Spec.Paused).To(HaveValue(BeFalse()))
@@ -610,7 +610,7 @@ var _ = Describe("ClusterClient", func() {
 			actualAwsCluster := &capa.AWSCluster{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, actualAwsCluster)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(capi.PausedAnnotation).ShouldNot(BeKeyOf(actualAwsCluster.Annotations))
+			Expect(clusterv1.PausedAnnotation).ShouldNot(BeKeyOf(actualAwsCluster.Annotations))
 		})
 	})
 })

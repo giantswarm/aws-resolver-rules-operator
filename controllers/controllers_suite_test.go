@@ -39,7 +39,7 @@ import (
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
 	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
-	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -109,7 +109,7 @@ var _ = BeforeSuite(func() {
 	err = capa.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = capi.AddToScheme(scheme.Scheme)
+	err = clusterv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = eks.AddToScheme(scheme.Scheme)
@@ -235,7 +235,7 @@ func newSubnetSpec(id, availabilityZone string, transitGatewayTagged bool) capa.
 	return subnet
 }
 
-func newCapiCluster(name string, annotationsKeyValues ...string) *capi.Cluster {
+func newCapiCluster(name string, annotationsKeyValues ...string) *clusterv1.Cluster {
 	if len(annotationsKeyValues)%2 != 0 {
 		Fail("wrong number of arguments for newCluster. Expected even number of arguments for annotation key/value pairs")
 	}
@@ -245,14 +245,14 @@ func newCapiCluster(name string, annotationsKeyValues ...string) *capi.Cluster {
 		annotations[annotationsKeyValues[i]] = annotationsKeyValues[i+1]
 	}
 
-	awsCluster := &capi.Cluster{
+	awsCluster := &clusterv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Namespace:   namespace,
 			Annotations: annotations,
 		},
-		Spec: capi.ClusterSpec{
-			InfrastructureRef: capi.ContractVersionedObjectReference{
+		Spec: clusterv1.ClusterSpec{
+			InfrastructureRef: clusterv1.ContractVersionedObjectReference{
 				APIGroup: capa.GroupVersion.Group,
 				Kind:     "AWSCluster",
 				Name:     name,
@@ -339,7 +339,7 @@ func newEksCluster(name string, annotationsKeyValues ...string) *eks.AWSManagedC
 	return eksCluster
 }
 
-func createRandomCapaClusterWithIdentity(annotationsKeyValues ...string) (*capa.AWSClusterRoleIdentity, *capa.AWSCluster, *capi.Cluster) {
+func createRandomCapaClusterWithIdentity(annotationsKeyValues ...string) (*capa.AWSClusterRoleIdentity, *capa.AWSCluster, *clusterv1.Cluster) {
 	name := uuid.NewString()
 	awsCluster := newCapaCluster(name, annotationsKeyValues...)
 	capiCluster := newCapiCluster(name, annotationsKeyValues...)
@@ -351,7 +351,7 @@ func createRandomCapaClusterWithIdentity(annotationsKeyValues ...string) (*capa.
 	}
 
 	Expect(k8sClient.Create(context.Background(), capiCluster)).To(Succeed())
-	tests.PatchCAPIClusterStatus(k8sClient, capiCluster, capi.ClusterStatus{
+	tests.PatchCAPIClusterStatus(k8sClient, capiCluster, clusterv1.ClusterStatus{
 		Phase: "Running",
 	})
 
@@ -364,18 +364,18 @@ func createRandomCapaClusterWithIdentity(annotationsKeyValues ...string) (*capa.
 	return identity, awsCluster, capiCluster
 }
 
-func createRandomAwsManagedControlplaneWithIdentity(annotationsKeyValues ...string) (*capa.AWSClusterRoleIdentity, *eks.AWSManagedControlPlane, *capi.Cluster) {
+func createRandomAwsManagedControlplaneWithIdentity(annotationsKeyValues ...string) (*capa.AWSClusterRoleIdentity, *eks.AWSManagedControlPlane, *clusterv1.Cluster) {
 	name := uuid.NewString()
 	eksCluster := newEksCluster(name, annotationsKeyValues...)
 	capiCluster := newCapiCluster(name, annotationsKeyValues...)
 	identity := newRoleIdentity()
 
-	capiCluster.Spec.InfrastructureRef = capi.ContractVersionedObjectReference{
+	capiCluster.Spec.InfrastructureRef = clusterv1.ContractVersionedObjectReference{
 		APIGroup: capa.GroupVersion.Group,
 		Kind:     "AWSManagedCluster",
 		Name:     name,
 	}
-	capiCluster.Spec.ControlPlaneRef = capi.ContractVersionedObjectReference{
+	capiCluster.Spec.ControlPlaneRef = clusterv1.ContractVersionedObjectReference{
 		APIGroup: eks.GroupVersion.Group,
 		Kind:     "AWSManagedControlPlane",
 		Name:     name,
@@ -387,7 +387,7 @@ func createRandomAwsManagedControlplaneWithIdentity(annotationsKeyValues ...stri
 	}
 
 	Expect(k8sClient.Create(context.Background(), capiCluster)).To(Succeed())
-	tests.PatchCAPIClusterStatus(k8sClient, capiCluster, capi.ClusterStatus{
+	tests.PatchCAPIClusterStatus(k8sClient, capiCluster, clusterv1.ClusterStatus{
 		Phase: "Running",
 	})
 

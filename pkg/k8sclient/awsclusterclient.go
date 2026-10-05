@@ -8,7 +8,7 @@ import (
 	"k8s.io/utils/ptr"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
-	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util"
 	conditions "sigs.k8s.io/cluster-api/util/deprecated/v1beta1/conditions" //nolint:staticcheck
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,8 +35,8 @@ func (a *AWSClusterClient) GetAWSCluster(ctx context.Context, namespacedName typ
 	return awsCluster, errors.WithStack(err)
 }
 
-func (a *AWSClusterClient) GetCluster(ctx context.Context, namespacedName types.NamespacedName) (*capi.Cluster, error) {
-	cluster := &capi.Cluster{}
+func (a *AWSClusterClient) GetCluster(ctx context.Context, namespacedName types.NamespacedName) (*clusterv1.Cluster, error) {
+	cluster := &clusterv1.Cluster{}
 	err := a.client.Get(ctx, namespacedName, cluster)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -45,7 +45,7 @@ func (a *AWSClusterClient) GetCluster(ctx context.Context, namespacedName types.
 	return cluster, errors.WithStack(err)
 }
 
-func (a *AWSClusterClient) GetOwner(ctx context.Context, awsCluster *capa.AWSCluster) (*capi.Cluster, error) {
+func (a *AWSClusterClient) GetOwner(ctx context.Context, awsCluster *capa.AWSCluster) (*clusterv1.Cluster, error) {
 	cluster, err := util.GetOwnerCluster(ctx, a.client, awsCluster.ObjectMeta)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -86,17 +86,17 @@ func (a *AWSClusterClient) MarkConditionTrue(ctx context.Context, awsCluster *ca
 	return a.client.Status().Patch(ctx, awsCluster, client.MergeFrom(originalCluster))
 }
 
-func (a *AWSClusterClient) Unpause(ctx context.Context, awsCluster *capa.AWSCluster, cluster *capi.Cluster) error {
+func (a *AWSClusterClient) Unpause(ctx context.Context, awsCluster *capa.AWSCluster, cluster *clusterv1.Cluster) error {
 	originalCluster := cluster.DeepCopy()
 	cluster.Spec.Paused = ptr.To(false)
-	delete(cluster.Annotations, capi.PausedAnnotation)
+	delete(cluster.Annotations, clusterv1.PausedAnnotation)
 	err := a.client.Patch(ctx, cluster, client.MergeFrom(originalCluster))
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
 	originalAwsCluster := awsCluster.DeepCopy()
-	delete(awsCluster.Annotations, capi.PausedAnnotation)
+	delete(awsCluster.Annotations, clusterv1.PausedAnnotation)
 	return a.client.Patch(ctx, awsCluster, client.MergeFrom(originalAwsCluster))
 }
 

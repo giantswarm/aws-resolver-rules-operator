@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/aws-resolver-rules-operator/controllers"
@@ -31,7 +31,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 		reconciler              *controllers.DnsReconciler
 		awsCluster              *capa.AWSCluster
 		awsClusterRoleIdentity  *capa.AWSClusterRoleIdentity
-		cluster                 *capi.Cluster
+		cluster                 *clusterv1.Cluster
 		result                  ctrl.Result
 		reconcileErr            error
 		resolverClient          *resolverfakes.FakeResolverClient
@@ -97,13 +97,13 @@ var _ = Describe("Dns Zone reconciler", func() {
 				},
 			},
 		}
-		cluster = &capi.Cluster{
+		cluster = &clusterv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ClusterName,
 				Namespace: ClusterNamespace,
 			},
-			Spec: capi.ClusterSpec{
-				InfrastructureRef: capi.ContractVersionedObjectReference{
+			Spec: clusterv1.ClusterSpec{
+				InfrastructureRef: clusterv1.ContractVersionedObjectReference{
 					Kind: "AWSCluster",
 				},
 			},
@@ -159,7 +159,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 			When("the infrastructure cluster is paused", func() {
 				BeforeEach(func() {
 					awsCluster.Annotations = map[string]string{
-						capi.PausedAnnotation: "true",
+						clusterv1.PausedAnnotation: "true",
 					}
 					clusterClient.GetAWSClusterReturns(awsCluster, nil)
 				})

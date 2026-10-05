@@ -10,7 +10,7 @@ import (
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
 	capiv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
-	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/aws-resolver-rules-operator/pkg/resolver"
@@ -119,7 +119,7 @@ func getSubnetIds(subnets capa.Subnets) []string {
 	return subnetIds
 }
 
-func IsEKS(cluster capi.Cluster) bool {
+func IsEKS(cluster clusterv1.Cluster) bool {
 	return cluster.Spec.ControlPlaneRef.IsDefined() &&
 		cluster.Spec.ControlPlaneRef.Kind == "AWSManagedControlPlane"
 }
@@ -128,16 +128,16 @@ func IsEKS(cluster capi.Cluster) bool {
 type ClusterClient interface {
 	GetAWSCluster(context.Context, types.NamespacedName) (*capa.AWSCluster, error)
 	GetAWSManagedControlPlane(context.Context, types.NamespacedName) (*eks.AWSManagedControlPlane, error)
-	GetCluster(context.Context, types.NamespacedName) (*capi.Cluster, error)
+	GetCluster(context.Context, types.NamespacedName) (*clusterv1.Cluster, error)
 	AddAWSClusterFinalizer(ctx context.Context, cluster *capa.AWSCluster, finalizer string) error
 	AddAWSManagedControlPlaneFinalizer(ctx context.Context, awsManagedControlPlane *eks.AWSManagedControlPlane, finalizer string) error
-	AddClusterFinalizer(context.Context, *capi.Cluster, string) error
-	Unpause(context.Context, *capa.AWSCluster, *capi.Cluster) error
+	AddClusterFinalizer(context.Context, *clusterv1.Cluster, string) error
+	Unpause(context.Context, *capa.AWSCluster, *clusterv1.Cluster) error
 	RemoveAWSClusterFinalizer(ctx context.Context, awsCluster *capa.AWSCluster, finalizer string) error
 	RemoveAWSManagedControlPlaneFinalizer(ctx context.Context, awsManagedControlPlane *eks.AWSManagedControlPlane, finalizer string) error
-	RemoveClusterFinalizer(context.Context, *capi.Cluster, string) error
+	RemoveClusterFinalizer(context.Context, *clusterv1.Cluster, string) error
 	GetIdentity(context.Context, *capa.AWSIdentityReference) (*capa.AWSClusterRoleIdentity, error)
-	MarkConditionTrue(context.Context, *capi.Cluster, capiv1beta1.ConditionType) error
+	MarkConditionTrue(context.Context, *clusterv1.Cluster, capiv1beta1.ConditionType) error
 }
 
 // predicateToFilterAWSClusterResourceVersionChanges is a function to avoid reconciling if the event triggering the reconciliation

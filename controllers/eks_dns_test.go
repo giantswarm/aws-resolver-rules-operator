@@ -14,7 +14,7 @@ import (
 	"k8s.io/utils/ptr"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/aws-resolver-rules-operator/controllers"
@@ -31,7 +31,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 		managementClusterAWSCluster *capa.AWSCluster
 		awsManagedControlPlane      *eks.AWSManagedControlPlane
 		awsClusterRoleIdentity      *capa.AWSClusterRoleIdentity
-		eksCluster                  *capi.Cluster
+		eksCluster                  *clusterv1.Cluster
 		result                      ctrl.Result
 		reconcileErr                error
 		resolverClient              *resolverfakes.FakeResolverClient
@@ -115,13 +115,13 @@ var _ = Describe("Dns Zone reconciler", func() {
 				},
 			},
 		}
-		eksCluster = &capi.Cluster{
+		eksCluster = &clusterv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ClusterName,
 				Namespace: ClusterNamespace,
 			},
-			Spec: capi.ClusterSpec{
-				InfrastructureRef: capi.ContractVersionedObjectReference{
+			Spec: clusterv1.ClusterSpec{
+				InfrastructureRef: clusterv1.ContractVersionedObjectReference{
 					Kind: "AWSManagedCluster",
 				},
 			},
@@ -210,7 +210,7 @@ var _ = Describe("Dns Zone reconciler", func() {
 			When("the infrastructure cluster is paused", func() {
 				BeforeEach(func() {
 					awsManagedControlPlane.Annotations = map[string]string{
-						capi.PausedAnnotation: "true",
+						clusterv1.PausedAnnotation: "true",
 					}
 					clusterClient.GetAWSManagedControlPlaneReturns(awsManagedControlPlane, nil)
 				})
