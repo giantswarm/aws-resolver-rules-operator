@@ -18,7 +18,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck
 )
 
 // KarpenterMachinePoolSpec defines the desired state of KarpenterMachinePool.
@@ -49,7 +49,7 @@ type KarpenterMachinePoolStatus struct {
 
 	// Conditions defines current service state of the KarpenterMachinePool.
 	// +optional
-	Conditions capi.Conditions `json:"conditions,omitempty"`
+	Conditions clusterv1beta1.Conditions `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -82,10 +82,10 @@ func init() {
 	SchemeBuilder.Register(&KarpenterMachinePool{}, &KarpenterMachinePoolList{})
 }
 
-func (in *KarpenterMachinePool) GetConditions() capi.Conditions {
+func (in *KarpenterMachinePool) GetConditions() clusterv1beta1.Conditions {
 	return in.Status.Conditions
 }
 
-func (in *KarpenterMachinePool) SetConditions(conditions capi.Conditions) {
+func (in *KarpenterMachinePool) SetConditions(conditions clusterv1beta1.Conditions) {
 	in.Status.Conditions = conditions
 }
