@@ -138,6 +138,7 @@ type Limits v1.ResourceList
 type ConsolidationPolicy string
 
 const (
+	ConsolidationPolicyBalanced                 ConsolidationPolicy = "Balanced"
 	ConsolidationPolicyWhenEmpty                ConsolidationPolicy = "WhenEmpty"
 	ConsolidationPolicyWhenEmptyOrUnderutilized ConsolidationPolicy = "WhenEmptyOrUnderutilized"
 )
@@ -195,7 +196,7 @@ type Disruption struct {
 	// ConsolidationPolicy describes which nodes Karpenter can disrupt through its consolidation
 	// algorithm. This policy defaults to "WhenEmptyOrUnderutilized" if not specified
 	// +kubebuilder:default:="WhenEmptyOrUnderutilized"
-	// +kubebuilder:validation:Enum:={WhenEmpty,WhenEmptyOrUnderutilized}
+	// +kubebuilder:validation:Enum:={WhenEmpty,WhenEmptyOrUnderutilized,Balanced}
 	// +optional
 	ConsolidationPolicy ConsolidationPolicy `json:"consolidationPolicy,omitempty"`
 	// Budgets is a list of Budgets.
