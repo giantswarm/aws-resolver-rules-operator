@@ -1169,23 +1169,6 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 									karpenterMachinePool.Spec.NodePool.Disruption.ConsolidationPolicy = karpenterinfra.ConsolidationPolicyBalanced
 									err = k8sClient.Update(ctx, karpenterMachinePool)
 									Expect(err).NotTo(HaveOccurred())
-
-									// A dynamic NodePool left over by other specs can't become static
-									nodePool := &unstructured.Unstructured{}
-									nodePool.SetGroupVersionKind(schema.GroupVersionKind{
-										Group:   "karpenter.sh",
-										Kind:    "NodePool",
-										Version: "v1",
-									})
-									nodePool.SetName(KarpenterMachinePoolName)
-									err = k8sClient.Delete(ctx, nodePool)
-									Expect(client.IgnoreNotFound(err)).NotTo(HaveOccurred())
-
-									// Likewise, later specs can't turn the static NodePool back into a dynamic one
-									DeferCleanup(func() {
-										err := k8sClient.Delete(ctx, nodePool)
-										Expect(client.IgnoreNotFound(err)).NotTo(HaveOccurred())
-									})
 								})
 								It("sets replicas and node limit on the NodePool", func() {
 									Expect(reconcileErr).NotTo(HaveOccurred())
