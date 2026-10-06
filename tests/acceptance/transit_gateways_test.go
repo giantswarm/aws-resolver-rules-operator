@@ -16,6 +16,7 @@ import (
 	gsannotation "github.com/giantswarm/k8smetadata/pkg/annotation"
 
 	"github.com/aws-resolver-rules-operator/pkg/aws"
+	"github.com/aws-resolver-rules-operator/tests/acceptance/fixture"
 )
 
 var _ = Describe("Transit Gateways", func() {
@@ -81,7 +82,7 @@ var _ = Describe("Transit Gateways", func() {
 			Expect(err).NotTo(HaveOccurred())
 			return describeTGWattachmentOutput.TransitGatewayVpcAttachments
 		}
-		Eventually(getTGWAttachments).Should(ContainElement(MatchFields(IgnoreExtras, Fields{
+		Eventually(getTGWAttachments).WithTimeout(fixture.TransitGatewayAttachmentTimeout).Should(ContainElement(MatchFields(IgnoreExtras, Fields{
 			"State": Equal(ec2types.TransitGatewayAttachmentStateAvailable),
 		})))
 	})
