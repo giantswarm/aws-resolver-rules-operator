@@ -32,7 +32,7 @@ const (
 	ClusterVCPCIDR    = "172.64.0.0/16"
 	ClusterSubnetCIDR = "172.64.0.0/20"
 
-	// AWS keeps a new transit gateway attachment `pending` for several minutes
+	// AWS takes several minutes to create or delete a transit gateway attachment
 	TransitGatewayAttachmentTimeout = 10 * time.Minute
 )
 
@@ -339,7 +339,8 @@ func (f *Fixture) deleteCluster() error {
 		return nil
 	}
 
-	timeout := time.After(3 * time.Minute)
+	// The operator only removes its finalizer once the transit gateway is gone
+	timeout := time.After(TransitGatewayAttachmentTimeout)
 	tick := time.NewTicker(5 * time.Second)
 
 	for {
