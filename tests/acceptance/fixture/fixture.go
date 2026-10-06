@@ -14,12 +14,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
@@ -75,7 +74,7 @@ func LoadFixture(k8sClient client.Client, data Data) *Fixture {
 }
 
 type Cluster struct {
-	Cluster             *capi.Cluster
+	Cluster             *clusterv1.Cluster
 	AWSCluster          *capa.AWSCluster
 	ClusterRoleIdentity *capa.AWSClusterRoleIdentity
 }
@@ -232,17 +231,16 @@ func (f *Fixture) createCluster(network Network) Cluster {
 	err := f.K8sClient.Create(ctx, clusterRoleIdentity)
 	Expect(err).NotTo(HaveOccurred())
 
-	cluster := &capi.Cluster{
+	cluster := &clusterv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      f.config.ManagementClusterName,
 			Namespace: f.config.ManagementClusterNamespace,
 		},
-		Spec: capi.ClusterSpec{
-			InfrastructureRef: &corev1.ObjectReference{
-				APIVersion: capa.GroupVersion.String(),
-				Kind:       "AWSCluster",
-				Namespace:  f.config.ManagementClusterNamespace,
-				Name:       f.config.ManagementClusterName,
+		Spec: clusterv1.ClusterSpec{
+			InfrastructureRef: clusterv1.ContractVersionedObjectReference{
+				APIGroup: capa.GroupVersion.Group,
+				Kind:     "AWSCluster",
+				Name:     f.config.ManagementClusterName,
 			},
 		},
 	}
@@ -300,7 +298,7 @@ func (f *Fixture) loadCluster(network Network) Cluster {
 	}, clusterRoleIdentity)
 	Expect(err).NotTo(HaveOccurred())
 
-	cluster := &capi.Cluster{}
+	cluster := &clusterv1.Cluster{}
 	err = f.K8sClient.Get(ctx, types.NamespacedName{
 		Name:      f.config.ManagementClusterName,
 		Namespace: f.config.ManagementClusterNamespace,
@@ -341,7 +339,7 @@ func (f *Fixture) deleteCluster() error {
 		case <-timeout:
 			return fmt.Errorf("timeout waiting for cluster deletion")
 		case <-tick.C:
-			actualCluster := &capi.Cluster{}
+			actualCluster := &clusterv1.Cluster{}
 			err := f.K8sClient.Get(context.Background(), client.ObjectKeyFromObject(awsCluster), actualCluster)
 			if k8serrors.IsNotFound(err) {
 				return nil

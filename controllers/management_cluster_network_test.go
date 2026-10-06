@@ -14,7 +14,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -121,7 +121,7 @@ var _ = Describe("ManagementClusterTransitGatewayReconciler", func() {
 			BeforeEach(func() {
 				patchedCluster := cluster.DeepCopy()
 				patchedCluster.Annotations = map[string]string{
-					capi.PausedAnnotation: "true",
+					clusterv1.PausedAnnotation: "true",
 				}
 
 				err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))

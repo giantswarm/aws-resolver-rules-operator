@@ -22,8 +22,8 @@ import (
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
 	"github.com/pkg/errors"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
-	"sigs.k8s.io/cluster-api/util/conditions"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	conditions "sigs.k8s.io/cluster-api/util/deprecated/v1beta1/conditions" //nolint:staticcheck
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -75,7 +75,7 @@ func (r *UnpauseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return r.reconcileNormal(ctx, awsCluster, cluster)
 }
 
-func (r *UnpauseReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AWSCluster, cluster *capi.Cluster) (ctrl.Result, error) {
+func (r *UnpauseReconciler) reconcileNormal(ctx context.Context, awsCluster *capa.AWSCluster, cluster *clusterv1.Cluster) (ctrl.Result, error) {
 	if conditions.IsTrue(awsCluster, capa.VpcReadyCondition) && conditions.IsTrue(awsCluster, capa.SubnetsReadyCondition) {
 		dnsModeAnnotation := awsCluster.Annotations[gsannotations.AWSDNSMode]
 		if dnsModeAnnotation != gsannotations.DNSModePrivate {
