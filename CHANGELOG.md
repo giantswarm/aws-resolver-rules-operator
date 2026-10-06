@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.1] - 2026-09-30
+
+### Fixed
+
+- Deleting a `KarpenterMachinePool` removes its bootstrap user data `karpenter-machine-pool/<name>` from the cluster's S3 bucket once its instances are gone, so a later pool of the same name never boots from stale data.
+
+## [0.28.0] - 2026-09-29
+
+### Added
+
+- Support `KarpenterMachinePool` on EKS clusters. On EKS the cluster is described by an `AWSManagedControlPlane` instead of an `AWSCluster`, there is no `spec.s3Bucket` and no kubeadm bootstrap secret, so Karpenter renders the `nodeadm` node userdata itself from `spec.ec2NodeClass.amiFamily` (defaulting to `AL2023`) rather than getting a hand-built Ignition stub pointing at S3.
+
+## [0.27.4] - 2026-09-29
+
+### Fixed
+
+- Gracefully handle already-deleted DNS delegation
+- Fix panic on error evaluation
+
 ## [0.27.3] - 2026-09-27
 
 ### Fixed
@@ -397,7 +416,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
 
-[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.3...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.28.1...HEAD
+[0.28.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.28.0...v0.28.1
+[0.28.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.4...v0.28.0
+[0.27.4]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.3...v0.27.4
 [0.27.3]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.2...v0.27.3
 [0.27.2]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.1...v0.27.2
 [0.27.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.0...v0.27.1

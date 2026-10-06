@@ -119,4 +119,5 @@ type RouteTableClient interface {
 //counterfeiter:generate . S3Client
 type S3Client interface {
 	Put(ctx context.Context, bucket, path string, data []byte) error
+	Delete(ctx context.Context, bucket, path string) error
 }

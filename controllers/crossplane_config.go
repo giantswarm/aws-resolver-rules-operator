@@ -176,11 +176,6 @@ func (r *CrossplaneClusterConfigReconciler) Reconcile(ctx context.Context, req c
 	return r.reconcileNormal(ctx, clusterInfo)
 }
 
-func IsEKS(cluster capi.Cluster) bool {
-	return cluster.Spec.ControlPlaneRef != nil &&
-		cluster.Spec.ControlPlaneRef.Kind == "AWSManagedControlPlane"
-}
-
 func getEKSId(urlString string) (string, error) {
 	u, err := url.Parse(urlString)
 	if err != nil {
@@ -444,7 +439,7 @@ func (r *CrossplaneClusterConfigReconciler) createConfigMap(ctx context.Context,
 			Name:      fmt.Sprintf("%s-crossplane-config", clusterInfo.Name),
 			Namespace: clusterInfo.Namespace,
 			Labels: map[string]string{
-				"app.kubernetes.io/managed-by": "aws-resolver-rules-operator",
+				"app.kubernetes.io/managed-by": "aws-resolver-rules-operator", //nolint:goconst
 			},
 		},
 		Data: map[string]string{
@@ -527,7 +522,7 @@ func (r *CrossplaneClusterConfigReconciler) getProviderConfigSpec(logger logr.Lo
 	// because we use Crossplane to create the IRSA OIDC setup – to static credentials,
 	// and also to have its own IAM role instead of reusing the CAPA role.
 	// Use static credentials only if defined as non-empty. We should later make them required.
-	useStaticAWSCredentials := os.Getenv("USE_CROSSPLANE_STATIC_AWS_CREDENTIALS") == "true"
+	useStaticAWSCredentials := os.Getenv("USE_CROSSPLANE_STATIC_AWS_CREDENTIALS") == "true" //nolint:goconst
 
 	if useStaticAWSCredentials {
 		providerRole := fmt.Sprintf("giantswarm-%s-crossplane", r.ManagementClusterName)
@@ -536,13 +531,13 @@ func (r *CrossplaneClusterConfigReconciler) getProviderConfigSpec(logger logr.Lo
 			"assumeRoleChain": []map[string]any{{
 				"roleARN": fmt.Sprintf("arn:%s:iam::%s:role/%s", partition, clusterInfo.RoleArn.AccountID, providerRole),
 			}},
-			"credentials": map[string]any{
+			"credentials": map[string]any{ //nolint:goconst
 				"secretRef": map[string]any{
 					"key":       "credentials",
 					"name":      "crossplane-aws-credentials",
 					"namespace": "crossplane",
 				},
-				"source": "Secret",
+				"source": "Secret", //nolint:goconst
 			},
 		}
 	} else {

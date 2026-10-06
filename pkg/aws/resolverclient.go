@@ -221,7 +221,7 @@ func (a *AWSResolver) deleteResolverEndpoint(ctx context.Context, resolverEndpoi
 	_, err = a.client.DeleteResolverEndpoint(ctx, &route53resolver.DeleteResolverEndpointInput{ResolverEndpointId: resolverEndpoint.Id})
 	if err != nil {
 		var rnfe *types.ResourceNotFoundException
-		if errors.As(err, rnfe) {
+		if errors.As(err, &rnfe) {
 			return nil
 		}
 		return errors.WithStack(err)
