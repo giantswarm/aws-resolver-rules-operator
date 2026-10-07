@@ -144,3 +144,5 @@ replace golang.org/x/text v0.38.0 => golang.org/x/text v0.41.0
 replace github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.4 => github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.20
 
 replace github.com/aws/aws-sdk-go-v2/service/s3 v1.96.0 => github.com/aws/aws-sdk-go-v2/service/s3 v1.113.4
+
+replace github.com/yuin/goldmark v1.4.13 => github.com/yuin/goldmark v1.8.6
