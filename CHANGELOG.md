@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Update CAPA to v2.13.1, CAPI to v1.13.6, and controller-runtime to v0.23.3. The operator now reads `Cluster` and `MachinePool` through the CAPI `v1beta2` API, so the management cluster needs CAPI v1.11 or newer.
 - Update the Karpenter Go modules to v1.14.1.
+- Update the OpenTelemetry Go modules to v1.45.0 to fix CVE-2026-81870.
 
 ## [0.28.1] - 2026-09-30
 
