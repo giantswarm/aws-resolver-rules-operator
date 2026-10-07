@@ -31,6 +31,9 @@ import (
 const (
 	ClusterVCPCIDR    = "172.64.0.0/16"
 	ClusterSubnetCIDR = "172.64.0.0/20"
+
+	// AWS takes several minutes to create or delete a transit gateway attachment
+	TransitGatewayAttachmentTimeout = 10 * time.Minute
 )
 
 type Data struct {
@@ -136,13 +139,15 @@ func (f *Fixture) Teardown() error {
 		err = DeletePrefixList(f.EC2Client, prefixListID)
 		Expect(err).To(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidPrefixListID.NotFound"))))
 
-		err = DetachTransitGateway(f.EC2Client, gatewayID, f.Network.VpcID)
-		Expect(err).To(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidTransitGatewayID.NotFound"))))
+		// AWS rejects deleting a `pending` attachment
+		Eventually(func() error {
+			return DetachTransitGateway(f.EC2Client, gatewayID, f.Network.VpcID)
+		}).WithTimeout(TransitGatewayAttachmentTimeout).Should(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidTransitGatewayID.NotFound"))))
 
 		Eventually(func() error {
 			err := DeleteTransitGateway(f.EC2Client, gatewayID)
 			return err
-		}).Should(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidTransitGatewayID.NotFound"))))
+		}).WithTimeout(TransitGatewayAttachmentTimeout).Should(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidTransitGatewayID.NotFound"))))
 	}
 
 	err := DisassociateRouteTable(f.EC2Client, f.Network.AssociationID)
@@ -334,7 +339,8 @@ func (f *Fixture) deleteCluster() error {
 		return nil
 	}
 
-	timeout := time.After(3 * time.Minute)
+	// The operator only removes its finalizer once the transit gateway is gone
+	timeout := time.After(TransitGatewayAttachmentTimeout)
 	tick := time.NewTicker(5 * time.Second)
 
 	for {

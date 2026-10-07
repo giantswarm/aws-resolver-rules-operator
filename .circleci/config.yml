@@ -45,6 +45,8 @@ jobs:
     - run:
         name: Run acceptance tests
         command: CGO_ENABLED=0 make test-acceptance
+        # Ginkgo prints nothing while waiting for transit gateway attachments
+        no_output_timeout: 30m
 
 workflows:
   package-and-push-chart-on-tag:
