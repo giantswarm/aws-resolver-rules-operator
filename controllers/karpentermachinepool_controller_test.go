@@ -1153,6 +1153,43 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 									ExpectUnstructured(*ec2NodeClass, "spec", "instanceStorePolicy").To(Equal("RAID0"))
 								})
 							})
+							When("the KarpenterMachinePool sets replicas for a static NodePool", func() {
+								BeforeEach(func() {
+									karpenterMachinePool := &karpenterinfra.KarpenterMachinePool{}
+									err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: KarpenterMachinePoolName}, karpenterMachinePool)
+									Expect(err).NotTo(HaveOccurred())
+
+									// Karpenter rejects weight and limits other than `nodes` on static NodePools
+									replicas := int64(3)
+									karpenterMachinePool.Spec.NodePool.Replicas = &replicas
+									karpenterMachinePool.Spec.NodePool.Weight = nil
+									karpenterMachinePool.Spec.NodePool.Limits = map[v1.ResourceName]resource.Quantity{
+										"nodes": resource.MustParse("5"),
+									}
+									karpenterMachinePool.Spec.NodePool.Disruption.ConsolidationPolicy = karpenterinfra.ConsolidationPolicyBalanced
+									err = k8sClient.Update(ctx, karpenterMachinePool)
+									Expect(err).NotTo(HaveOccurred())
+								})
+								It("sets replicas and node limit on the NodePool", func() {
+									Expect(reconcileErr).NotTo(HaveOccurred())
+
+									nodePool := &unstructured.Unstructured{}
+									nodePool.SetGroupVersionKind(schema.GroupVersionKind{
+										Group:   "karpenter.sh",
+										Kind:    "NodePool",
+										Version: "v1",
+									})
+									err := k8sClient.Get(ctx, types.NamespacedName{Name: KarpenterMachinePoolName}, nodePool)
+									Expect(err).NotTo(HaveOccurred())
+
+									ExpectUnstructured(*nodePool, "spec", "replicas").To(BeEquivalentTo(int64(3)))
+									ExpectUnstructured(*nodePool, "spec", "limits").To(Equal(map[string]interface{}{"nodes": "5"}))
+									ExpectUnstructured(*nodePool, "spec", "disruption", "consolidationPolicy").To(BeEquivalentTo(karpenterinfra.ConsolidationPolicyBalanced))
+									_, found, err := unstructured.NestedFieldNoCopy(nodePool.Object, "spec", "weight")
+									Expect(err).NotTo(HaveOccurred())
+									Expect(found).To(BeFalse())
+								})
+							})
 							It("creates karpenter NodePool object in workload cluster", func() {
 								nodepoolList := &unstructured.UnstructuredList{}
 								nodepoolList.SetGroupVersionKind(schema.GroupVersionKind{
@@ -1171,6 +1208,9 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 								ExpectUnstructured(nodepoolList.Items[0], "spec", "limits").To(HaveKeyWithValue("cpu", "1"))
 								ExpectUnstructured(nodepoolList.Items[0], "spec", "limits").To(HaveKeyWithValue("memory", "1000Mi"))
 								ExpectUnstructured(nodepoolList.Items[0], "spec", "weight").To(BeEquivalentTo(int64(1)))
+								_, found, err := unstructured.NestedFieldNoCopy(nodepoolList.Items[0].Object, "spec", "replicas")
+								Expect(err).NotTo(HaveOccurred())
+								Expect(found).To(BeFalse())
 								ExpectUnstructured(nodepoolList.Items[0], "spec", "template", "spec", "expireAfter").To(BeEquivalentTo("24h"))
 								ExpectUnstructured(nodepoolList.Items[0], "spec", "template", "spec", "terminationGracePeriod").To(BeEquivalentTo("30s"))
 								ExpectUnstructured(nodepoolList.Items[0], "spec", "template", "spec", "startupTaints").To(BeEquivalentTo([]interface{}{

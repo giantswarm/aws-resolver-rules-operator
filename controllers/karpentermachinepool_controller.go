@@ -646,6 +646,10 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateNodePool(ctx context.Cont
 				spec.Weight = karpenterMachinePool.Spec.NodePool.Weight
 			}
 
+			if karpenterMachinePool.Spec.NodePool.Replicas != nil {
+				spec.Replicas = karpenterMachinePool.Spec.NodePool.Replicas
+			}
+
 			spec.Template.Labels = karpenterMachinePool.Spec.NodePool.Template.Labels
 
 			spec.Template.Spec.Taints = karpenterMachinePool.Spec.NodePool.Template.Spec.Taints

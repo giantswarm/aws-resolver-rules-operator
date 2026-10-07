@@ -754,6 +754,14 @@ spec:
                       x-kubernetes-int-or-string: true
                     description: Limits define a set of bounds for provisioning capacity.
                     type: object
+                  replicas:
+                    description: |-
+                      Replicas makes the NodePool static: Karpenter keeps exactly this number of nodes instead of
+                      scaling with pod demand. Requires the alpha `StaticCapacity` feature gate in Karpenter. Only
+                      `limits.nodes` and no `weight` are allowed with it, and it cannot be added or removed after creation.
+                    format: int64
+                    minimum: 0
+                    type: integer
                   template:
                     description: |-
                       Template contains the template of possibilities for the provisioning logic to launch a NodeClaim with.
