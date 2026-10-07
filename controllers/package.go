@@ -18,7 +18,6 @@ import (
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
-//go:generate go run ../hack/importalias -alias sigs.k8s.io/cluster-api/api/core/v1beta1=clusterv1beta1 -alias sigs.k8s.io/cluster-api/api/core/v1beta2=clusterv1 ./controllersfakes
 
 const (
 	DnsFinalizer = "capa-operator.finalizers.giantswarm.io/dns-controller"

@@ -31,6 +31,9 @@ import (
 const (
 	ClusterVCPCIDR    = "172.64.0.0/16"
 	ClusterSubnetCIDR = "172.64.0.0/20"
+
+	// AWS takes several minutes to create or delete a transit gateway attachment
+	TransitGatewayAttachmentTimeout = 10 * time.Minute
 )
 
 type Data struct {
@@ -113,36 +116,41 @@ func (f *Fixture) Setup() error {
 }
 
 func (f *Fixture) Teardown() error {
-	actualCluster := &capa.AWSCluster{}
-	err := f.K8sClient.Get(context.Background(), client.ObjectKeyFromObject(f.ManagementCluster.Cluster), actualCluster)
-	Expect(err).NotTo(HaveOccurred())
+	// `Setup` may have failed before creating the cluster
+	if f.ManagementCluster.Cluster != nil {
+		actualCluster := &capa.AWSCluster{}
+		err := f.K8sClient.Get(context.Background(), client.ObjectKeyFromObject(f.ManagementCluster.Cluster), actualCluster)
+		Expect(err).NotTo(HaveOccurred())
 
-	err = f.deleteCluster()
-	if err != nil {
-		defer ginkgo.Fail(fmt.Sprintf("failed to delete cluster: %v", err))
+		err = f.deleteCluster()
+		if err != nil {
+			defer ginkgo.Fail(fmt.Sprintf("failed to delete cluster: %v", err))
+		}
+
+		err = DeleteKubernetesObject(f.K8sClient, f.ManagementCluster.ClusterRoleIdentity)
+		Expect(err).NotTo(HaveOccurred())
+
+		transitGatewayAnnotation := annotations.GetNetworkTopologyTransitGateway(actualCluster)
+		prefixListAnnotation := annotations.GetNetworkTopologyPrefixList(actualCluster)
+
+		gatewayID := getARNID(transitGatewayAnnotation)
+		prefixListID := getARNID(prefixListAnnotation)
+
+		err = DeletePrefixList(f.EC2Client, prefixListID)
+		Expect(err).To(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidPrefixListID.NotFound"))))
+
+		// AWS rejects deleting a `pending` attachment
+		Eventually(func() error {
+			return DetachTransitGateway(f.EC2Client, gatewayID, f.Network.VpcID)
+		}).WithTimeout(TransitGatewayAttachmentTimeout).Should(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidTransitGatewayID.NotFound"))))
+
+		Eventually(func() error {
+			err := DeleteTransitGateway(f.EC2Client, gatewayID)
+			return err
+		}).WithTimeout(TransitGatewayAttachmentTimeout).Should(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidTransitGatewayID.NotFound"))))
 	}
 
-	err = DeleteKubernetesObject(f.K8sClient, f.ManagementCluster.ClusterRoleIdentity)
-	Expect(err).NotTo(HaveOccurred())
-
-	transitGatewayAnnotation := annotations.GetNetworkTopologyTransitGateway(actualCluster)
-	prefixListAnnotation := annotations.GetNetworkTopologyPrefixList(actualCluster)
-
-	gatewayID := getARNID(transitGatewayAnnotation)
-	prefixListID := getARNID(prefixListAnnotation)
-
-	err = DeletePrefixList(f.EC2Client, prefixListID)
-	Expect(err).To(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidPrefixListID.NotFound"))))
-
-	err = DetachTransitGateway(f.EC2Client, gatewayID, f.Network.VpcID)
-	Expect(err).To(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidTransitGatewayID.NotFound"))))
-
-	Eventually(func() error {
-		err := DeleteTransitGateway(f.EC2Client, gatewayID)
-		return err
-	}).Should(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidTransitGatewayID.NotFound"))))
-
-	err = DisassociateRouteTable(f.EC2Client, f.Network.AssociationID)
+	err := DisassociateRouteTable(f.EC2Client, f.Network.AssociationID)
 	Expect(err).To(SatisfyAny(BeNil(), MatchError(ContainSubstring("InvalidRouteTableAssociationID.NotFound"))))
 
 	err = DeleteRouteTable(f.EC2Client, f.Network.RouteTableID)
@@ -331,7 +339,8 @@ func (f *Fixture) deleteCluster() error {
 		return nil
 	}
 
-	timeout := time.After(3 * time.Minute)
+	// The operator only removes its finalizer once the transit gateway is gone
+	timeout := time.After(TransitGatewayAttachmentTimeout)
 	tick := time.NewTicker(5 * time.Second)
 
 	for {
