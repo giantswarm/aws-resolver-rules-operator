@@ -150,6 +150,10 @@ var _ = AfterEach(func() {
 	namespaceObj := &corev1.Namespace{}
 	namespaceObj.Name = namespace
 	Expect(k8sClient.Delete(context.Background(), namespaceObj)).To(Succeed())
+
+	// Cluster-scoped, so deleting the namespace doesn't remove them
+	Expect(k8sClient.DeleteAllOf(context.Background(), &karpv1.NodePool{})).To(Succeed())
+	Expect(k8sClient.DeleteAllOf(context.Background(), &karpawsv1.EC2NodeClass{})).To(Succeed())
 })
 
 func newCluster(name string, annotationsKeyValues ...string) *capa.AWSCluster {
