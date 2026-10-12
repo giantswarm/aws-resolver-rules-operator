@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-10-12
+
 ### Added
 
 - Add `spec.nodePool.replicas` to `KarpenterMachinePool` and pass it to the Karpenter `NodePool`, so a node pool can be static with a fixed number of nodes. This needs the alpha `StaticCapacity` feature gate in Karpenter.
@@ -425,7 +427,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
 
-[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.28.1...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.29.0...HEAD
+[0.29.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.28.1...v0.29.0
 [0.28.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.28.0...v0.28.1
 [0.28.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.4...v0.28.0
 [0.27.4]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.3...v0.27.4
