@@ -38,7 +38,7 @@ require (
 	sigs.k8s.io/cluster-api v1.13.6
 	sigs.k8s.io/cluster-api-provider-aws/v2 v2.13.1
 	sigs.k8s.io/controller-runtime v0.23.3
-	sigs.k8s.io/karpenter v1.14.1
+	sigs.k8s.io/karpenter v1.15.0
 	sigs.k8s.io/yaml v1.6.0
 )
 
