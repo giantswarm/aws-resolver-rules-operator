@@ -35,7 +35,7 @@ create-acceptance-cluster: kind
 
 .PHONY: install-cluster-api
 install-cluster-api: clusterctl
-	AWS_B64ENCODED_CREDENTIALS="" GOPROXY="off" $(CLUSTERCTL) init --kubeconfig "$(KUBECONFIG)" --infrastructure=aws:v2.3.0 --wait-providers || true
+	AWS_B64ENCODED_CREDENTIALS="" GOPROXY="off" $(CLUSTERCTL) init --kubeconfig "$(KUBECONFIG)" --infrastructure=aws:v2.13.1 --wait-providers || true
 
 .PHONY: deploy-acceptance-cluster
 deploy-acceptance-cluster: docker-build create-acceptance-cluster install-cluster-api deploy
@@ -150,7 +150,7 @@ $(DOCKER_COMPOSE): ## Download docker-compose locally if necessary.
 	chmod +x $(DOCKER_COMPOSE)
 
 # Keep this in sync with the `sigs.k8s.io/cluster-api` version in `go.mod`
-CLUSTERCTL_VERSION ?= v1.10.2
+CLUSTERCTL_VERSION ?= v1.13.6
 
 CLUSTERCTL = $(shell pwd)/bin/clusterctl-$(CLUSTERCTL_VERSION)
 

@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	eks "sigs.k8s.io/cluster-api-provider-aws/v2/controlplane/eks/api/v1beta2"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -30,7 +30,7 @@ var _ = Describe("CrossplaneClusterConfigMapReconcilerEKS", func() {
 		accountID              string
 		identity               *capa.AWSClusterRoleIdentity
 		awsManagedControlplane *eks.AWSManagedControlPlane
-		cluster                *capi.Cluster
+		cluster                *clusterv1.Cluster
 
 		request    ctrl.Request
 		reconciler *controllers.CrossplaneClusterConfigReconciler
