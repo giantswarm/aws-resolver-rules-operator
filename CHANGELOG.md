@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- CI: no approval job holds a pull request's checks open. Integration tests run on every branch, and acceptance tests run in a pipeline triggered with the `run-acceptance-tests` parameter.
+
+### Fixed
+
+- The `helm.sh/chart` label is valid for long chart versions: the 63-character cut trims the whole trailing run of `-`, `.` and `_`.
+
 ## [0.29.0] - 2026-10-12
 
 ### Added

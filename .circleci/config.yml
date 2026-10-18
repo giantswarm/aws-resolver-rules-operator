@@ -2,6 +2,12 @@ version: 2.1
 orbs:
   architect: giantswarm/architect@10.10.0
 
+parameters:
+  # Acceptance tests create AWS resources: trigger a pipeline with this parameter to run them.
+  run-acceptance-tests:
+    type: boolean
+    default: false
+
 jobs:
   unit-tests:
     executor: architect/architect
@@ -56,15 +62,10 @@ workflows:
           tags:
             only: /^v.*/
 
-    - hold:
-        type: approval
-        requires:
-        - unit-tests
-
     - integration-tests:
         context: architect
         requires:
-        - hold
+        - unit-tests
         filters:
           tags:
             only: /^v.*/
@@ -74,15 +75,6 @@ workflows:
         name: go-build
         binary: aws-resolver-rules-operator
         resource_class: xlarge
-        filters:
-          tags:
-            only: /^v.*/
-
-    - acceptance-tests:
-        context: architect
-        requires:
-        - hold
-        - go-build
         filters:
           tags:
             only: /^v.*/
@@ -120,3 +112,17 @@ workflows:
             ignore:
             - main
             - master
+
+  acceptance-tests:
+    when: << pipeline.parameters.run-acceptance-tests >>
+    jobs:
+    - architect/go-build:
+        context: architect
+        name: go-build
+        binary: aws-resolver-rules-operator
+        resource_class: xlarge
+
+    - acceptance-tests:
+        context: architect
+        requires:
+        - go-build
