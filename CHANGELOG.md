@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- CI: no approval job holds a pull request's checks open. Integration tests run on every branch, and acceptance tests run in a pipeline triggered with the `run-acceptance-tests` parameter.
+
+### Fixed
+
+- The `helm.sh/chart` label is valid for long chart versions: the 63-character cut trims the whole trailing run of `-`, `.` and `_`.
+
 ## [0.29.0] - 2026-10-12
 
 ### Added
@@ -42,7 +50,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- The `helm.sh/chart` label is valid for long chart versions: the 63-character cut trims the whole trailing run of `-`, `.` and `_`.
 - Carry `spec.ec2NodeClass.instanceStorePolicy` of the `KarpenterMachinePool` to the `EC2NodeClass`, so Karpenter counts the instance store as the node's ephemeral storage.
 - Write the wildcard CNAME record of a workload cluster zone only while its target has a DNS record, and delete it once the target is gone. A wildcard whose target has no record resolves to itself, so every name without a record of its own answered SERVFAIL, e.g. after the ingress controller was removed and no `network.giantswarm.io/wildcard-cname-target` was set.
 
