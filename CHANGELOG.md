@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.1] - 2026-10-18
+
 ### Changed
 
 - CI: no approval job holds a pull request's checks open. Integration tests run on every branch, and acceptance tests run in a pipeline triggered with the `run-acceptance-tests` parameter.
@@ -435,7 +437,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
 
-[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.29.0...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.29.1...HEAD
+[0.29.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.29.0...v0.29.1
 [0.29.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.28.1...v0.29.0
 [0.28.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.28.0...v0.28.1
 [0.28.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.27.4...v0.28.0
