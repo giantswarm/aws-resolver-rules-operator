@@ -78,8 +78,8 @@ github.com/aws/karpenter-provider-aws v1.14.1 h1:WGtIQTQcxpElYMdWfWuPwaF2+9muR+h
 github.com/aws/karpenter-provider-aws v1.14.1/go.mod h1:CwiZs59GJgelgcBxVd3kqAmbysxCvOhyE16r6r6PYwY=
 github.com/aws/smithy-go v1.28.6 h1:Pj+/sUviNYjow8ELRtNwKHZ9ECeF+7pATX3+shjLIrw=
 github.com/aws/smithy-go v1.28.6/go.mod h1:YE2RhdIuDbA5E5bTdciG9KrW3+TiEONeUWCqxX9i1Fc=
-github.com/aws/smithy-go/metrics/smithyotelmetrics v1.0.33 h1:bmETxIXi6zUdwxCP+hqyG8Wx+BIeGTE8Dwblo5etOy0=
-github.com/aws/smithy-go/metrics/smithyotelmetrics v1.0.33/go.mod h1:3f+aIb0EMYnrkzDA8pjnZGL7BhigFy0qqoMJuH3kJDA=
+github.com/aws/smithy-go/metrics/smithyotelmetrics v1.0.34 h1:qWQz3zAhFtv1VNzxOO61LjWshHjs4Rqf5FLpuF9Lxyc=
+github.com/aws/smithy-go/metrics/smithyotelmetrics v1.0.34/go.mod h1:5+DNJuA/F0WnslZYQj4POD3x572DfLKB/ok/52Jn1RQ=
 github.com/awslabs/amazon-eks-ami/nodeadm v0.0.0-20240229193347-cfab22a10647 h1:8yRBVsjGmI7qQsPWtIrbWP+XfwHO9Wq7gdLVzjqiZFs=
 github.com/awslabs/amazon-eks-ami/nodeadm v0.0.0-20240229193347-cfab22a10647/go.mod h1:9NafTAUHL0FlMeL6Cu5PXnMZ1q/LnC9X2emLXHsVbM8=
 github.com/awslabs/operatorpkg v0.0.0-20260708223819-4da4c353c5fa h1:SM2D/TaMO79MaSpBvRLm2Ed/SKbGCxuckRJBDDCGUck=
