@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- CI: the localstack integration tests pull `gsoci.azurecr.io/giantswarm/localstack:v2.2.0-gsdev2` instead of the quay.io copy, which no longer pulls since the quay.io org was removed.
+
 ## [0.29.1] - 2026-10-18
 
 ### Changed
