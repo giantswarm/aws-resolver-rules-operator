@@ -1,5 +1,8 @@
 version: 2
 linters:
+  enable:
+    - gosec
+    - goconst
   exclusions:
     rules:
     - path: _test\.go
