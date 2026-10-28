@@ -13,7 +13,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.5
 	github.com/aws/aws-sdk-go-v2/service/sts v1.51.5
 	github.com/aws/karpenter-provider-aws v1.14.1
-	github.com/aws/smithy-go v1.28.6
+	github.com/aws/smithy-go v1.28.7
 	github.com/aws/smithy-go/metrics/smithyotelmetrics v1.0.34
 	github.com/blang/semver/v4 v4.0.0
 	github.com/giantswarm/k8smetadata v0.26.0
