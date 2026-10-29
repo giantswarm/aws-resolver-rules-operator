@@ -1,6 +1,6 @@
 version: 2.1
 orbs:
-  architect: giantswarm/architect@10.10.0
+  architect: giantswarm/architect@10.16.7
 
 parameters:
   # Acceptance tests create AWS resources: trigger a pipeline with this parameter to run them.
