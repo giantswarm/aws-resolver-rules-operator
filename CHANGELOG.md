@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- CI: architect orb 10.16.7. It signs the image again when a Rekor entry already exists but the registry has no signature, which failed `push-to-registries` on 10.10.0, and it pushes the chart to the git catalogs with the architect GitHub App instead of the `catalogbot` account. A nancy scan the Sonatype API refuses no longer fails `go-build`: it prints `NOT SCANNED:` and records a failed JUnit test.
+
 ### Fixed
 
 - Bump `golang.org/x/net` to v0.62.0 for CVE-2026-97045 and CVE-2026-78661, which fail the nancy scan.
