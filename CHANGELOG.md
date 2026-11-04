@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- CI: architect orb 10.16.7, which pushes the chart to the git app catalogs with the architect GitHub App instead of the `catalogbot` account (giantswarm/giantswarm#34786).
 - Update CAPA to v2.13.1, CAPI to v1.13.6, and controller-runtime to v0.23.3. The operator now reads `Cluster` and `MachinePool` through the CAPI `v1beta2` API, so the management cluster needs CAPI v1.11 or newer.
 - Update the Karpenter Go modules to v1.14.1.
 
