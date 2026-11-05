@@ -259,6 +259,8 @@ var _ = Describe("ClusterClient", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "does-not-exist",
 						Namespace: namespace,
+						// Not read from the API, so it needs a resource version for the optimistic lock.
+						ResourceVersion: "1",
 					},
 				}
 				err := clusterClient.AddAWSClusterFinalizer(ctx, nonExistingAWSCluster, controllers.ResolverRulesFinalizer)
@@ -317,6 +319,8 @@ var _ = Describe("ClusterClient", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "does-not-exist",
 						Namespace: namespace,
+						// Not read from the API, so it needs a resource version for the optimistic lock.
+						ResourceVersion: "1",
 					},
 					Spec: clusterv1.ClusterSpec{
 						InfrastructureRef: clusterv1.ContractVersionedObjectReference{
@@ -384,12 +388,38 @@ var _ = Describe("ClusterClient", func() {
 			})
 		})
 
+		When("another controller removed its finalizer after the cluster was read", func() {
+			const otherFinalizer = "other-operator.finalizers.giantswarm.io/test"
+
+			BeforeEach(func() {
+				awsCluster.Finalizers = append(awsCluster.Finalizers, otherFinalizer)
+				Expect(k8sClient.Update(ctx, awsCluster)).To(Succeed())
+
+				latest := &capa.AWSCluster{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: awsCluster.Name, Namespace: awsCluster.Namespace}, latest)).To(Succeed())
+				latest.Finalizers = []string{controllers.ResolverRulesFinalizer}
+				Expect(k8sClient.Update(ctx, latest)).To(Succeed())
+			})
+
+			It("returns a conflict and does not add the other finalizer back", func() {
+				err := clusterClient.RemoveAWSClusterFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
+				Expect(k8serrors.IsConflict(err)).To(BeTrue())
+
+				actualCluster := &capa.AWSCluster{}
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: awsCluster.Name, Namespace: awsCluster.Namespace}, actualCluster)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(actualCluster.Finalizers).To(ConsistOf(controllers.ResolverRulesFinalizer))
+			})
+		})
+
 		When("the cluster does not exist", func() {
 			It("returns an error", func() {
 				awsCluster = &capa.AWSCluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "does-not-exist",
 						Namespace: namespace,
+						// Not read from the API, so it needs a resource version for the optimistic lock.
+						ResourceVersion: "1",
 					},
 				}
 				err := clusterClient.RemoveAWSClusterFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
@@ -460,6 +490,8 @@ var _ = Describe("ClusterClient", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "does-not-exist",
 						Namespace: namespace,
+						// Not read from the API, so it needs a resource version for the optimistic lock.
+						ResourceVersion: "1",
 					},
 					Spec: clusterv1.ClusterSpec{
 						InfrastructureRef: clusterv1.ContractVersionedObjectReference{
