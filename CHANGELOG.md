@@ -14,8 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- CI: architect orb 10.16.7, which pushes the chart to the git app catalogs with the architect GitHub App instead of the `catalogbot` account (giantswarm/giantswarm#34786).
 - Update CAPA to v2.13.1, CAPI to v1.13.6, and controller-runtime to v0.23.3. The operator now reads `Cluster` and `MachinePool` through the CAPI `v1beta2` API, so the management cluster needs CAPI v1.11 or newer.
 - Update the Karpenter Go modules to v1.14.1.
+
+### Security
+
+- Update `golang.org/x/net` to v0.62.0 and the `github.com/go-openapi/swag` modules to v0.27.1 (with `go-openapi/jsonpointer` v1.0.0) to fix the CVEs nancy reports.
+
+### Fixed
+
+- CI: the localstack integration tests pull `gsoci.azurecr.io/giantswarm/localstack:v2.2.0-gsdev2` instead of the quay.io copy, which no longer pulls (backport of #509).
 
 ## [0.28.1] - 2026-09-30
 
