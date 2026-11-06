@@ -95,6 +95,16 @@ workflows:
             ignore:
             - main
             - master
+    - architect/sync-china-registry:
+        context: architect
+        name: sync-china-registry
+        requires:
+        - push-to-registries
+        filters:
+          tags:
+            only: /^v.*/
+          branches:
+            ignore: /.*/
     - architect/push-to-app-catalog:
         context: architect
         executor: app-build-suite
