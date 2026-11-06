@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Use optimistic locking when adding or removing finalizers, so a patch built from an outdated object fails with a conflict instead of adding back finalizers other controllers have removed.
 - CI: mirror release images to the China registry with `sync-china-registry`.
 - Bump `golang.org/x/net` to v0.62.0 for CVE-2026-97045 and CVE-2026-78661, which fail the nancy scan.
 - CI: the localstack integration tests pull `gsoci.azurecr.io/giantswarm/localstack:v2.2.0-gsdev2` instead of the quay.io copy, which no longer pulls since the quay.io org was removed.

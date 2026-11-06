@@ -59,7 +59,7 @@ func (a *ClusterClient) AddAWSClusterFinalizer(ctx context.Context, awsCluster *
 	originalCluster := awsCluster.DeepCopy()
 	updated := controllerutil.AddFinalizer(awsCluster, finalizer)
 	if updated {
-		return a.client.Patch(ctx, awsCluster, client.MergeFrom(originalCluster))
+		return a.client.Patch(ctx, awsCluster, client.MergeFromWithOptions(originalCluster, client.MergeFromWithOptimisticLock{}))
 	}
 
 	return nil
@@ -68,7 +68,7 @@ func (a *ClusterClient) AddAWSManagedControlPlaneFinalizer(ctx context.Context, 
 	originalCluster := awsManagedControlPlane.DeepCopy()
 	updated := controllerutil.AddFinalizer(awsManagedControlPlane, finalizer)
 	if updated {
-		return a.client.Patch(ctx, awsManagedControlPlane, client.MergeFrom(originalCluster))
+		return a.client.Patch(ctx, awsManagedControlPlane, client.MergeFromWithOptions(originalCluster, client.MergeFromWithOptimisticLock{}))
 	}
 
 	return nil
@@ -78,7 +78,7 @@ func (a *ClusterClient) AddClusterFinalizer(ctx context.Context, cluster *cluste
 	originalCluster := cluster.DeepCopy()
 	updated := controllerutil.AddFinalizer(cluster, finalizer)
 	if updated {
-		return a.client.Patch(ctx, cluster, client.MergeFrom(originalCluster))
+		return a.client.Patch(ctx, cluster, client.MergeFromWithOptions(originalCluster, client.MergeFromWithOptimisticLock{}))
 	}
 
 	return nil
@@ -87,19 +87,19 @@ func (a *ClusterClient) AddClusterFinalizer(ctx context.Context, cluster *cluste
 func (a *ClusterClient) RemoveAWSClusterFinalizer(ctx context.Context, awsCluster *capa.AWSCluster, finalizer string) error {
 	originalCluster := awsCluster.DeepCopy()
 	controllerutil.RemoveFinalizer(awsCluster, finalizer)
-	return a.client.Patch(ctx, awsCluster, client.MergeFrom(originalCluster))
+	return a.client.Patch(ctx, awsCluster, client.MergeFromWithOptions(originalCluster, client.MergeFromWithOptimisticLock{}))
 }
 
 func (a *ClusterClient) RemoveAWSManagedControlPlaneFinalizer(ctx context.Context, awsManagedControlPlane *eks.AWSManagedControlPlane, finalizer string) error {
 	originalCluster := awsManagedControlPlane.DeepCopy()
 	controllerutil.RemoveFinalizer(awsManagedControlPlane, finalizer)
-	return a.client.Patch(ctx, awsManagedControlPlane, client.MergeFrom(originalCluster))
+	return a.client.Patch(ctx, awsManagedControlPlane, client.MergeFromWithOptions(originalCluster, client.MergeFromWithOptimisticLock{}))
 }
 
 func (a *ClusterClient) RemoveClusterFinalizer(ctx context.Context, cluster *clusterv1.Cluster, finalizer string) error {
 	originalCluster := cluster.DeepCopy()
 	controllerutil.RemoveFinalizer(cluster, finalizer)
-	return a.client.Patch(ctx, cluster, client.MergeFrom(originalCluster))
+	return a.client.Patch(ctx, cluster, client.MergeFromWithOptions(originalCluster, client.MergeFromWithOptimisticLock{}))
 }
 
 func (a *ClusterClient) GetIdentity(ctx context.Context, identityRef *capa.AWSIdentityReference) (*capa.AWSClusterRoleIdentity, error) {

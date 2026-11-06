@@ -392,7 +392,7 @@ func (r *CrossplaneClusterConfigReconciler) reconcileDelete(ctx context.Context,
 func (r *CrossplaneClusterConfigReconciler) AddFinalizer(ctx context.Context, cluster *clusterv1.Cluster) error {
 	originalCluster := cluster.DeepCopy()
 	controllerutil.AddFinalizer(cluster, Finalizer)
-	return r.Client.Patch(ctx, cluster, client.MergeFrom(originalCluster))
+	return r.Client.Patch(ctx, cluster, client.MergeFromWithOptions(originalCluster, client.MergeFromWithOptimisticLock{}))
 }
 
 func (r *CrossplaneClusterConfigReconciler) RemoveFinalizer(ctx context.Context, cluster *clusterv1.Cluster) error {
@@ -409,7 +409,7 @@ func (r *CrossplaneClusterConfigReconciler) RemoveFinalizer(ctx context.Context,
 	if err == nil {
 		originalAWSCluster := awsCluster.DeepCopy()
 		controllerutil.RemoveFinalizer(awsCluster, Finalizer)
-		err = r.Client.Patch(ctx, awsCluster, client.MergeFrom(originalAWSCluster))
+		err = r.Client.Patch(ctx, awsCluster, client.MergeFromWithOptions(originalAWSCluster, client.MergeFromWithOptimisticLock{}))
 		if err != nil {
 			return err
 		}
@@ -417,7 +417,7 @@ func (r *CrossplaneClusterConfigReconciler) RemoveFinalizer(ctx context.Context,
 
 	originalCluster := cluster.DeepCopy()
 	controllerutil.RemoveFinalizer(cluster, Finalizer)
-	err = r.Client.Patch(ctx, cluster, client.MergeFrom(originalCluster))
+	err = r.Client.Patch(ctx, cluster, client.MergeFromWithOptions(originalCluster, client.MergeFromWithOptimisticLock{}))
 	if err != nil {
 		return err
 	}
