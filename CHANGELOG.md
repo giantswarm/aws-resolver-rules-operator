@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Update `golang.org/x/net` to v0.62.0 and the `github.com/go-openapi/swag` modules to v0.27.1 (with `go-openapi/jsonpointer` v1.0.0) to fix the CVEs nancy reports.
 
+### Fixed
+
+- CI: the localstack integration tests pull `gsoci.azurecr.io/giantswarm/localstack:v2.2.0-gsdev2` instead of the quay.io copy, which no longer pulls (backport of #509).
+
 ## [0.28.1] - 2026-09-30
 
 ### Fixed
