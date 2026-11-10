@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-11-10
+
 ### Changed
 
 - CI: architect orb 10.16.7. It signs the image again when a Rekor entry already exists but the registry has no signature, which failed `push-to-registries` on 10.10.0, and it pushes the chart to the git catalogs with the architect GitHub App instead of the `catalogbot` account. A nancy scan the Sonatype API refuses no longer fails `go-build`: it prints `NOT SCANNED:` and records a failed JUnit test.
@@ -448,7 +450,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
 
-[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.29.1...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.30.0...HEAD
+[0.30.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.29.1...v0.30.0
 [0.29.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.29.0...v0.29.1
 [0.29.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.28.1...v0.29.0
 [0.28.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.28.0...v0.28.1
