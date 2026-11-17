@@ -11,8 +11,12 @@ import (
 type FakeRouteTableClient struct {
 	AddRoutesStub        func(context.Context, resolver.RouteRule, resolver.Filter) error
 	addRoutesMutex       sync.RWMutex
-	addRoutesArgsForCall []FakeRouteTableClientAddRoutesArgs
-	addRoutesReturns     struct {
+	addRoutesArgsForCall []struct {
+		arg1 context.Context
+		arg2 resolver.RouteRule
+		arg3 resolver.Filter
+	}
+	addRoutesReturns struct {
 		result1 error
 	}
 	addRoutesReturnsOnCall map[int]struct {
@@ -20,44 +24,32 @@ type FakeRouteTableClient struct {
 	}
 	RemoveRoutesStub        func(context.Context, resolver.RouteRule, resolver.Filter) error
 	removeRoutesMutex       sync.RWMutex
-	removeRoutesArgsForCall []FakeRouteTableClientRemoveRoutesArgs
-	removeRoutesReturns     struct {
+	removeRoutesArgsForCall []struct {
+		arg1 context.Context
+		arg2 resolver.RouteRule
+		arg3 resolver.Filter
+	}
+	removeRoutesReturns struct {
 		result1 error
 	}
 	removeRoutesReturnsOnCall map[int]struct {
 		result1 error
 	}
 	invocations      map[string][][]interface{}
-	callOrder        []string
 	invocationsMutex sync.RWMutex
 }
 
-// FakeRouteTableClientAddRoutesArgs holds the arguments of one call to AddRoutes.
-type FakeRouteTableClientAddRoutesArgs struct {
-	Arg1 context.Context
-	Arg2 resolver.RouteRule
-	Arg3 resolver.Filter
-}
-
-// FakeRouteTableClientRemoveRoutesArgs holds the arguments of one call to RemoveRoutes.
-type FakeRouteTableClientRemoveRoutesArgs struct {
-	Arg1 context.Context
-	Arg2 resolver.RouteRule
-	Arg3 resolver.Filter
-}
-
 func (fake *FakeRouteTableClient) AddRoutes(arg1 context.Context, arg2 resolver.RouteRule, arg3 resolver.Filter) error {
-	var arg3Copy resolver.Filter
-	if arg3 != nil {
-		arg3Copy = make(resolver.Filter, len(arg3))
-		copy(arg3Copy, arg3)
-	}
 	fake.addRoutesMutex.Lock()
 	ret, specificReturn := fake.addRoutesReturnsOnCall[len(fake.addRoutesArgsForCall)]
-	fake.addRoutesArgsForCall = append(fake.addRoutesArgsForCall, FakeRouteTableClientAddRoutesArgs{arg1, arg2, arg3Copy})
+	fake.addRoutesArgsForCall = append(fake.addRoutesArgsForCall, struct {
+		arg1 context.Context
+		arg2 resolver.RouteRule
+		arg3 resolver.Filter
+	}{arg1, arg2, arg3})
 	stub := fake.AddRoutesStub
 	fakeReturns := fake.addRoutesReturns
-	fake.recordInvocation("AddRoutes", []interface{}{arg1, arg2, arg3Copy})
+	fake.recordInvocation("AddRoutes", []interface{}{arg1, arg2, arg3})
 	fake.addRoutesMutex.Unlock()
 	if stub != nil {
 		return stub(arg1, arg2, arg3)
@@ -84,15 +76,7 @@ func (fake *FakeRouteTableClient) AddRoutesArgsForCall(i int) (context.Context, 
 	fake.addRoutesMutex.RLock()
 	defer fake.addRoutesMutex.RUnlock()
 	argsForCall := fake.addRoutesArgsForCall[i]
-	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3
-}
-
-func (fake *FakeRouteTableClient) AddRoutesArgs() []FakeRouteTableClientAddRoutesArgs {
-	fake.addRoutesMutex.RLock()
-	defer fake.addRoutesMutex.RUnlock()
-	args := make([]FakeRouteTableClientAddRoutesArgs, len(fake.addRoutesArgsForCall))
-	copy(args, fake.addRoutesArgsForCall)
-	return args
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
 func (fake *FakeRouteTableClient) AddRoutesReturns(result1 error) {
@@ -119,17 +103,16 @@ func (fake *FakeRouteTableClient) AddRoutesReturnsOnCall(i int, result1 error) {
 }
 
 func (fake *FakeRouteTableClient) RemoveRoutes(arg1 context.Context, arg2 resolver.RouteRule, arg3 resolver.Filter) error {
-	var arg3Copy resolver.Filter
-	if arg3 != nil {
-		arg3Copy = make(resolver.Filter, len(arg3))
-		copy(arg3Copy, arg3)
-	}
 	fake.removeRoutesMutex.Lock()
 	ret, specificReturn := fake.removeRoutesReturnsOnCall[len(fake.removeRoutesArgsForCall)]
-	fake.removeRoutesArgsForCall = append(fake.removeRoutesArgsForCall, FakeRouteTableClientRemoveRoutesArgs{arg1, arg2, arg3Copy})
+	fake.removeRoutesArgsForCall = append(fake.removeRoutesArgsForCall, struct {
+		arg1 context.Context
+		arg2 resolver.RouteRule
+		arg3 resolver.Filter
+	}{arg1, arg2, arg3})
 	stub := fake.RemoveRoutesStub
 	fakeReturns := fake.removeRoutesReturns
-	fake.recordInvocation("RemoveRoutes", []interface{}{arg1, arg2, arg3Copy})
+	fake.recordInvocation("RemoveRoutes", []interface{}{arg1, arg2, arg3})
 	fake.removeRoutesMutex.Unlock()
 	if stub != nil {
 		return stub(arg1, arg2, arg3)
@@ -156,15 +139,7 @@ func (fake *FakeRouteTableClient) RemoveRoutesArgsForCall(i int) (context.Contex
 	fake.removeRoutesMutex.RLock()
 	defer fake.removeRoutesMutex.RUnlock()
 	argsForCall := fake.removeRoutesArgsForCall[i]
-	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3
-}
-
-func (fake *FakeRouteTableClient) RemoveRoutesArgs() []FakeRouteTableClientRemoveRoutesArgs {
-	fake.removeRoutesMutex.RLock()
-	defer fake.removeRoutesMutex.RUnlock()
-	args := make([]FakeRouteTableClientRemoveRoutesArgs, len(fake.removeRoutesArgsForCall))
-	copy(args, fake.removeRoutesArgsForCall)
-	return args
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
 func (fake *FakeRouteTableClient) RemoveRoutesReturns(result1 error) {
@@ -200,18 +175,9 @@ func (fake *FakeRouteTableClient) Invocations() map[string][][]interface{} {
 	return copiedInvocations
 }
 
-func (fake *FakeRouteTableClient) CallOrder() []string {
-	fake.invocationsMutex.RLock()
-	defer fake.invocationsMutex.RUnlock()
-	order := make([]string, len(fake.callOrder))
-	copy(order, fake.callOrder)
-	return order
-}
-
 func (fake *FakeRouteTableClient) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
-	fake.callOrder = append(fake.callOrder, key)
 	if fake.invocations == nil {
 		fake.invocations = map[string][][]interface{}{}
 	}

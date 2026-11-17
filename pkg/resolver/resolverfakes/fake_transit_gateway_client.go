@@ -11,8 +11,12 @@ import (
 type FakeTransitGatewayClient struct {
 	ApplyStub        func(context.Context, string, map[string]string) (string, error)
 	applyMutex       sync.RWMutex
-	applyArgsForCall []FakeTransitGatewayClientApplyArgs
-	applyReturns     struct {
+	applyArgsForCall []struct {
+		arg1 context.Context
+		arg2 string
+		arg3 map[string]string
+	}
+	applyReturns struct {
 		result1 string
 		result2 error
 	}
@@ -22,8 +26,11 @@ type FakeTransitGatewayClient struct {
 	}
 	ApplyAttachmentStub        func(context.Context, resolver.TransitGatewayAttachment) error
 	applyAttachmentMutex       sync.RWMutex
-	applyAttachmentArgsForCall []FakeTransitGatewayClientApplyAttachmentArgs
-	applyAttachmentReturns     struct {
+	applyAttachmentArgsForCall []struct {
+		arg1 context.Context
+		arg2 resolver.TransitGatewayAttachment
+	}
+	applyAttachmentReturns struct {
 		result1 error
 	}
 	applyAttachmentReturnsOnCall map[int]struct {
@@ -31,8 +38,11 @@ type FakeTransitGatewayClient struct {
 	}
 	DeleteStub        func(context.Context, string) error
 	deleteMutex       sync.RWMutex
-	deleteArgsForCall []FakeTransitGatewayClientDeleteArgs
-	deleteReturns     struct {
+	deleteArgsForCall []struct {
+		arg1 context.Context
+		arg2 string
+	}
+	deleteReturns struct {
 		result1 error
 	}
 	deleteReturnsOnCall map[int]struct {
@@ -40,47 +50,28 @@ type FakeTransitGatewayClient struct {
 	}
 	DetachStub        func(context.Context, resolver.TransitGatewayAttachment) error
 	detachMutex       sync.RWMutex
-	detachArgsForCall []FakeTransitGatewayClientDetachArgs
-	detachReturns     struct {
+	detachArgsForCall []struct {
+		arg1 context.Context
+		arg2 resolver.TransitGatewayAttachment
+	}
+	detachReturns struct {
 		result1 error
 	}
 	detachReturnsOnCall map[int]struct {
 		result1 error
 	}
 	invocations      map[string][][]interface{}
-	callOrder        []string
 	invocationsMutex sync.RWMutex
-}
-
-// FakeTransitGatewayClientApplyArgs holds the arguments of one call to Apply.
-type FakeTransitGatewayClientApplyArgs struct {
-	Arg1 context.Context
-	Arg2 string
-	Arg3 map[string]string
-}
-
-// FakeTransitGatewayClientApplyAttachmentArgs holds the arguments of one call to ApplyAttachment.
-type FakeTransitGatewayClientApplyAttachmentArgs struct {
-	Arg1 context.Context
-	Arg2 resolver.TransitGatewayAttachment
-}
-
-// FakeTransitGatewayClientDeleteArgs holds the arguments of one call to Delete.
-type FakeTransitGatewayClientDeleteArgs struct {
-	Arg1 context.Context
-	Arg2 string
-}
-
-// FakeTransitGatewayClientDetachArgs holds the arguments of one call to Detach.
-type FakeTransitGatewayClientDetachArgs struct {
-	Arg1 context.Context
-	Arg2 resolver.TransitGatewayAttachment
 }
 
 func (fake *FakeTransitGatewayClient) Apply(arg1 context.Context, arg2 string, arg3 map[string]string) (string, error) {
 	fake.applyMutex.Lock()
 	ret, specificReturn := fake.applyReturnsOnCall[len(fake.applyArgsForCall)]
-	fake.applyArgsForCall = append(fake.applyArgsForCall, FakeTransitGatewayClientApplyArgs{arg1, arg2, arg3})
+	fake.applyArgsForCall = append(fake.applyArgsForCall, struct {
+		arg1 context.Context
+		arg2 string
+		arg3 map[string]string
+	}{arg1, arg2, arg3})
 	stub := fake.ApplyStub
 	fakeReturns := fake.applyReturns
 	fake.recordInvocation("Apply", []interface{}{arg1, arg2, arg3})
@@ -110,15 +101,7 @@ func (fake *FakeTransitGatewayClient) ApplyArgsForCall(i int) (context.Context, 
 	fake.applyMutex.RLock()
 	defer fake.applyMutex.RUnlock()
 	argsForCall := fake.applyArgsForCall[i]
-	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3
-}
-
-func (fake *FakeTransitGatewayClient) ApplyArgs() []FakeTransitGatewayClientApplyArgs {
-	fake.applyMutex.RLock()
-	defer fake.applyMutex.RUnlock()
-	args := make([]FakeTransitGatewayClientApplyArgs, len(fake.applyArgsForCall))
-	copy(args, fake.applyArgsForCall)
-	return args
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
 func (fake *FakeTransitGatewayClient) ApplyReturns(result1 string, result2 error) {
@@ -150,7 +133,10 @@ func (fake *FakeTransitGatewayClient) ApplyReturnsOnCall(i int, result1 string, 
 func (fake *FakeTransitGatewayClient) ApplyAttachment(arg1 context.Context, arg2 resolver.TransitGatewayAttachment) error {
 	fake.applyAttachmentMutex.Lock()
 	ret, specificReturn := fake.applyAttachmentReturnsOnCall[len(fake.applyAttachmentArgsForCall)]
-	fake.applyAttachmentArgsForCall = append(fake.applyAttachmentArgsForCall, FakeTransitGatewayClientApplyAttachmentArgs{arg1, arg2})
+	fake.applyAttachmentArgsForCall = append(fake.applyAttachmentArgsForCall, struct {
+		arg1 context.Context
+		arg2 resolver.TransitGatewayAttachment
+	}{arg1, arg2})
 	stub := fake.ApplyAttachmentStub
 	fakeReturns := fake.applyAttachmentReturns
 	fake.recordInvocation("ApplyAttachment", []interface{}{arg1, arg2})
@@ -180,15 +166,7 @@ func (fake *FakeTransitGatewayClient) ApplyAttachmentArgsForCall(i int) (context
 	fake.applyAttachmentMutex.RLock()
 	defer fake.applyAttachmentMutex.RUnlock()
 	argsForCall := fake.applyAttachmentArgsForCall[i]
-	return argsForCall.Arg1, argsForCall.Arg2
-}
-
-func (fake *FakeTransitGatewayClient) ApplyAttachmentArgs() []FakeTransitGatewayClientApplyAttachmentArgs {
-	fake.applyAttachmentMutex.RLock()
-	defer fake.applyAttachmentMutex.RUnlock()
-	args := make([]FakeTransitGatewayClientApplyAttachmentArgs, len(fake.applyAttachmentArgsForCall))
-	copy(args, fake.applyAttachmentArgsForCall)
-	return args
+	return argsForCall.arg1, argsForCall.arg2
 }
 
 func (fake *FakeTransitGatewayClient) ApplyAttachmentReturns(result1 error) {
@@ -217,7 +195,10 @@ func (fake *FakeTransitGatewayClient) ApplyAttachmentReturnsOnCall(i int, result
 func (fake *FakeTransitGatewayClient) Delete(arg1 context.Context, arg2 string) error {
 	fake.deleteMutex.Lock()
 	ret, specificReturn := fake.deleteReturnsOnCall[len(fake.deleteArgsForCall)]
-	fake.deleteArgsForCall = append(fake.deleteArgsForCall, FakeTransitGatewayClientDeleteArgs{arg1, arg2})
+	fake.deleteArgsForCall = append(fake.deleteArgsForCall, struct {
+		arg1 context.Context
+		arg2 string
+	}{arg1, arg2})
 	stub := fake.DeleteStub
 	fakeReturns := fake.deleteReturns
 	fake.recordInvocation("Delete", []interface{}{arg1, arg2})
@@ -247,15 +228,7 @@ func (fake *FakeTransitGatewayClient) DeleteArgsForCall(i int) (context.Context,
 	fake.deleteMutex.RLock()
 	defer fake.deleteMutex.RUnlock()
 	argsForCall := fake.deleteArgsForCall[i]
-	return argsForCall.Arg1, argsForCall.Arg2
-}
-
-func (fake *FakeTransitGatewayClient) DeleteArgs() []FakeTransitGatewayClientDeleteArgs {
-	fake.deleteMutex.RLock()
-	defer fake.deleteMutex.RUnlock()
-	args := make([]FakeTransitGatewayClientDeleteArgs, len(fake.deleteArgsForCall))
-	copy(args, fake.deleteArgsForCall)
-	return args
+	return argsForCall.arg1, argsForCall.arg2
 }
 
 func (fake *FakeTransitGatewayClient) DeleteReturns(result1 error) {
@@ -284,7 +257,10 @@ func (fake *FakeTransitGatewayClient) DeleteReturnsOnCall(i int, result1 error) 
 func (fake *FakeTransitGatewayClient) Detach(arg1 context.Context, arg2 resolver.TransitGatewayAttachment) error {
 	fake.detachMutex.Lock()
 	ret, specificReturn := fake.detachReturnsOnCall[len(fake.detachArgsForCall)]
-	fake.detachArgsForCall = append(fake.detachArgsForCall, FakeTransitGatewayClientDetachArgs{arg1, arg2})
+	fake.detachArgsForCall = append(fake.detachArgsForCall, struct {
+		arg1 context.Context
+		arg2 resolver.TransitGatewayAttachment
+	}{arg1, arg2})
 	stub := fake.DetachStub
 	fakeReturns := fake.detachReturns
 	fake.recordInvocation("Detach", []interface{}{arg1, arg2})
@@ -314,15 +290,7 @@ func (fake *FakeTransitGatewayClient) DetachArgsForCall(i int) (context.Context,
 	fake.detachMutex.RLock()
 	defer fake.detachMutex.RUnlock()
 	argsForCall := fake.detachArgsForCall[i]
-	return argsForCall.Arg1, argsForCall.Arg2
-}
-
-func (fake *FakeTransitGatewayClient) DetachArgs() []FakeTransitGatewayClientDetachArgs {
-	fake.detachMutex.RLock()
-	defer fake.detachMutex.RUnlock()
-	args := make([]FakeTransitGatewayClientDetachArgs, len(fake.detachArgsForCall))
-	copy(args, fake.detachArgsForCall)
-	return args
+	return argsForCall.arg1, argsForCall.arg2
 }
 
 func (fake *FakeTransitGatewayClient) DetachReturns(result1 error) {
@@ -358,18 +326,9 @@ func (fake *FakeTransitGatewayClient) Invocations() map[string][][]interface{} {
 	return copiedInvocations
 }
 
-func (fake *FakeTransitGatewayClient) CallOrder() []string {
-	fake.invocationsMutex.RLock()
-	defer fake.invocationsMutex.RUnlock()
-	order := make([]string, len(fake.callOrder))
-	copy(order, fake.callOrder)
-	return order
-}
-
 func (fake *FakeTransitGatewayClient) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
-	fake.callOrder = append(fake.callOrder, key)
 	if fake.invocations == nil {
 		fake.invocations = map[string][][]interface{}{}
 	}

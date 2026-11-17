@@ -12,8 +12,13 @@ import (
 type FakeEC2Client struct {
 	CreateSecurityGroupForResolverEndpointsStub        func(context.Context, string, string, map[string]string) (string, error)
 	createSecurityGroupForResolverEndpointsMutex       sync.RWMutex
-	createSecurityGroupForResolverEndpointsArgsForCall []FakeEC2ClientCreateSecurityGroupForResolverEndpointsArgs
-	createSecurityGroupForResolverEndpointsReturns     struct {
+	createSecurityGroupForResolverEndpointsArgsForCall []struct {
+		arg1 context.Context
+		arg2 string
+		arg3 string
+		arg4 map[string]string
+	}
+	createSecurityGroupForResolverEndpointsReturns struct {
 		result1 string
 		result2 error
 	}
@@ -23,8 +28,13 @@ type FakeEC2Client struct {
 	}
 	DeleteSecurityGroupForResolverEndpointsStub        func(context.Context, logr.Logger, string, string) error
 	deleteSecurityGroupForResolverEndpointsMutex       sync.RWMutex
-	deleteSecurityGroupForResolverEndpointsArgsForCall []FakeEC2ClientDeleteSecurityGroupForResolverEndpointsArgs
-	deleteSecurityGroupForResolverEndpointsReturns     struct {
+	deleteSecurityGroupForResolverEndpointsArgsForCall []struct {
+		arg1 context.Context
+		arg2 logr.Logger
+		arg3 string
+		arg4 string
+	}
+	deleteSecurityGroupForResolverEndpointsReturns struct {
 		result1 error
 	}
 	deleteSecurityGroupForResolverEndpointsReturnsOnCall map[int]struct {
@@ -32,8 +42,12 @@ type FakeEC2Client struct {
 	}
 	GetNonTerminatedInstancesByTagsStub        func(context.Context, logr.Logger, map[string]string) ([]string, error)
 	getNonTerminatedInstancesByTagsMutex       sync.RWMutex
-	getNonTerminatedInstancesByTagsArgsForCall []FakeEC2ClientGetNonTerminatedInstancesByTagsArgs
-	getNonTerminatedInstancesByTagsReturns     struct {
+	getNonTerminatedInstancesByTagsArgsForCall []struct {
+		arg1 context.Context
+		arg2 logr.Logger
+		arg3 map[string]string
+	}
+	getNonTerminatedInstancesByTagsReturns struct {
 		result1 []string
 		result2 error
 	}
@@ -43,52 +57,30 @@ type FakeEC2Client struct {
 	}
 	TerminateInstancesStub        func(context.Context, logr.Logger, []string) error
 	terminateInstancesMutex       sync.RWMutex
-	terminateInstancesArgsForCall []FakeEC2ClientTerminateInstancesArgs
-	terminateInstancesReturns     struct {
+	terminateInstancesArgsForCall []struct {
+		arg1 context.Context
+		arg2 logr.Logger
+		arg3 []string
+	}
+	terminateInstancesReturns struct {
 		result1 error
 	}
 	terminateInstancesReturnsOnCall map[int]struct {
 		result1 error
 	}
 	invocations      map[string][][]interface{}
-	callOrder        []string
 	invocationsMutex sync.RWMutex
-}
-
-// FakeEC2ClientCreateSecurityGroupForResolverEndpointsArgs holds the arguments of one call to CreateSecurityGroupForResolverEndpoints.
-type FakeEC2ClientCreateSecurityGroupForResolverEndpointsArgs struct {
-	Arg1 context.Context
-	Arg2 string
-	Arg3 string
-	Arg4 map[string]string
-}
-
-// FakeEC2ClientDeleteSecurityGroupForResolverEndpointsArgs holds the arguments of one call to DeleteSecurityGroupForResolverEndpoints.
-type FakeEC2ClientDeleteSecurityGroupForResolverEndpointsArgs struct {
-	Arg1 context.Context
-	Arg2 logr.Logger
-	Arg3 string
-	Arg4 string
-}
-
-// FakeEC2ClientGetNonTerminatedInstancesByTagsArgs holds the arguments of one call to GetNonTerminatedInstancesByTags.
-type FakeEC2ClientGetNonTerminatedInstancesByTagsArgs struct {
-	Arg1 context.Context
-	Arg2 logr.Logger
-	Arg3 map[string]string
-}
-
-// FakeEC2ClientTerminateInstancesArgs holds the arguments of one call to TerminateInstances.
-type FakeEC2ClientTerminateInstancesArgs struct {
-	Arg1 context.Context
-	Arg2 logr.Logger
-	Arg3 []string
 }
 
 func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpoints(arg1 context.Context, arg2 string, arg3 string, arg4 map[string]string) (string, error) {
 	fake.createSecurityGroupForResolverEndpointsMutex.Lock()
 	ret, specificReturn := fake.createSecurityGroupForResolverEndpointsReturnsOnCall[len(fake.createSecurityGroupForResolverEndpointsArgsForCall)]
-	fake.createSecurityGroupForResolverEndpointsArgsForCall = append(fake.createSecurityGroupForResolverEndpointsArgsForCall, FakeEC2ClientCreateSecurityGroupForResolverEndpointsArgs{arg1, arg2, arg3, arg4})
+	fake.createSecurityGroupForResolverEndpointsArgsForCall = append(fake.createSecurityGroupForResolverEndpointsArgsForCall, struct {
+		arg1 context.Context
+		arg2 string
+		arg3 string
+		arg4 map[string]string
+	}{arg1, arg2, arg3, arg4})
 	stub := fake.CreateSecurityGroupForResolverEndpointsStub
 	fakeReturns := fake.createSecurityGroupForResolverEndpointsReturns
 	fake.recordInvocation("CreateSecurityGroupForResolverEndpoints", []interface{}{arg1, arg2, arg3, arg4})
@@ -118,15 +110,7 @@ func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpointsArgsForCall(i 
 	fake.createSecurityGroupForResolverEndpointsMutex.RLock()
 	defer fake.createSecurityGroupForResolverEndpointsMutex.RUnlock()
 	argsForCall := fake.createSecurityGroupForResolverEndpointsArgsForCall[i]
-	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3, argsForCall.Arg4
-}
-
-func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpointsArgs() []FakeEC2ClientCreateSecurityGroupForResolverEndpointsArgs {
-	fake.createSecurityGroupForResolverEndpointsMutex.RLock()
-	defer fake.createSecurityGroupForResolverEndpointsMutex.RUnlock()
-	args := make([]FakeEC2ClientCreateSecurityGroupForResolverEndpointsArgs, len(fake.createSecurityGroupForResolverEndpointsArgsForCall))
-	copy(args, fake.createSecurityGroupForResolverEndpointsArgsForCall)
-	return args
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
 }
 
 func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpointsReturns(result1 string, result2 error) {
@@ -158,7 +142,12 @@ func (fake *FakeEC2Client) CreateSecurityGroupForResolverEndpointsReturnsOnCall(
 func (fake *FakeEC2Client) DeleteSecurityGroupForResolverEndpoints(arg1 context.Context, arg2 logr.Logger, arg3 string, arg4 string) error {
 	fake.deleteSecurityGroupForResolverEndpointsMutex.Lock()
 	ret, specificReturn := fake.deleteSecurityGroupForResolverEndpointsReturnsOnCall[len(fake.deleteSecurityGroupForResolverEndpointsArgsForCall)]
-	fake.deleteSecurityGroupForResolverEndpointsArgsForCall = append(fake.deleteSecurityGroupForResolverEndpointsArgsForCall, FakeEC2ClientDeleteSecurityGroupForResolverEndpointsArgs{arg1, arg2, arg3, arg4})
+	fake.deleteSecurityGroupForResolverEndpointsArgsForCall = append(fake.deleteSecurityGroupForResolverEndpointsArgsForCall, struct {
+		arg1 context.Context
+		arg2 logr.Logger
+		arg3 string
+		arg4 string
+	}{arg1, arg2, arg3, arg4})
 	stub := fake.DeleteSecurityGroupForResolverEndpointsStub
 	fakeReturns := fake.deleteSecurityGroupForResolverEndpointsReturns
 	fake.recordInvocation("DeleteSecurityGroupForResolverEndpoints", []interface{}{arg1, arg2, arg3, arg4})
@@ -188,15 +177,7 @@ func (fake *FakeEC2Client) DeleteSecurityGroupForResolverEndpointsArgsForCall(i 
 	fake.deleteSecurityGroupForResolverEndpointsMutex.RLock()
 	defer fake.deleteSecurityGroupForResolverEndpointsMutex.RUnlock()
 	argsForCall := fake.deleteSecurityGroupForResolverEndpointsArgsForCall[i]
-	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3, argsForCall.Arg4
-}
-
-func (fake *FakeEC2Client) DeleteSecurityGroupForResolverEndpointsArgs() []FakeEC2ClientDeleteSecurityGroupForResolverEndpointsArgs {
-	fake.deleteSecurityGroupForResolverEndpointsMutex.RLock()
-	defer fake.deleteSecurityGroupForResolverEndpointsMutex.RUnlock()
-	args := make([]FakeEC2ClientDeleteSecurityGroupForResolverEndpointsArgs, len(fake.deleteSecurityGroupForResolverEndpointsArgsForCall))
-	copy(args, fake.deleteSecurityGroupForResolverEndpointsArgsForCall)
-	return args
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
 }
 
 func (fake *FakeEC2Client) DeleteSecurityGroupForResolverEndpointsReturns(result1 error) {
@@ -225,7 +206,11 @@ func (fake *FakeEC2Client) DeleteSecurityGroupForResolverEndpointsReturnsOnCall(
 func (fake *FakeEC2Client) GetNonTerminatedInstancesByTags(arg1 context.Context, arg2 logr.Logger, arg3 map[string]string) ([]string, error) {
 	fake.getNonTerminatedInstancesByTagsMutex.Lock()
 	ret, specificReturn := fake.getNonTerminatedInstancesByTagsReturnsOnCall[len(fake.getNonTerminatedInstancesByTagsArgsForCall)]
-	fake.getNonTerminatedInstancesByTagsArgsForCall = append(fake.getNonTerminatedInstancesByTagsArgsForCall, FakeEC2ClientGetNonTerminatedInstancesByTagsArgs{arg1, arg2, arg3})
+	fake.getNonTerminatedInstancesByTagsArgsForCall = append(fake.getNonTerminatedInstancesByTagsArgsForCall, struct {
+		arg1 context.Context
+		arg2 logr.Logger
+		arg3 map[string]string
+	}{arg1, arg2, arg3})
 	stub := fake.GetNonTerminatedInstancesByTagsStub
 	fakeReturns := fake.getNonTerminatedInstancesByTagsReturns
 	fake.recordInvocation("GetNonTerminatedInstancesByTags", []interface{}{arg1, arg2, arg3})
@@ -255,15 +240,7 @@ func (fake *FakeEC2Client) GetNonTerminatedInstancesByTagsArgsForCall(i int) (co
 	fake.getNonTerminatedInstancesByTagsMutex.RLock()
 	defer fake.getNonTerminatedInstancesByTagsMutex.RUnlock()
 	argsForCall := fake.getNonTerminatedInstancesByTagsArgsForCall[i]
-	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3
-}
-
-func (fake *FakeEC2Client) GetNonTerminatedInstancesByTagsArgs() []FakeEC2ClientGetNonTerminatedInstancesByTagsArgs {
-	fake.getNonTerminatedInstancesByTagsMutex.RLock()
-	defer fake.getNonTerminatedInstancesByTagsMutex.RUnlock()
-	args := make([]FakeEC2ClientGetNonTerminatedInstancesByTagsArgs, len(fake.getNonTerminatedInstancesByTagsArgsForCall))
-	copy(args, fake.getNonTerminatedInstancesByTagsArgsForCall)
-	return args
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
 func (fake *FakeEC2Client) GetNonTerminatedInstancesByTagsReturns(result1 []string, result2 error) {
@@ -300,7 +277,11 @@ func (fake *FakeEC2Client) TerminateInstances(arg1 context.Context, arg2 logr.Lo
 	}
 	fake.terminateInstancesMutex.Lock()
 	ret, specificReturn := fake.terminateInstancesReturnsOnCall[len(fake.terminateInstancesArgsForCall)]
-	fake.terminateInstancesArgsForCall = append(fake.terminateInstancesArgsForCall, FakeEC2ClientTerminateInstancesArgs{arg1, arg2, arg3Copy})
+	fake.terminateInstancesArgsForCall = append(fake.terminateInstancesArgsForCall, struct {
+		arg1 context.Context
+		arg2 logr.Logger
+		arg3 []string
+	}{arg1, arg2, arg3Copy})
 	stub := fake.TerminateInstancesStub
 	fakeReturns := fake.terminateInstancesReturns
 	fake.recordInvocation("TerminateInstances", []interface{}{arg1, arg2, arg3Copy})
@@ -330,15 +311,7 @@ func (fake *FakeEC2Client) TerminateInstancesArgsForCall(i int) (context.Context
 	fake.terminateInstancesMutex.RLock()
 	defer fake.terminateInstancesMutex.RUnlock()
 	argsForCall := fake.terminateInstancesArgsForCall[i]
-	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3
-}
-
-func (fake *FakeEC2Client) TerminateInstancesArgs() []FakeEC2ClientTerminateInstancesArgs {
-	fake.terminateInstancesMutex.RLock()
-	defer fake.terminateInstancesMutex.RUnlock()
-	args := make([]FakeEC2ClientTerminateInstancesArgs, len(fake.terminateInstancesArgsForCall))
-	copy(args, fake.terminateInstancesArgsForCall)
-	return args
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
 func (fake *FakeEC2Client) TerminateInstancesReturns(result1 error) {
@@ -374,18 +347,9 @@ func (fake *FakeEC2Client) Invocations() map[string][][]interface{} {
 	return copiedInvocations
 }
 
-func (fake *FakeEC2Client) CallOrder() []string {
-	fake.invocationsMutex.RLock()
-	defer fake.invocationsMutex.RUnlock()
-	order := make([]string, len(fake.callOrder))
-	copy(order, fake.callOrder)
-	return order
-}
-
 func (fake *FakeEC2Client) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
-	fake.callOrder = append(fake.callOrder, key)
 	if fake.invocations == nil {
 		fake.invocations = map[string][][]interface{}{}
 	}
