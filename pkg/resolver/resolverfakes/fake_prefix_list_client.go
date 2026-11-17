@@ -11,12 +11,8 @@ import (
 type FakePrefixListClient struct {
 	ApplyStub        func(context.Context, string, map[string]string) (string, error)
 	applyMutex       sync.RWMutex
-	applyArgsForCall []struct {
-		arg1 context.Context
-		arg2 string
-		arg3 map[string]string
-	}
-	applyReturns struct {
+	applyArgsForCall []FakePrefixListClientApplyArgs
+	applyReturns     struct {
 		result1 string
 		result2 error
 	}
@@ -26,11 +22,8 @@ type FakePrefixListClient struct {
 	}
 	ApplyEntryStub        func(context.Context, resolver.PrefixListEntry) error
 	applyEntryMutex       sync.RWMutex
-	applyEntryArgsForCall []struct {
-		arg1 context.Context
-		arg2 resolver.PrefixListEntry
-	}
-	applyEntryReturns struct {
+	applyEntryArgsForCall []FakePrefixListClientApplyEntryArgs
+	applyEntryReturns     struct {
 		result1 error
 	}
 	applyEntryReturnsOnCall map[int]struct {
@@ -38,11 +31,8 @@ type FakePrefixListClient struct {
 	}
 	DeleteStub        func(context.Context, string) error
 	deleteMutex       sync.RWMutex
-	deleteArgsForCall []struct {
-		arg1 context.Context
-		arg2 string
-	}
-	deleteReturns struct {
+	deleteArgsForCall []FakePrefixListClientDeleteArgs
+	deleteReturns     struct {
 		result1 error
 	}
 	deleteReturnsOnCall map[int]struct {
@@ -50,28 +40,47 @@ type FakePrefixListClient struct {
 	}
 	DeleteEntryStub        func(context.Context, resolver.PrefixListEntry) error
 	deleteEntryMutex       sync.RWMutex
-	deleteEntryArgsForCall []struct {
-		arg1 context.Context
-		arg2 resolver.PrefixListEntry
-	}
-	deleteEntryReturns struct {
+	deleteEntryArgsForCall []FakePrefixListClientDeleteEntryArgs
+	deleteEntryReturns     struct {
 		result1 error
 	}
 	deleteEntryReturnsOnCall map[int]struct {
 		result1 error
 	}
 	invocations      map[string][][]interface{}
+	callOrder        []string
 	invocationsMutex sync.RWMutex
+}
+
+// FakePrefixListClientApplyArgs holds the arguments of one call to Apply.
+type FakePrefixListClientApplyArgs struct {
+	Arg1 context.Context
+	Arg2 string
+	Arg3 map[string]string
+}
+
+// FakePrefixListClientApplyEntryArgs holds the arguments of one call to ApplyEntry.
+type FakePrefixListClientApplyEntryArgs struct {
+	Arg1 context.Context
+	Arg2 resolver.PrefixListEntry
+}
+
+// FakePrefixListClientDeleteArgs holds the arguments of one call to Delete.
+type FakePrefixListClientDeleteArgs struct {
+	Arg1 context.Context
+	Arg2 string
+}
+
+// FakePrefixListClientDeleteEntryArgs holds the arguments of one call to DeleteEntry.
+type FakePrefixListClientDeleteEntryArgs struct {
+	Arg1 context.Context
+	Arg2 resolver.PrefixListEntry
 }
 
 func (fake *FakePrefixListClient) Apply(arg1 context.Context, arg2 string, arg3 map[string]string) (string, error) {
 	fake.applyMutex.Lock()
 	ret, specificReturn := fake.applyReturnsOnCall[len(fake.applyArgsForCall)]
-	fake.applyArgsForCall = append(fake.applyArgsForCall, struct {
-		arg1 context.Context
-		arg2 string
-		arg3 map[string]string
-	}{arg1, arg2, arg3})
+	fake.applyArgsForCall = append(fake.applyArgsForCall, FakePrefixListClientApplyArgs{arg1, arg2, arg3})
 	stub := fake.ApplyStub
 	fakeReturns := fake.applyReturns
 	fake.recordInvocation("Apply", []interface{}{arg1, arg2, arg3})
@@ -101,7 +110,15 @@ func (fake *FakePrefixListClient) ApplyArgsForCall(i int) (context.Context, stri
 	fake.applyMutex.RLock()
 	defer fake.applyMutex.RUnlock()
 	argsForCall := fake.applyArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3
+}
+
+func (fake *FakePrefixListClient) ApplyArgs() []FakePrefixListClientApplyArgs {
+	fake.applyMutex.RLock()
+	defer fake.applyMutex.RUnlock()
+	args := make([]FakePrefixListClientApplyArgs, len(fake.applyArgsForCall))
+	copy(args, fake.applyArgsForCall)
+	return args
 }
 
 func (fake *FakePrefixListClient) ApplyReturns(result1 string, result2 error) {
@@ -133,10 +150,7 @@ func (fake *FakePrefixListClient) ApplyReturnsOnCall(i int, result1 string, resu
 func (fake *FakePrefixListClient) ApplyEntry(arg1 context.Context, arg2 resolver.PrefixListEntry) error {
 	fake.applyEntryMutex.Lock()
 	ret, specificReturn := fake.applyEntryReturnsOnCall[len(fake.applyEntryArgsForCall)]
-	fake.applyEntryArgsForCall = append(fake.applyEntryArgsForCall, struct {
-		arg1 context.Context
-		arg2 resolver.PrefixListEntry
-	}{arg1, arg2})
+	fake.applyEntryArgsForCall = append(fake.applyEntryArgsForCall, FakePrefixListClientApplyEntryArgs{arg1, arg2})
 	stub := fake.ApplyEntryStub
 	fakeReturns := fake.applyEntryReturns
 	fake.recordInvocation("ApplyEntry", []interface{}{arg1, arg2})
@@ -166,7 +180,15 @@ func (fake *FakePrefixListClient) ApplyEntryArgsForCall(i int) (context.Context,
 	fake.applyEntryMutex.RLock()
 	defer fake.applyEntryMutex.RUnlock()
 	argsForCall := fake.applyEntryArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+	return argsForCall.Arg1, argsForCall.Arg2
+}
+
+func (fake *FakePrefixListClient) ApplyEntryArgs() []FakePrefixListClientApplyEntryArgs {
+	fake.applyEntryMutex.RLock()
+	defer fake.applyEntryMutex.RUnlock()
+	args := make([]FakePrefixListClientApplyEntryArgs, len(fake.applyEntryArgsForCall))
+	copy(args, fake.applyEntryArgsForCall)
+	return args
 }
 
 func (fake *FakePrefixListClient) ApplyEntryReturns(result1 error) {
@@ -195,10 +217,7 @@ func (fake *FakePrefixListClient) ApplyEntryReturnsOnCall(i int, result1 error) 
 func (fake *FakePrefixListClient) Delete(arg1 context.Context, arg2 string) error {
 	fake.deleteMutex.Lock()
 	ret, specificReturn := fake.deleteReturnsOnCall[len(fake.deleteArgsForCall)]
-	fake.deleteArgsForCall = append(fake.deleteArgsForCall, struct {
-		arg1 context.Context
-		arg2 string
-	}{arg1, arg2})
+	fake.deleteArgsForCall = append(fake.deleteArgsForCall, FakePrefixListClientDeleteArgs{arg1, arg2})
 	stub := fake.DeleteStub
 	fakeReturns := fake.deleteReturns
 	fake.recordInvocation("Delete", []interface{}{arg1, arg2})
@@ -228,7 +247,15 @@ func (fake *FakePrefixListClient) DeleteArgsForCall(i int) (context.Context, str
 	fake.deleteMutex.RLock()
 	defer fake.deleteMutex.RUnlock()
 	argsForCall := fake.deleteArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+	return argsForCall.Arg1, argsForCall.Arg2
+}
+
+func (fake *FakePrefixListClient) DeleteArgs() []FakePrefixListClientDeleteArgs {
+	fake.deleteMutex.RLock()
+	defer fake.deleteMutex.RUnlock()
+	args := make([]FakePrefixListClientDeleteArgs, len(fake.deleteArgsForCall))
+	copy(args, fake.deleteArgsForCall)
+	return args
 }
 
 func (fake *FakePrefixListClient) DeleteReturns(result1 error) {
@@ -257,10 +284,7 @@ func (fake *FakePrefixListClient) DeleteReturnsOnCall(i int, result1 error) {
 func (fake *FakePrefixListClient) DeleteEntry(arg1 context.Context, arg2 resolver.PrefixListEntry) error {
 	fake.deleteEntryMutex.Lock()
 	ret, specificReturn := fake.deleteEntryReturnsOnCall[len(fake.deleteEntryArgsForCall)]
-	fake.deleteEntryArgsForCall = append(fake.deleteEntryArgsForCall, struct {
-		arg1 context.Context
-		arg2 resolver.PrefixListEntry
-	}{arg1, arg2})
+	fake.deleteEntryArgsForCall = append(fake.deleteEntryArgsForCall, FakePrefixListClientDeleteEntryArgs{arg1, arg2})
 	stub := fake.DeleteEntryStub
 	fakeReturns := fake.deleteEntryReturns
 	fake.recordInvocation("DeleteEntry", []interface{}{arg1, arg2})
@@ -290,7 +314,15 @@ func (fake *FakePrefixListClient) DeleteEntryArgsForCall(i int) (context.Context
 	fake.deleteEntryMutex.RLock()
 	defer fake.deleteEntryMutex.RUnlock()
 	argsForCall := fake.deleteEntryArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+	return argsForCall.Arg1, argsForCall.Arg2
+}
+
+func (fake *FakePrefixListClient) DeleteEntryArgs() []FakePrefixListClientDeleteEntryArgs {
+	fake.deleteEntryMutex.RLock()
+	defer fake.deleteEntryMutex.RUnlock()
+	args := make([]FakePrefixListClientDeleteEntryArgs, len(fake.deleteEntryArgsForCall))
+	copy(args, fake.deleteEntryArgsForCall)
+	return args
 }
 
 func (fake *FakePrefixListClient) DeleteEntryReturns(result1 error) {
@@ -326,9 +358,18 @@ func (fake *FakePrefixListClient) Invocations() map[string][][]interface{} {
 	return copiedInvocations
 }
 
+func (fake *FakePrefixListClient) CallOrder() []string {
+	fake.invocationsMutex.RLock()
+	defer fake.invocationsMutex.RUnlock()
+	order := make([]string, len(fake.callOrder))
+	copy(order, fake.callOrder)
+	return order
+}
+
 func (fake *FakePrefixListClient) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
+	fake.callOrder = append(fake.callOrder, key)
 	if fake.invocations == nil {
 		fake.invocations = map[string][][]interface{}{}
 	}

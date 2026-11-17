@@ -225,16 +225,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 
 	// Handle deletion: cleanup EC2 instances and Karpenter resources
 	if !karpenterMachinePool.GetDeletionTimestamp().IsZero() {
-		hadFinalizer := controllerutil.ContainsFinalizer(karpenterMachinePool, KarpenterFinalizer)
-		result, err := r.reconcileDelete(ctx, logger, cluster, karpenterMachinePool, roleIdentity, region, s3BucketName)
-		if hadFinalizer && !controllerutil.ContainsFinalizer(karpenterMachinePool, KarpenterFinalizer) {
-			// reconcileDelete removed the finalizer with its own patch. Base the deferred patch on the
-			// patched object, so it does not write the finalizers again.
-			if helperErr := resetPatchHelper(); helperErr != nil {
-				return reconcile.Result{}, errors.Join(err, helperErr)
-			}
-		}
-		return result, err
+		return r.reconcileDelete(ctx, logger, cluster, karpenterMachinePool, roleIdentity, region, s3BucketName, resetPatchHelper)
 	}
 
 	// Validate version skew: ensure worker nodes don't use newer Kubernetes versions than control plane
@@ -261,12 +252,8 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	// Add finalizer to ensure proper cleanup sequence. This happens before any other change to the
 	// object in this reconciliation, because the patch overwrites the object with the API response.
 	if !controllerutil.ContainsFinalizer(karpenterMachinePool, KarpenterFinalizer) {
-		if err := r.patchFinalizer(ctx, karpenterMachinePool, controllerutil.AddFinalizer); err != nil {
+		if err := r.patchFinalizer(ctx, karpenterMachinePool, controllerutil.AddFinalizer, resetPatchHelper); err != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to add finalizer to KarpenterMachinePool: %w", err)
-		}
-		// Base the deferred patch on the patched object, so it does not write the finalizers again.
-		if err := resetPatchHelper(); err != nil {
-			return reconcile.Result{}, err
 		}
 	}
 
@@ -401,7 +388,7 @@ func (r *KarpenterMachinePoolReconciler) reconcileMachinePoolBootstrapUserData(c
 // Once no instance is left, the pool's bootstrap user data is removed from the cluster's S3
 // bucket (none exists on EKS, where s3BucketName is empty), so a later pool of the same name
 // never boots from it.
-func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, logger logr.Logger, cluster *clusterv1.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, roleIdentity *capa.AWSClusterRoleIdentity, region, s3BucketName string) (reconcile.Result, error) {
+func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, logger logr.Logger, cluster *clusterv1.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, roleIdentity *capa.AWSClusterRoleIdentity, region, s3BucketName string, resetPatchHelper func() error) (reconcile.Result, error) {
 	ec2Client, err := r.awsClients.NewEC2Client(region, roleIdentity.Spec.RoleArn)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to create EC2 client: %w", err)
@@ -456,7 +443,7 @@ func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, lo
 	}
 
 	logger.Info("Removing finalizer", "finalizer", KarpenterFinalizer)
-	if err := r.patchFinalizer(ctx, karpenterMachinePool, controllerutil.RemoveFinalizer); err != nil {
+	if err := r.patchFinalizer(ctx, karpenterMachinePool, controllerutil.RemoveFinalizer, resetPatchHelper); err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to remove finalizer from KarpenterMachinePool: %w", err)
 	}
 
@@ -470,9 +457,12 @@ func (r *KarpenterMachinePoolReconciler) reconcileDelete(ctx context.Context, lo
 // object could add back or drop the other controller's finalizer. With it, the API server rejects
 // the patch with a 409 Conflict and the reconciliation is retried with the current object.
 //
-// On success the object is updated from the API response. On failure its finalizers are left as
-// they were, so the deferred patch does not write them without the lock.
-func (r *KarpenterMachinePoolReconciler) patchFinalizer(ctx context.Context, karpenterMachinePool *v1alpha1.KarpenterMachinePool, mutate func(client.Object, string) bool) error {
+// On success the object is updated from the API response and resetPatchHelper is called, so the
+// deferred patch starts from the patched object and does not write the finalizers again. Both
+// drop any other change made to the object before, so call this before changing anything else.
+// On failure its finalizers are left as they were, so the deferred patch does not write them
+// without the lock.
+func (r *KarpenterMachinePoolReconciler) patchFinalizer(ctx context.Context, karpenterMachinePool *v1alpha1.KarpenterMachinePool, mutate func(client.Object, string) bool, resetPatchHelper func() error) error {
 	original := karpenterMachinePool.DeepCopy()
 	if !mutate(karpenterMachinePool, KarpenterFinalizer) {
 		return nil
@@ -483,7 +473,7 @@ func (r *KarpenterMachinePoolReconciler) patchFinalizer(ctx context.Context, kar
 		return err
 	}
 
-	return nil
+	return resetPatchHelper()
 }
 
 // getWorkloadClusterNodeClaims retrieves NodeClaim resources from the workload cluster

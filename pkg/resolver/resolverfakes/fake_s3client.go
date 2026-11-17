@@ -11,12 +11,8 @@ import (
 type FakeS3Client struct {
 	DeleteStub        func(context.Context, string, string) error
 	deleteMutex       sync.RWMutex
-	deleteArgsForCall []struct {
-		arg1 context.Context
-		arg2 string
-		arg3 string
-	}
-	deleteReturns struct {
+	deleteArgsForCall []FakeS3ClientDeleteArgs
+	deleteReturns     struct {
 		result1 error
 	}
 	deleteReturnsOnCall map[int]struct {
@@ -24,30 +20,37 @@ type FakeS3Client struct {
 	}
 	PutStub        func(context.Context, string, string, []byte) error
 	putMutex       sync.RWMutex
-	putArgsForCall []struct {
-		arg1 context.Context
-		arg2 string
-		arg3 string
-		arg4 []byte
-	}
-	putReturns struct {
+	putArgsForCall []FakeS3ClientPutArgs
+	putReturns     struct {
 		result1 error
 	}
 	putReturnsOnCall map[int]struct {
 		result1 error
 	}
 	invocations      map[string][][]interface{}
+	callOrder        []string
 	invocationsMutex sync.RWMutex
+}
+
+// FakeS3ClientDeleteArgs holds the arguments of one call to Delete.
+type FakeS3ClientDeleteArgs struct {
+	Arg1 context.Context
+	Arg2 string
+	Arg3 string
+}
+
+// FakeS3ClientPutArgs holds the arguments of one call to Put.
+type FakeS3ClientPutArgs struct {
+	Arg1 context.Context
+	Arg2 string
+	Arg3 string
+	Arg4 []byte
 }
 
 func (fake *FakeS3Client) Delete(arg1 context.Context, arg2 string, arg3 string) error {
 	fake.deleteMutex.Lock()
 	ret, specificReturn := fake.deleteReturnsOnCall[len(fake.deleteArgsForCall)]
-	fake.deleteArgsForCall = append(fake.deleteArgsForCall, struct {
-		arg1 context.Context
-		arg2 string
-		arg3 string
-	}{arg1, arg2, arg3})
+	fake.deleteArgsForCall = append(fake.deleteArgsForCall, FakeS3ClientDeleteArgs{arg1, arg2, arg3})
 	stub := fake.DeleteStub
 	fakeReturns := fake.deleteReturns
 	fake.recordInvocation("Delete", []interface{}{arg1, arg2, arg3})
@@ -77,7 +80,15 @@ func (fake *FakeS3Client) DeleteArgsForCall(i int) (context.Context, string, str
 	fake.deleteMutex.RLock()
 	defer fake.deleteMutex.RUnlock()
 	argsForCall := fake.deleteArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3
+}
+
+func (fake *FakeS3Client) DeleteArgs() []FakeS3ClientDeleteArgs {
+	fake.deleteMutex.RLock()
+	defer fake.deleteMutex.RUnlock()
+	args := make([]FakeS3ClientDeleteArgs, len(fake.deleteArgsForCall))
+	copy(args, fake.deleteArgsForCall)
+	return args
 }
 
 func (fake *FakeS3Client) DeleteReturns(result1 error) {
@@ -111,12 +122,7 @@ func (fake *FakeS3Client) Put(arg1 context.Context, arg2 string, arg3 string, ar
 	}
 	fake.putMutex.Lock()
 	ret, specificReturn := fake.putReturnsOnCall[len(fake.putArgsForCall)]
-	fake.putArgsForCall = append(fake.putArgsForCall, struct {
-		arg1 context.Context
-		arg2 string
-		arg3 string
-		arg4 []byte
-	}{arg1, arg2, arg3, arg4Copy})
+	fake.putArgsForCall = append(fake.putArgsForCall, FakeS3ClientPutArgs{arg1, arg2, arg3, arg4Copy})
 	stub := fake.PutStub
 	fakeReturns := fake.putReturns
 	fake.recordInvocation("Put", []interface{}{arg1, arg2, arg3, arg4Copy})
@@ -146,7 +152,15 @@ func (fake *FakeS3Client) PutArgsForCall(i int) (context.Context, string, string
 	fake.putMutex.RLock()
 	defer fake.putMutex.RUnlock()
 	argsForCall := fake.putArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3, argsForCall.Arg4
+}
+
+func (fake *FakeS3Client) PutArgs() []FakeS3ClientPutArgs {
+	fake.putMutex.RLock()
+	defer fake.putMutex.RUnlock()
+	args := make([]FakeS3ClientPutArgs, len(fake.putArgsForCall))
+	copy(args, fake.putArgsForCall)
+	return args
 }
 
 func (fake *FakeS3Client) PutReturns(result1 error) {
@@ -182,9 +196,18 @@ func (fake *FakeS3Client) Invocations() map[string][][]interface{} {
 	return copiedInvocations
 }
 
+func (fake *FakeS3Client) CallOrder() []string {
+	fake.invocationsMutex.RLock()
+	defer fake.invocationsMutex.RUnlock()
+	order := make([]string, len(fake.callOrder))
+	copy(order, fake.callOrder)
+	return order
+}
+
 func (fake *FakeS3Client) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
+	fake.callOrder = append(fake.callOrder, key)
 	if fake.invocations == nil {
 		fake.invocations = map[string][][]interface{}{}
 	}
