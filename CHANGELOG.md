@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.1] - 2026-11-18
+
 ### Fixed
 
 - Use optimistic locking when adding or removing the KarpenterMachinePool finalizer, so a patch built from an outdated object fails with a conflict instead of overwriting other controllers' finalizers.
@@ -455,7 +457,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - changed: `app.giantswarm.io` label group was changed to `application.giantswarm.io`
 
-[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.30.0...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.30.1...HEAD
+[0.30.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.30.0...v0.30.1
 [0.30.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.29.1...v0.30.0
 [0.29.1]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.29.0...v0.29.1
 [0.29.0]: https://github.com/giantswarm/aws-resolver-rules-operator/compare/v0.28.1...v0.29.0
