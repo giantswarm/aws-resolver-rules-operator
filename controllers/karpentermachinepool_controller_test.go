@@ -13,6 +13,7 @@ import (
 	"github.com/onsi/gomega/gstruct"
 	gomegatypes "github.com/onsi/gomega/types"
 	v1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -45,7 +46,54 @@ const (
 	KarpenterMachinePoolName      = "foo"
 	KarpenterNodesInstanceProfile = "karpenter-iam-role"
 	KubernetesVersion             = "v1.29.1"
+	OtherFinalizer                = "other-operator.finalizers.giantswarm.io/test"
 )
+
+// staleReadClient runs afterFirstGet right after the first KarpenterMachinePool is read, to
+// simulate another controller changing it while the reconciler holds an outdated copy.
+type staleReadClient struct {
+	client.Client
+	afterFirstGet func(ctx context.Context)
+}
+
+func (c *staleReadClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if err := c.Client.Get(ctx, key, obj, opts...); err != nil {
+		return err
+	}
+	if _, ok := obj.(*karpenterinfra.KarpenterMachinePool); ok && c.afterFirstGet != nil {
+		afterFirstGet := c.afterFirstGet
+		c.afterFirstGet = nil
+		afterFirstGet(ctx)
+	}
+	return nil
+}
+
+// newReconcilerWithStaleRead returns a reconciler whose first read of the KarpenterMachinePool is
+// followed by another controller removing OtherFinalizer from it.
+func newReconcilerWithStaleRead(s3Client *resolverfakes.FakeS3Client, ec2Client *resolverfakes.FakeEC2Client) *controllers.KarpenterMachinePoolReconciler {
+	staleClient := &staleReadClient{
+		Client: k8sClient,
+		afterFirstGet: func(ctx context.Context) {
+			latest := &karpenterinfra.KarpenterMachinePool{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: KarpenterMachinePoolName}, latest)).To(Succeed())
+			var finalizers []string
+			for _, f := range latest.Finalizers {
+				if f != OtherFinalizer {
+					finalizers = append(finalizers, f)
+				}
+			}
+			latest.Finalizers = finalizers
+			Expect(k8sClient.Update(ctx, latest)).To(Succeed())
+		},
+	}
+	workloadClusterClientGetter := func(ctx context.Context, _ string, _ client.Client, _ client.ObjectKey) (client.Client, error) {
+		return k8sClient, nil
+	}
+	return controllers.NewKarpenterMachinepoolReconciler(staleClient, workloadClusterClientGetter, &resolver.FakeClients{
+		S3Client:  s3Client,
+		EC2Client: ec2Client,
+	})
+}
 
 var _ = Describe("KarpenterMachinePool reconciler", func() {
 	var (
@@ -431,6 +479,42 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 					_, bucket, key := s3Client.DeleteArgsForCall(0)
 					Expect(bucket).To(Equal(AWSClusterBucketName))
 					Expect(key).To(Equal(path.Join(controllers.S3ObjectPrefix, KarpenterMachinePoolName)))
+				})
+
+				When("another controller removed its finalizer after the KarpenterMachinePool was read", func() {
+					BeforeEach(func() {
+						// Recreate the KarpenterMachinePool with a second finalizer, because no
+						// finalizer can be added once it is being deleted.
+						old := &karpenterinfra.KarpenterMachinePool{}
+						Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: KarpenterMachinePoolName}, old)).To(Succeed())
+						fresh := &karpenterinfra.KarpenterMachinePool{
+							ObjectMeta: ctrl.ObjectMeta{
+								Namespace:       namespace,
+								Name:            KarpenterMachinePoolName,
+								Labels:          old.Labels,
+								OwnerReferences: old.OwnerReferences,
+								Finalizers:      []string{controllers.KarpenterFinalizer, OtherFinalizer},
+							},
+							Spec: old.Spec,
+						}
+						old.Finalizers = nil
+						Expect(k8sClient.Update(ctx, old)).To(Succeed())
+						Eventually(func() bool {
+							return k8serrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(old), &karpenterinfra.KarpenterMachinePool{}))
+						}, time.Second*10, time.Millisecond*250).Should(BeTrue())
+						Expect(k8sClient.Create(ctx, fresh)).To(Succeed())
+						Expect(k8sClient.Delete(ctx, fresh)).To(Succeed())
+
+						reconciler = newReconcilerWithStaleRead(s3Client, ec2Client)
+					})
+
+					It("returns a conflict and does not add the other finalizer back", func() {
+						Expect(k8serrors.IsConflict(reconcileErr)).To(BeTrue(), "expected a conflict, got %v", reconcileErr)
+
+						actual := &karpenterinfra.KarpenterMachinePool{}
+						Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: KarpenterMachinePoolName}, actual)).To(Succeed())
+						Expect(actual.Finalizers).To(ConsistOf(controllers.KarpenterFinalizer))
+					})
 				})
 
 				When("the S3 API returns an error", func() {
@@ -1542,6 +1626,24 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 										Expect(updatedKarpenterMachinePool.Spec.ProviderIDList).NotTo(ContainElement("aws:///us-west-2b/i-other333333333333"))
 										Expect(updatedKarpenterMachinePool.Spec.ProviderIDList).NotTo(ContainElement("aws:///us-west-2b/i-other444444444444"))
 									})
+								})
+							})
+							When("another controller removed its finalizer after the KarpenterMachinePool was read", func() {
+								BeforeEach(func() {
+									kmp := &karpenterinfra.KarpenterMachinePool{}
+									Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: KarpenterMachinePoolName}, kmp)).To(Succeed())
+									kmp.Finalizers = []string{OtherFinalizer}
+									Expect(k8sClient.Update(ctx, kmp)).To(Succeed())
+
+									reconciler = newReconcilerWithStaleRead(s3Client, ec2Client)
+								})
+
+								It("returns a conflict and does not add the other finalizer back", func() {
+									Expect(k8serrors.IsConflict(reconcileErr)).To(BeTrue(), "expected a conflict, got %v", reconcileErr)
+
+									actual := &karpenterinfra.KarpenterMachinePool{}
+									Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: KarpenterMachinePoolName}, actual)).To(Succeed())
+									Expect(actual.Finalizers).To(BeEmpty())
 								})
 							})
 							When("the S3 API returns an error", func() {

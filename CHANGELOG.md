@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Use optimistic locking when adding or removing the KarpenterMachinePool finalizer, so a patch built from an outdated object fails with a conflict instead of overwriting other controllers' finalizers.
+- Skip the finalizer patch when the finalizer is already added or removed, so reconciliations no longer fail with a conflict on every outdated read.
+
 ## [0.30.0] - 2026-11-10
 
 ### Changed

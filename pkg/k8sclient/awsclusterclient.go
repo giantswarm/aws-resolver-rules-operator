@@ -56,14 +56,22 @@ func (a *AWSClusterClient) GetOwner(ctx context.Context, awsCluster *capa.AWSClu
 
 func (a *AWSClusterClient) AddFinalizer(ctx context.Context, awsCluster *capa.AWSCluster, finalizer string) error {
 	originalCluster := awsCluster.DeepCopy()
-	controllerutil.AddFinalizer(awsCluster, finalizer)
-	return a.client.Patch(ctx, awsCluster, client.MergeFromWithOptions(originalCluster, client.MergeFromWithOptimisticLock{}))
+	updated := controllerutil.AddFinalizer(awsCluster, finalizer)
+	if updated {
+		return a.client.Patch(ctx, awsCluster, client.MergeFromWithOptions(originalCluster, client.MergeFromWithOptimisticLock{}))
+	}
+
+	return nil
 }
 
 func (a *AWSClusterClient) RemoveFinalizer(ctx context.Context, awsCluster *capa.AWSCluster, finalizer string) error {
 	originalCluster := awsCluster.DeepCopy()
-	controllerutil.RemoveFinalizer(awsCluster, finalizer)
-	return a.client.Patch(ctx, awsCluster, client.MergeFromWithOptions(originalCluster, client.MergeFromWithOptimisticLock{}))
+	updated := controllerutil.RemoveFinalizer(awsCluster, finalizer)
+	if updated {
+		return a.client.Patch(ctx, awsCluster, client.MergeFromWithOptions(originalCluster, client.MergeFromWithOptimisticLock{}))
+	}
+
+	return nil
 }
 
 func (a *AWSClusterClient) GetIdentity(ctx context.Context, awsCluster *capa.AWSCluster) (*capa.AWSClusterRoleIdentity, error) {

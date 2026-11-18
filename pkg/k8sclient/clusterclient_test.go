@@ -388,6 +388,22 @@ var _ = Describe("ClusterClient", func() {
 			})
 		})
 
+		When("the finalizer was already removed and the cluster was changed after it was read", func() {
+			BeforeEach(func() {
+				Expect(clusterClient.RemoveAWSClusterFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)).To(Succeed())
+
+				latest := &capa.AWSCluster{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: awsCluster.Name, Namespace: awsCluster.Namespace}, latest)).To(Succeed())
+				latest.Labels = map[string]string{"test": "changed"}
+				Expect(k8sClient.Update(ctx, latest)).To(Succeed())
+			})
+
+			It("does not patch the cluster", func() {
+				err := clusterClient.RemoveAWSClusterFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
 		When("another controller removed its finalizer after the cluster was read", func() {
 			const otherFinalizer = "other-operator.finalizers.giantswarm.io/test"
 
@@ -420,6 +436,7 @@ var _ = Describe("ClusterClient", func() {
 						Namespace: namespace,
 						// Not read from the API, so it needs a resource version for the optimistic lock.
 						ResourceVersion: "1",
+						Finalizers:      []string{controllers.ResolverRulesFinalizer},
 					},
 				}
 				err := clusterClient.RemoveAWSClusterFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
@@ -447,8 +464,9 @@ var _ = Describe("ClusterClient", func() {
 		BeforeEach(func() {
 			cluster = &clusterv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-cluster2",
-					Namespace: namespace,
+					Name:       "test-cluster2",
+					Namespace:  namespace,
+					Finalizers: []string{controllers.RouteFinalizer},
 				},
 				Spec: clusterv1.ClusterSpec{
 					InfrastructureRef: clusterv1.ContractVersionedObjectReference{
@@ -492,6 +510,7 @@ var _ = Describe("ClusterClient", func() {
 						Namespace: namespace,
 						// Not read from the API, so it needs a resource version for the optimistic lock.
 						ResourceVersion: "1",
+						Finalizers:      []string{controllers.RouteFinalizer},
 					},
 					Spec: clusterv1.ClusterSpec{
 						InfrastructureRef: clusterv1.ContractVersionedObjectReference{

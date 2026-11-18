@@ -279,6 +279,22 @@ var _ = Describe("AWSClusterClient", func() {
 			})
 		})
 
+		When("the finalizer already exists and the cluster was changed after it was read", func() {
+			BeforeEach(func() {
+				Expect(awsClusterClient.AddFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)).To(Succeed())
+
+				latest := &capa.AWSCluster{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: awsCluster.Name, Namespace: awsCluster.Namespace}, latest)).To(Succeed())
+				latest.Labels = map[string]string{"test": "changed"}
+				Expect(k8sClient.Update(ctx, latest)).To(Succeed())
+			})
+
+			It("does not patch the cluster", func() {
+				err := awsClusterClient.AddFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
 		When("the cluster does not exist", func() {
 			It("returns an error", func() {
 				awsCluster = &capa.AWSCluster{
@@ -347,6 +363,22 @@ var _ = Describe("AWSClusterClient", func() {
 			})
 		})
 
+		When("the finalizer was already removed and the cluster was changed after it was read", func() {
+			BeforeEach(func() {
+				Expect(awsClusterClient.RemoveFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)).To(Succeed())
+
+				latest := &capa.AWSCluster{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: awsCluster.Name, Namespace: awsCluster.Namespace}, latest)).To(Succeed())
+				latest.Labels = map[string]string{"test": "changed"}
+				Expect(k8sClient.Update(ctx, latest)).To(Succeed())
+			})
+
+			It("does not patch the cluster", func() {
+				err := awsClusterClient.RemoveFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
 		When("another controller removed its finalizer after the cluster was read", func() {
 			const otherFinalizer = "other-operator.finalizers.giantswarm.io/test"
 
@@ -379,6 +411,7 @@ var _ = Describe("AWSClusterClient", func() {
 						Namespace: namespace,
 						// Not read from the API, so it needs a resource version for the optimistic lock.
 						ResourceVersion: "1",
+						Finalizers:      []string{controllers.ResolverRulesFinalizer},
 					},
 				}
 				err := awsClusterClient.RemoveFinalizer(ctx, awsCluster, controllers.ResolverRulesFinalizer)

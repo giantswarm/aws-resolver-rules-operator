@@ -86,20 +86,32 @@ func (a *ClusterClient) AddClusterFinalizer(ctx context.Context, cluster *cluste
 
 func (a *ClusterClient) RemoveAWSClusterFinalizer(ctx context.Context, awsCluster *capa.AWSCluster, finalizer string) error {
 	originalCluster := awsCluster.DeepCopy()
-	controllerutil.RemoveFinalizer(awsCluster, finalizer)
-	return a.client.Patch(ctx, awsCluster, client.MergeFromWithOptions(originalCluster, client.MergeFromWithOptimisticLock{}))
+	updated := controllerutil.RemoveFinalizer(awsCluster, finalizer)
+	if updated {
+		return a.client.Patch(ctx, awsCluster, client.MergeFromWithOptions(originalCluster, client.MergeFromWithOptimisticLock{}))
+	}
+
+	return nil
 }
 
 func (a *ClusterClient) RemoveAWSManagedControlPlaneFinalizer(ctx context.Context, awsManagedControlPlane *eks.AWSManagedControlPlane, finalizer string) error {
 	originalCluster := awsManagedControlPlane.DeepCopy()
-	controllerutil.RemoveFinalizer(awsManagedControlPlane, finalizer)
-	return a.client.Patch(ctx, awsManagedControlPlane, client.MergeFromWithOptions(originalCluster, client.MergeFromWithOptimisticLock{}))
+	updated := controllerutil.RemoveFinalizer(awsManagedControlPlane, finalizer)
+	if updated {
+		return a.client.Patch(ctx, awsManagedControlPlane, client.MergeFromWithOptions(originalCluster, client.MergeFromWithOptimisticLock{}))
+	}
+
+	return nil
 }
 
 func (a *ClusterClient) RemoveClusterFinalizer(ctx context.Context, cluster *clusterv1.Cluster, finalizer string) error {
 	originalCluster := cluster.DeepCopy()
-	controllerutil.RemoveFinalizer(cluster, finalizer)
-	return a.client.Patch(ctx, cluster, client.MergeFromWithOptions(originalCluster, client.MergeFromWithOptimisticLock{}))
+	updated := controllerutil.RemoveFinalizer(cluster, finalizer)
+	if updated {
+		return a.client.Patch(ctx, cluster, client.MergeFromWithOptions(originalCluster, client.MergeFromWithOptimisticLock{}))
+	}
+
+	return nil
 }
 
 func (a *ClusterClient) GetIdentity(ctx context.Context, identityRef *capa.AWSIdentityReference) (*capa.AWSClusterRoleIdentity, error) {
