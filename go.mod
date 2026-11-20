@@ -4,14 +4,14 @@ go 1.26.6
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.48.0
-	github.com/aws/aws-sdk-go-v2/config v1.33.20
-	github.com/aws/aws-sdk-go-v2/credentials v1.21.2
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.349.0
+	github.com/aws/aws-sdk-go-v2/config v1.33.21
+	github.com/aws/aws-sdk-go-v2/credentials v1.21.3
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.350.0
 	github.com/aws/aws-sdk-go-v2/service/ram v1.46.1
-	github.com/aws/aws-sdk-go-v2/service/route53 v1.71.0
-	github.com/aws/aws-sdk-go-v2/service/route53resolver v1.54.12
+	github.com/aws/aws-sdk-go-v2/service/route53 v1.73.0
+	github.com/aws/aws-sdk-go-v2/service/route53resolver v1.55.0
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.116.0
-	github.com/aws/aws-sdk-go-v2/service/sts v1.52.0
+	github.com/aws/aws-sdk-go-v2/service/sts v1.53.0
 	github.com/aws/karpenter-provider-aws v1.14.1
 	github.com/aws/smithy-go v1.28.9
 	github.com/aws/smithy-go/metrics/smithyotelmetrics v1.0.37
