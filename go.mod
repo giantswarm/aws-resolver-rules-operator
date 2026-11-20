@@ -12,7 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/route53resolver v1.54.12
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.116.0
 	github.com/aws/aws-sdk-go-v2/service/sts v1.52.0
-	github.com/aws/karpenter-provider-aws v1.14.1
+	github.com/aws/karpenter-provider-aws v1.15.3
 	github.com/aws/smithy-go v1.28.9
 	github.com/aws/smithy-go/metrics/smithyotelmetrics v1.0.37
 	github.com/blang/semver/v4 v4.0.0
