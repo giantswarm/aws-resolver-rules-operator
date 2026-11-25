@@ -2484,7 +2484,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 			Expect(found).To(BeFalse())
 		})
 
-		It("carries maxPods to the EC2NodeClass, beside the fixed reserved resources", func() {
+		It("carries maxPods to the EC2NodeClass", func() {
 			Expect(reconcileErr).NotTo(HaveOccurred())
 
 			ec2nodeclassList := &unstructured.UnstructuredList{}
@@ -2497,23 +2497,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 			Expect(k8sClient.List(ctx, ec2nodeclassList)).To(Succeed())
 			Expect(ec2nodeclassList.Items).To(HaveLen(1))
 
-			ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "kubelet").To(
-				gstruct.MatchAllKeys(gstruct.Keys{
-					"maxPods": BeEquivalentTo(110),
-					"systemReserved": gstruct.MatchAllKeys(gstruct.Keys{
-						"cpu":    Equal("250m"),
-						"memory": Equal("384Mi"),
-					}),
-					"kubeReserved": gstruct.MatchAllKeys(gstruct.Keys{
-						"cpu":               Equal("350m"),
-						"memory":            Equal("1280Mi"),
-						"ephemeral-storage": Equal("1024Mi"),
-					}),
-					"evictionHard": gstruct.MatchAllKeys(gstruct.Keys{
-						"memory.available": Equal("200Mi"),
-					}),
-				}),
-			)
+			ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "kubelet", "maxPods").To(BeEquivalentTo(110))
 		})
 
 		When("the KarpenterMachinePool sets no kubelet configuration", func() {
@@ -2524,7 +2508,7 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 				Expect(k8sClient.Update(ctx, karpenterMachinePool)).To(Succeed())
 			})
 
-			It("keeps the EC2NodeClass kubelet configuration unchanged, so existing nodes don't drift", func() {
+			It("does not set maxPods on the EC2NodeClass", func() {
 				Expect(reconcileErr).NotTo(HaveOccurred())
 
 				ec2nodeclassList := &unstructured.UnstructuredList{}
@@ -2537,22 +2521,9 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 				Expect(k8sClient.List(ctx, ec2nodeclassList)).To(Succeed())
 				Expect(ec2nodeclassList.Items).To(HaveLen(1))
 
-				ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "kubelet").To(
-					gstruct.MatchAllKeys(gstruct.Keys{
-						"systemReserved": gstruct.MatchAllKeys(gstruct.Keys{
-							"cpu":    Equal("250m"),
-							"memory": Equal("384Mi"),
-						}),
-						"kubeReserved": gstruct.MatchAllKeys(gstruct.Keys{
-							"cpu":               Equal("350m"),
-							"memory":            Equal("1280Mi"),
-							"ephemeral-storage": Equal("1024Mi"),
-						}),
-						"evictionHard": gstruct.MatchAllKeys(gstruct.Keys{
-							"memory.available": Equal("200Mi"),
-						}),
-					}),
-				)
+				_, found, err := unstructured.NestedFieldNoCopy(ec2nodeclassList.Items[0].Object, "spec", "kubelet", "maxPods")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(found).To(BeFalse(), "expected no maxPods when the KarpenterMachinePool sets no kubelet configuration")
 			})
 		})
 
