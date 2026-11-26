@@ -261,7 +261,7 @@ func (r *KarpenterMachinePoolReconciler) Reconcile(ctx context.Context, req reco
 	conditions.MarkVersionSkewPolicySatisfied(karpenterMachinePool)
 
 	// Create or update Karpenter custom resources in the workload cluster.
-	if err := r.createOrUpdateKarpenterResources(ctx, logger, cluster, karpenterMachinePool, machinePool, additionalTags, amiFamily, userData); err != nil {
+	if err := r.createOrUpdateKarpenterResources(ctx, logger, cluster, karpenterMachinePool, machinePool, additionalTags, amiFamily, userData, isEKS); err != nil {
 		logger.Error(err, "failed to create or update Karpenter custom resources in the workload cluster")
 		conditions.MarkKarpenterMachinePoolNotReady(karpenterMachinePool, conditions.NotReadyReason, fmt.Sprintf("Failed to create or update Karpenter resources: %v", err))
 		karpenterMachinePool.Status.Ready = false
@@ -558,14 +558,14 @@ func (r *KarpenterMachinePoolReconciler) getControlPlaneVersion(ctx context.Cont
 }
 
 // createOrUpdateKarpenterResources creates or updates the Karpenter NodePool and EC2NodeClass custom resources in the workload cluster.
-func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx context.Context, logger logr.Logger, cluster *clusterv1.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, machinePool *clusterv1.MachinePool, additionalTags capa.Tags, amiFamily, userData *string) error {
+func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx context.Context, logger logr.Logger, cluster *clusterv1.Cluster, karpenterMachinePool *v1alpha1.KarpenterMachinePool, machinePool *clusterv1.MachinePool, additionalTags capa.Tags, amiFamily, userData *string, isEKS bool) error {
 	workloadClusterClient, err := r.clusterClientGetter(ctx, "", r.client, client.ObjectKeyFromObject(cluster))
 	if err != nil {
 		return fmt.Errorf("failed to get workload cluster client: %w", err)
 	}
 
 	// Create or update EC2NodeClass
-	if err := r.createOrUpdateEC2NodeClass(ctx, logger, workloadClusterClient, karpenterMachinePool, additionalTags, amiFamily, userData); err != nil {
+	if err := r.createOrUpdateEC2NodeClass(ctx, logger, workloadClusterClient, karpenterMachinePool, additionalTags, amiFamily, userData, isEKS); err != nil {
 		conditions.MarkEC2NodeClassNotCreated(karpenterMachinePool, conditions.EC2NodeClassCreationFailedReason, fmt.Sprintf("%v", err))
 		return fmt.Errorf("failed to create or update EC2NodeClass: %w", err)
 	}
@@ -584,7 +584,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateKarpenterResources(ctx co
 // createOrUpdateEC2NodeClass creates or updates the EC2NodeClass resource in the workload cluster
 // EC2NodeClass defines the EC2-specific configuration for nodes that Karpenter will provision,
 // including AMI selection, instance profiles, security groups, and user data.
-func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, karpenterMachinePool *v1alpha1.KarpenterMachinePool, additionalTags capa.Tags, amiFamily, userData *string) error {
+func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.Context, logger logr.Logger, workloadClusterClient client.Client, karpenterMachinePool *v1alpha1.KarpenterMachinePool, additionalTags capa.Tags, amiFamily, userData *string, isEKS bool) error {
 	ec2NodeClass := &karpawsv1.EC2NodeClass{}
 	ec2NodeClass.SetName(karpenterMachinePool.Name)
 	ec2NodeClass.SetNamespace("")
@@ -602,20 +602,7 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 			SubnetSelectorTerms:        toKarpenterSubnetSelectorTerms(karpenterMachinePool.Spec.EC2NodeClass.SubnetSelectorTerms),
 			UserData:                   userData,
 			Tags:                       mergeMaps(additionalTags, karpenterMachinePool.Spec.EC2NodeClass.Tags),
-			Kubelet: &karpawsv1.KubeletConfiguration{
-				SystemReserved: map[string]string{
-					"cpu":    "250m",
-					"memory": "384Mi",
-				},
-				KubeReserved: map[string]string{
-					"cpu":               "350m",
-					"memory":            "1280Mi",
-					"ephemeral-storage": "1024Mi",
-				},
-				EvictionHard: map[string]string{
-					"memory.available": "200Mi",
-				},
-			},
+			Kubelet:                    ec2NodeClassKubelet(karpenterMachinePool.Spec.EC2NodeClass.Kubelet, isEKS),
 		}
 
 		ec2NodeClass.Spec = spec
@@ -634,6 +621,34 @@ func (r *KarpenterMachinePoolReconciler) createOrUpdateEC2NodeClass(ctx context.
 	}
 
 	return nil
+}
+
+// ec2NodeClassKubelet returns the kubelet configuration of the EC2NodeClass: fixed reserved
+// resources and eviction thresholds, plus the KarpenterMachinePool's maxPods on EKS clusters.
+//
+// On EKS, Karpenter renders the nodeadm userdata itself, so the EC2NodeClass is the only place to
+// set maxPods. Without it, Karpenter uses the AWS VPC CNI's ENI formula, which doesn't match
+// Cilium's ENI IPAM. On CAPA, the node userdata sets maxPods, and passing it here too would change
+// every existing EC2NodeClass and make Karpenter replace their nodes as drifted.
+func ec2NodeClassKubelet(kubelet *v1alpha1.KubeletConfiguration, isEKS bool) *karpawsv1.KubeletConfiguration {
+	cfg := &karpawsv1.KubeletConfiguration{
+		SystemReserved: map[string]string{
+			"cpu":    "250m",
+			"memory": "384Mi",
+		},
+		KubeReserved: map[string]string{
+			"cpu":               "350m",
+			"memory":            "1280Mi",
+			"ephemeral-storage": "1024Mi",
+		},
+		EvictionHard: map[string]string{
+			"memory.available": "200Mi",
+		},
+	}
+	if isEKS && kubelet != nil {
+		cfg.MaxPods = kubelet.MaxPods
+	}
+	return cfg
 }
 
 // mergeMaps combines multiple maps, with later maps taking precedence for duplicate keys

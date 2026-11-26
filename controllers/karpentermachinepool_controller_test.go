@@ -826,6 +826,11 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 							Tags: map[string]string{
 								"one-tag": "only-for-karpenter",
 							},
+							// cluster-aws sets maxPods in the node userdata and here; the EC2NodeClass
+							// must not get it, or Karpenter replaces every existing node as drifted
+							Kubelet: &karpenterinfra.KubeletConfiguration{
+								MaxPods: ptr.To(int32(110)),
+							},
 						},
 						NodePool: &karpenterinfra.NodePoolSpec{
 							Template: karpenterinfra.NodeClaimTemplate{
@@ -2406,6 +2411,9 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 						SubnetSelectorTerms: []karpenterinfra.SubnetSelectorTerm{
 							{Tags: map[string]string{"karpenter.sh/discovery": ClusterName}},
 						},
+						Kubelet: &karpenterinfra.KubeletConfiguration{
+							MaxPods: ptr.To(int32(110)),
+						},
 					},
 					NodePool: &karpenterinfra.NodePoolSpec{
 						Template: karpenterinfra.NodeClaimTemplate{
@@ -2474,6 +2482,49 @@ var _ = Describe("KarpenterMachinePool reconciler", func() {
 			_, found, err := unstructured.NestedString(ec2nodeclassList.Items[0].Object, "spec", "userData")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(found).To(BeFalse())
+		})
+
+		It("carries maxPods to the EC2NodeClass", func() {
+			Expect(reconcileErr).NotTo(HaveOccurred())
+
+			ec2nodeclassList := &unstructured.UnstructuredList{}
+			ec2nodeclassList.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   controllers.EC2NodeClassAPIGroup,
+				Kind:    "EC2NodeClassList",
+				Version: "v1",
+			})
+
+			Expect(k8sClient.List(ctx, ec2nodeclassList)).To(Succeed())
+			Expect(ec2nodeclassList.Items).To(HaveLen(1))
+
+			ExpectUnstructured(ec2nodeclassList.Items[0], "spec", "kubelet", "maxPods").To(BeEquivalentTo(110))
+		})
+
+		When("the KarpenterMachinePool sets no kubelet configuration", func() {
+			BeforeEach(func() {
+				karpenterMachinePool := &karpenterinfra.KarpenterMachinePool{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: KarpenterMachinePoolName}, karpenterMachinePool)).To(Succeed())
+				karpenterMachinePool.Spec.EC2NodeClass.Kubelet = nil
+				Expect(k8sClient.Update(ctx, karpenterMachinePool)).To(Succeed())
+			})
+
+			It("does not set maxPods on the EC2NodeClass", func() {
+				Expect(reconcileErr).NotTo(HaveOccurred())
+
+				ec2nodeclassList := &unstructured.UnstructuredList{}
+				ec2nodeclassList.SetGroupVersionKind(schema.GroupVersionKind{
+					Group:   controllers.EC2NodeClassAPIGroup,
+					Kind:    "EC2NodeClassList",
+					Version: "v1",
+				})
+
+				Expect(k8sClient.List(ctx, ec2nodeclassList)).To(Succeed())
+				Expect(ec2nodeclassList.Items).To(HaveLen(1))
+
+				_, found, err := unstructured.NestedFieldNoCopy(ec2nodeclassList.Items[0].Object, "spec", "kubelet", "maxPods")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(found).To(BeFalse(), "expected no maxPods when the KarpenterMachinePool sets no kubelet configuration")
+			})
 		})
 
 		It("does not write any bootstrap data to S3", func() {

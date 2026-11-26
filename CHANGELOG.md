@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Carry `maxPods` from the KarpenterMachinePool's `ec2NodeClass.kubelet` to the EC2NodeClass of EKS clusters. Karpenter renders the node userdata there, so the setting was lost and nodes got the AWS VPC CNI's ENI-based limit instead. Only `maxPods` is carried, and only on EKS: an EKS node pool that sets it gets its nodes replaced once as drifted, the EC2NodeClasses of other EKS node pools and of CAPA clusters stay unchanged. CAPA userdata already sets `maxPods`.
+
 ## [0.30.1] - 2026-11-18
 
 ### Fixed
